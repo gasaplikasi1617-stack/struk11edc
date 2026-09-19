@@ -125,51 +125,156 @@ async function callGasGet(url: string, params: Record<string, string> = {}): Pro
   }
 }
 
-// Two-way merge helper without duplicates
-function mergeTransactions(localList: any[], sheetList: any[]) {
-  const getSig = (t: any) => {
-    if (t.id && String(t.id).trim().length > 3) return String(t.id).trim();
-    return `${t.idpel || ""}|${t.bulanTagihan || ""}|${Number(t.totalBayar) || 0}|${t.tanggal || ""}`.toLowerCase();
-  };
+// Anti-duplicate normalization helpers
+function cleanStr(str: any): string {
+  if (!str) return "";
+  return String(str).trim().toLowerCase().replace(/\s+/g, " ");
+}
 
-  const localMap = new Map<string, any>();
-  const localSigs = new Set<string>();
+function cleanPeriod(str: any): string {
+  if (!str) return "";
+  return String(str).toLowerCase().replace(/[\s\-_/.,]/g, "");
+}
 
-  for (const t of localList) {
-    if (t.id) localMap.set(String(t.id), t);
-    localSigs.add(getSig(t));
+function cleanDate(str: any): string {
+  if (!str) return "";
+  return String(str).trim().toLowerCase().replace(/[-.]/g, "/");
+}
+
+function findDuplicateTransaction(incoming: any, existingList: any[]): { isDuplicate: boolean; reason?: string; matched?: any } {
+  if (!incoming || !Array.isArray(existingList) || existingList.length === 0) {
+    return { isDuplicate: false };
   }
 
-  const sheetSigs = new Set<string>();
+  const incId = incoming.id ? String(incoming.id).trim() : "";
+  const incIdpel = cleanStr(incoming.idpel);
+  const incBulan = cleanPeriod(incoming.bulanTagihan);
+  const incTotal = Number(incoming.totalBayar || 0);
+  const incTanggal = cleanDate(incoming.tanggal);
+  const incNama = cleanStr(incoming.namaPelanggan);
+  const incRincian = cleanStr(incoming.rincianTagihan);
+
+  for (const ex of existingList) {
+    // 1. Direct ID match
+    if (incId && ex.id && String(ex.id).trim() === incId) {
+      return {
+        isDuplicate: true,
+        reason: `ID Transaksi '${incId}' sudah terdaftar di riwayat.`,
+        matched: ex,
+      };
+    }
+
+    const exIdpel = cleanStr(ex.idpel);
+    const exBulan = cleanPeriod(ex.bulanTagihan);
+    const exTotal = Number(ex.totalBayar || 0);
+    const exTanggal = cleanDate(ex.tanggal);
+    const exNama = cleanStr(ex.namaPelanggan);
+    const exRincian = cleanStr(ex.rincianTagihan);
+
+    // 2. Match by IDPEL (if valid IDPEL is present)
+    const hasValidIdpel = incIdpel && incIdpel !== "-" && incIdpel.length >= 4;
+    if (hasValidIdpel && incIdpel === exIdpel) {
+      // 2a. Same Period
+      const hasValidPeriod = incBulan && incBulan !== "-" && incBulan.length >= 3;
+      if (hasValidPeriod && exBulan && incBulan === exBulan) {
+        return {
+          isDuplicate: true,
+          reason: `ID Pelanggan ${incoming.idpel} dengan Periode Tagihan ${incoming.bulanTagihan || "-"} sudah pernah tersimpan di riwayat.`,
+          matched: ex,
+        };
+      }
+
+      // 2b. Same Total + Same Date
+      if (incTotal > 0 && incTotal === exTotal && incTanggal && exTanggal && incTanggal === exTanggal) {
+        return {
+          isDuplicate: true,
+          reason: `ID Pelanggan ${incoming.idpel} dengan Total Rp ${incTotal.toLocaleString("id-ID")} pada tanggal ${incoming.tanggal} sudah pernah tersimpan di riwayat.`,
+          matched: ex,
+        };
+      }
+
+      // 2c. Same Total + Same Service / Rincian
+      if (incTotal > 0 && incTotal === exTotal && incRincian && exRincian && incRincian === exRincian) {
+        return {
+          isDuplicate: true,
+          reason: `ID Pelanggan ${incoming.idpel} (${incoming.rincianTagihan}) dengan Total Rp ${incTotal.toLocaleString("id-ID")} sudah ada di riwayat.`,
+          matched: ex,
+        };
+      }
+
+      // 2d. Same Total + Same Customer Name
+      if (incTotal > 0 && incTotal === exTotal && incNama && exNama && incNama === exNama) {
+        return {
+          isDuplicate: true,
+          reason: `ID Pelanggan ${incoming.idpel} atas nama ${incoming.namaPelanggan} dengan Total Rp ${incTotal.toLocaleString("id-ID")} sudah ada di riwayat.`,
+          matched: ex,
+        };
+      }
+    }
+
+    // 3. Fallback without IDPEL: Match Customer Name + Date + Total
+    const hasValidNama = incNama && incNama !== "-" && incNama.length >= 3;
+    if (hasValidNama && incNama === exNama && incTotal > 0 && incTotal === exTotal) {
+      if (incTanggal && exTanggal && incTanggal === exTanggal) {
+        return {
+          isDuplicate: true,
+          reason: `Pelanggan atas nama ${incoming.namaPelanggan} dengan Total Rp ${incTotal.toLocaleString("id-ID")} pada tanggal ${incoming.tanggal} sudah ada di riwayat.`,
+          matched: ex,
+        };
+      }
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
+function deduplicateList(list: any[]): { cleaned: any[]; removedCount: number } {
+  if (!Array.isArray(list)) return { cleaned: [], removedCount: 0 };
+  const cleaned: any[] = [];
+  let removedCount = 0;
+  for (const item of list) {
+    const check = findDuplicateTransaction(item, cleaned);
+    if (check.isDuplicate) {
+      removedCount++;
+    } else {
+      cleaned.push(item);
+    }
+  }
+  return { cleaned, removedCount };
+}
+
+// Two-way merge helper without duplicates
+function mergeTransactions(localList: any[], sheetList: any[]) {
+  const localDedupe = deduplicateList(localList).cleaned;
+  const sheetDedupe = deduplicateList(sheetList).cleaned;
+
+  const merged: any[] = [...localDedupe];
   const newFromSheet: any[] = [];
 
-  for (const s of sheetList) {
-    const sig = getSig(s);
-    sheetSigs.add(sig);
-    if ((s.id && localMap.has(String(s.id))) || localSigs.has(sig)) {
-      continue;
+  for (const s of sheetDedupe) {
+    const dupCheck = findDuplicateTransaction(s, merged);
+    if (!dupCheck.isDuplicate) {
+      merged.push(s);
+      newFromSheet.push(s);
     }
-    newFromSheet.push(s);
-    localSigs.add(sig);
   }
 
   const newFromLocal: any[] = [];
-  for (const l of localList) {
-    const sig = getSig(l);
-    if (!sheetSigs.has(sig)) {
+  for (const l of localDedupe) {
+    const dupCheck = findDuplicateTransaction(l, sheetDedupe);
+    if (!dupCheck.isDuplicate) {
       newFromLocal.push(l);
     }
   }
 
-  const combined = [...newFromSheet, ...localList];
-  combined.sort((a, b) => {
+  merged.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id && a.id.startsWith("TX-") ? Number(a.id.replace("TX-", "")) : 0);
     const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id && b.id.startsWith("TX-") ? Number(b.id.replace("TX-", "")) : 0);
     return timeB - timeA;
   });
 
   return {
-    merged: combined.slice(0, 100),
+    merged: merged.slice(0, 100),
     newFromSheet,
     newFromLocal,
   };
@@ -179,7 +284,14 @@ function getTransactions(): any[] {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(data);
+      const list = JSON.parse(data);
+      if (Array.isArray(list)) {
+        const { cleaned, removedCount } = deduplicateList(list);
+        if (removedCount > 0) {
+          saveTransactions(cleaned);
+        }
+        return cleaned;
+      }
     }
   } catch (e) {
     console.error("Error reading transactions:", e);
@@ -189,7 +301,8 @@ function getTransactions(): any[] {
 
 function saveTransactions(txs: any[]) {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(txs, null, 2), "utf-8");
+    const { cleaned } = deduplicateList(txs);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(cleaned, null, 2), "utf-8");
   } catch (e) {
     console.error("Error saving transactions:", e);
   }
@@ -206,33 +319,37 @@ app.get("/api/transactions", (req, res) => {
   res.json(txs.slice(0, 100));
 });
 
-// Save a new transaction
+// Save a new transaction with strict anti-duplicate guarantee
 app.post("/api/transactions", (req, res) => {
   const txs = getTransactions();
   const incoming = req.body;
+  const force = Boolean(incoming.force);
 
-  // Anti-duplicate check: if same idpel & totalBayar created within last 60 seconds, skip duplicate
-  const now = Date.now();
-  const duplicate = txs.find((t: any) => {
-    const isSameIdpel = t.idpel === incoming.idpel;
-    const isSameTotal = Number(t.totalBayar) === Number(incoming.totalBayar);
-    const timeDiff = incoming.createdAt ? Math.abs(new Date(incoming.createdAt).getTime() - new Date(t.createdAt || 0).getTime()) : 0;
-    return isSameIdpel && isSameTotal && timeDiff < 60000;
-  });
-
-  if (duplicate) {
-    return res.json({ success: true, transaction: duplicate, note: "Anti-duplicate prevented" });
+  if (!force) {
+    const dupCheck = findDuplicateTransaction(incoming, txs);
+    if (dupCheck.isDuplicate) {
+      return res.status(200).json({
+        success: false,
+        isDuplicate: true,
+        message: "Data transaksi ini sudah pernah tersimpan di riwayat!",
+        reason: dupCheck.reason,
+        transaction: dupCheck.matched,
+      });
+    }
   }
 
+  const now = Date.now();
   const newTx = {
     id: incoming.id || ("TX-" + now),
     createdAt: incoming.createdAt || new Date().toISOString(),
     ...incoming,
   };
+  delete newTx.force;
+
   txs.unshift(newTx); // Add to beginning
-  // Keep last 100 max
-  if (txs.length > 100) txs.splice(100);
-  saveTransactions(txs);
+  const { cleaned } = deduplicateList(txs);
+  if (cleaned.length > 100) cleaned.splice(100);
+  saveTransactions(cleaned);
 
   // Auto-sync to Google Apps Script if enabled and configured
   const gasCfg = getGasConfig();
@@ -243,6 +360,21 @@ app.post("/api/transactions", (req, res) => {
   }
 
   res.json({ success: true, transaction: newTx });
+});
+
+// Endpoint to deduplicate all transactions
+app.post("/api/transactions/deduplicate", (req, res) => {
+  const txs = getTransactions();
+  const { cleaned, removedCount } = deduplicateList(txs);
+  saveTransactions(cleaned);
+  res.json({
+    success: true,
+    removedCount,
+    remainingCount: cleaned.length,
+    message: removedCount > 0
+      ? `Berhasil membersihkan ${removedCount} data transaksi duplikat!`
+      : "Data riwayat sudah bersih, tidak ditemukan data duplikat.",
+  });
 });
 
 // Delete a transaction

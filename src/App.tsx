@@ -5,6 +5,8 @@ import { ReceiptForm } from './components/ReceiptForm';
 import { ReceiptPreview } from './components/ReceiptPreview';
 import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
+import { DuplicateWarningModal } from './components/DuplicateWarningModal';
+import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'gas'>('create');
@@ -35,6 +37,18 @@ export default function App() {
   const [savedStatus, setSavedStatus] = useState(false);
   const [resetTrigger, setResetTrigger] = useState(0);
 
+  // Duplicate Warning State
+  const [duplicateModal, setDuplicateModal] = useState<{
+    isOpen: boolean;
+    reason: string;
+    incoming: Partial<ReceiptData>;
+    matched?: ReceiptData;
+  }>({
+    isOpen: false,
+    reason: '',
+    incoming: {},
+  });
+
   // Fetch transactions on mount
   useEffect(() => {
     fetchTransactions();
@@ -47,7 +61,8 @@ export default function App() {
       if (contentType && contentType.includes("application/json")) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setTransactions(data);
+          const { cleaned } = deduplicateTransactionList(data);
+          setTransactions(cleaned);
           return;
         }
       }
@@ -58,18 +73,20 @@ export default function App() {
     try {
       const local = localStorage.getItem('agent_batara_txs');
       if (local) {
-        setTransactions(JSON.parse(local));
+        const parsed = JSON.parse(local);
+        const { cleaned } = deduplicateTransactionList(parsed);
+        setTransactions(cleaned);
       }
     } catch (err) {}
   };
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveTransaction = async () => {
+  const handleSaveTransaction = async (force: boolean = false) => {
     if (isSaving) return;
     setIsSaving(true);
 
-    const payload = {
+    const payload: ReceiptData = {
       id: "TX-" + Date.now(),
       createdAt: new Date().toISOString(),
       ...receipt,
@@ -78,31 +95,40 @@ export default function App() {
       noHp: agentConfig.noHp,
     };
 
-    // Client-side anti-duplicate check within last 60 seconds
-    const recentDuplicate = transactions.find((t) => {
-      const isSameIdpel = t.idpel === payload.idpel;
-      const isSameTotal = Number(t.totalBayar) === Number(payload.totalBayar);
-      const timeDiff = Math.abs(new Date(payload.createdAt).getTime() - new Date(t.createdAt || 0).getTime());
-      return isSameIdpel && isSameTotal && timeDiff < 60000;
-    });
-
-    if (recentDuplicate) {
-      setIsSaving(false);
-      setSavedStatus(true);
-      setResetTrigger(prev => prev + 1);
-      setTimeout(() => setSavedStatus(false), 3000);
-      return;
+    // 1. Strict Anti-Duplicate Check
+    if (!force) {
+      const dupResult = checkDuplicateTransaction(payload, transactions);
+      if (dupResult.isDuplicate) {
+        setIsSaving(false);
+        setDuplicateModal({
+          isOpen: true,
+          reason: dupResult.reason || 'Data transaksi ini sudah pernah tersimpan di riwayat.',
+          incoming: payload,
+          matched: dupResult.matchedTransaction,
+        });
+        return;
+      }
     }
 
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, force }),
       });
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const data = await res.json();
+        if (data.isDuplicate && !force) {
+          setIsSaving(false);
+          setDuplicateModal({
+            isOpen: true,
+            reason: data.reason || data.message || 'Transaksi sudah ada di riwayat.',
+            incoming: payload,
+            matched: data.transaction,
+          });
+          return;
+        }
         if (data.success) {
           setSavedStatus(true);
           fetchTransactions();
@@ -116,11 +142,12 @@ export default function App() {
       console.error('Server save error, falling back to localStorage:', e);
     }
 
-    // LocalStorage fallback
+    // LocalStorage fallback with deduplication
     try {
-      const current = [payload, ...transactions].slice(0, 100);
-      setTransactions(current);
-      localStorage.setItem('agent_batara_txs', JSON.stringify(current));
+      const current = [payload, ...transactions];
+      const { cleaned } = deduplicateTransactionList(current);
+      setTransactions(cleaned.slice(0, 100));
+      localStorage.setItem('agent_batara_txs', JSON.stringify(cleaned.slice(0, 100)));
       setSavedStatus(true);
       setResetTrigger(prev => prev + 1);
       setTimeout(() => setSavedStatus(false), 3000);
@@ -129,8 +156,11 @@ export default function App() {
   };
 
   const handlePrint = () => {
-    // Automatically save upon print/export as requested ("Setiap kali resi dicetak/disimpan, data otomatis tersimpan")
-    handleSaveTransaction();
+    // Check if it's already in history before saving on print
+    const dupResult = checkDuplicateTransaction(receipt, transactions);
+    if (!dupResult.isDuplicate) {
+      handleSaveTransaction(false);
+    }
     window.print();
   };
 
@@ -207,6 +237,16 @@ export default function App() {
           <GasIntegrationTab onSyncSuccess={fetchTransactions} />
         )}
       </main>
+
+      <DuplicateWarningModal
+        isOpen={duplicateModal.isOpen}
+        onClose={() => setDuplicateModal(prev => ({ ...prev, isOpen: false }))}
+        reason={duplicateModal.reason}
+        incoming={duplicateModal.incoming}
+        matched={duplicateModal.matched}
+        onForceSave={() => handleSaveTransaction(true)}
+        onViewHistory={() => setActiveTab('history')}
+      />
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
         <p>Cetak Resi Tagihan — Agen Batara &copy; 2026 | Didukung oleh Google Apps Script & Google Sheets</p>

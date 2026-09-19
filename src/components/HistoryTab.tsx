@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Database,
   Image as ImageIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -101,7 +102,7 @@ export function HistoryTab({
       } else {
         if (data.error && data.error.includes('belum dikonfigurasi')) {
           setExportSuccessNotice(
-            'URL Google Apps Script belum dikonfigurasi. Silakan atur URL di tab "Integrasi & Sinkron GAS".'
+            'URL Google Apps Script belum dikonfigurasi. Silakan atur URL di tab "Integrasi".'
           );
         } else {
           setExportSuccessNotice(`Sinkronisasi gagal: ${data.error || 'Terjadi kesalahan'}`);
@@ -112,6 +113,25 @@ export function HistoryTab({
     } finally {
       setIsSyncingGas(false);
       setTimeout(() => setExportSuccessNotice(null), 6000);
+    }
+  };
+
+  const [isDeduplicating, setIsDeduplicating] = useState(false);
+
+  const handleDeduplicate = async () => {
+    setIsDeduplicating(true);
+    try {
+      const res = await fetch('/api/transactions/deduplicate', { method: 'POST' });
+      const data = await res.json();
+      if (onRefreshTransactions) {
+        await onRefreshTransactions();
+      }
+      setExportSuccessNotice(data.message || 'Pemeriksaan anti-duplikat selesai.');
+    } catch (err: any) {
+      setExportSuccessNotice('Gagal membersihkan duplikat: ' + (err.message || String(err)));
+    } finally {
+      setIsDeduplicating(false);
+      setTimeout(() => setExportSuccessNotice(null), 5000);
     }
   };
 
@@ -295,8 +315,19 @@ export function HistoryTab({
             </p>
           </div>
 
-          {/* Export to Excel & GAS Two-Way Sync Action Buttons */}
+          {/* Export to Excel, Anti-Duplicate & GAS Two-Way Sync Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="btn-deduplicate-history"
+              onClick={handleDeduplicate}
+              disabled={isDeduplicating || transactions.length === 0}
+              className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all"
+              title="Periksa dan pastikan tidak ada data transaksi yang dobel di riwayat"
+            >
+              <ShieldCheck className={`w-4 h-4 ${isDeduplicating ? 'animate-pulse' : ''}`} />
+              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Duplikat'}</span>
+            </button>
+
             <button
               id="btn-gas-sync-history"
               onClick={handleGasSyncClick}

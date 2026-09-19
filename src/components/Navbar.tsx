@@ -61,7 +61,7 @@ export function Navbar({ activeTab, setActiveTab, historyCount }: NavbarProps) {
               }`}
             >
               <RefreshCw className="w-4 h-4" />
-              <span>Integrasi & Sinkron GAS</span>
+              <span>Integrasi</span>
             </button>
           </nav>
         </div>

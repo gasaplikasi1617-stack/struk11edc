@@ -17,17 +17,14 @@ import {
   Zap,
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
+import { DEFAULT_GAS_DATA, GasScriptData } from '../data/gasTemplates';
 
 interface GasIntegrationTabProps {
   onSyncSuccess?: () => void;
 }
 
 export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
-  const [gasData, setGasData] = useState<{
-    codeGs: string;
-    indexHtml: string;
-    instructions: string[];
-  } | null>(null);
+  const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
   const [gasUrl, setGasUrl] = useState('');
   const [autoSync, setAutoSync] = useState(true);
@@ -54,11 +51,18 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   // Load config and code on mount
   useEffect(() => {
-    // 1. Load GAS source code
+    // 1. Load GAS source code from server if updated
     fetch('/api/gas-code')
-      .then((res) => res.json())
-      .then((data) => setGasData(data))
-      .catch((err) => console.error('Failed to load GAS code:', err));
+      .then((res) => {
+        if (!res.ok) throw new Error('Network error');
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.codeGs && data.indexHtml) {
+          setGasData(data);
+        }
+      })
+      .catch((err) => console.log('Using default GAS code:', err.message));
 
     // 2. Load stored GAS config
     fetch('/api/gas/config')

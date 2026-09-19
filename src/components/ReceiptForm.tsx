@@ -343,7 +343,7 @@ export function ReceiptForm({
             ) : (
               <>
                 <Wand2 className="w-4 h-4" />
-                <span>Parse Data Otomatis</span>
+                <span>Input</span>
               </>
             )}
           </button>
@@ -417,9 +417,8 @@ export function ReceiptForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
-              <span>ID Pelanggan (Idpel)</span>
-              <span className="text-[10px] text-blue-600 font-medium">Polis = No. Pel = Idpel</span>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              ID Pelanggan (Idpel)
             </label>
             <input
               type="text"
@@ -529,7 +528,7 @@ export function ReceiptForm({
             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm"
           >
             <CheckCircle className="w-4 h-4" />
-            <span>Simpan ke Database Riwayat</span>
+            <span>Simpan</span>
           </button>
           <button
             type="button"
@@ -538,7 +537,7 @@ export function ReceiptForm({
             title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi"
           >
             <Printer className="w-4 h-4" />
-            <span>Cetak Resi A6 / Export PDF</span>
+            <span>Cetak Resi</span>
             <span className="text-[11px] bg-blue-800/60 px-2 py-0.5 rounded-full font-normal">Auto Save</span>
           </button>
         </div>
