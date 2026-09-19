@@ -54,7 +54,7 @@ app.post("/api/transactions", (req, res) => {
     const isSameIdpel = t.idpel === incoming.idpel;
     const isSameTotal = Number(t.totalBayar) === Number(incoming.totalBayar);
     const timeDiff = incoming.createdAt ? Math.abs(new Date(incoming.createdAt).getTime() - new Date(t.createdAt || 0).getTime()) : 0;
-    return isSameIdpel && isSameTotal && timeDiff < 10000;
+    return isSameIdpel && isSameTotal && timeDiff < 60000;
   });
 
   if (duplicate) {

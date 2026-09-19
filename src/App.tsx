@@ -62,7 +62,12 @@ export default function App() {
     } catch (err) {}
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSaveTransaction = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
     const payload = {
       id: "TX-" + Date.now(),
       createdAt: new Date().toISOString(),
@@ -71,6 +76,21 @@ export default function App() {
       alamat: agentConfig.alamat,
       noHp: agentConfig.noHp,
     };
+
+    // Client-side anti-duplicate check within last 60 seconds
+    const recentDuplicate = transactions.find((t) => {
+      const isSameIdpel = t.idpel === payload.idpel;
+      const isSameTotal = Number(t.totalBayar) === Number(payload.totalBayar);
+      const timeDiff = Math.abs(new Date(payload.createdAt).getTime() - new Date(t.createdAt || 0).getTime());
+      return isSameIdpel && isSameTotal && timeDiff < 60000;
+    });
+
+    if (recentDuplicate) {
+      setIsSaving(false);
+      setSavedStatus(true);
+      setTimeout(() => setSavedStatus(false), 3000);
+      return;
+    }
 
     try {
       const res = await fetch('/api/transactions', {
@@ -85,6 +105,7 @@ export default function App() {
           setSavedStatus(true);
           fetchTransactions();
           setTimeout(() => setSavedStatus(false), 3000);
+          setIsSaving(false);
           return;
         }
       }
@@ -100,6 +121,7 @@ export default function App() {
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 3000);
     } catch (err) {}
+    setIsSaving(false);
   };
 
   const handlePrint = () => {

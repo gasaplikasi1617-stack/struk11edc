@@ -32,31 +32,48 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <style>
           @page {
-            size: A6 portrait;
+            size: 105mm 148mm;
             margin: 0;
           }
-          body {
+          html, body {
+            width: 105mm;
+            height: 148mm;
             margin: 0;
-            padding: 10mm;
+            padding: 0;
             background: white;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            overflow: hidden;
+          }
+          .print-wrapper {
+            width: 105mm;
+            height: 148mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 4mm;
           }
           .receipt-box {
-            width: 100%;
-            max-width: 380px;
-            margin: 0 auto;
+            width: 98mm;
+            max-height: 140mm;
             border: 2px solid #1e293b;
-            padding: 16px;
+            padding: 10px;
             box-sizing: border-box;
             background: #ffffff;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            font-size: 11px;
+            line-height: 1.35;
           }
         </style>
       </head>
       <body>
-        <div class="receipt-box">
-          ${receiptElement.innerHTML}
+        <div class="print-wrapper">
+          <div class="receipt-box">
+            ${receiptElement.innerHTML}
+          </div>
         </div>
         <script>
           window.onload = function() {
@@ -105,7 +122,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
       {/* A6 Receipt Container - styled specifically for A6 portrait look and print */}
       <div
         id="printable-receipt"
-        className="w-full max-w-[380px] bg-white border-2 border-slate-800 p-5 text-slate-900 font-mono text-xs shadow-xl relative my-2"
+        className="w-full max-w-[380px] bg-white p-5 text-slate-900 font-mono text-xs shadow-xl relative my-2"
         style={{ minHeight: '520px' }}
       >
         {/* Header Agen */}
@@ -115,13 +132,15 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           <p className="text-[11px] text-slate-700">Telp/WA: {receipt.noHp || '-'}</p>
           <div className="mt-2 text-[10px] bg-slate-100 py-1 px-2.5 rounded inline-block font-bold uppercase border border-slate-200">
             {(() => {
-              const r = (receipt.rincianTagihan || '').toLowerCase();
-              if (r.includes('pln') || r.includes('listrik')) return 'STRUK PEMBAYARAN LISTRIK PLN';
-              if (r.includes('pdam') || r.includes('air')) return 'STRUK PEMBAYARAN PDAM AIR';
-              if (r.includes('indihome') || r.includes('telkom') || r.includes('internet')) return 'STRUK PEMBAYARAN INDIHOME / TELKOM';
-              if (r.includes('bpjs')) return 'STRUK PEMBAYARAN BPJS KESEHATAN';
+              const text = ((receipt.rincianTagihan || '') + ' ' + (receipt.pemakaian || '') + ' ' + (receipt.idpel || '')).toLowerCase();
+              if (text.includes('pln') || text.includes('listrik') || text.includes('kwh')) return 'STRUK PEMBAYARAN LISTRIK PLN';
+              if (text.includes('pdam') || text.includes('air') || text.includes('m3')) return 'STRUK PEMBAYARAN PDAM AIR';
+              if (text.includes('indihome') || text.includes('telkom') || text.includes('fiber') || text.includes('internet')) return 'STRUK PEMBAYARAN INDIHOME / TELKOM';
+              if (text.includes('bpjs') || text.includes('kesehatan')) return 'STRUK PEMBAYARAN BPJS KESEHATAN';
+              if (text.includes('pbb') || text.includes('pajak')) return 'STRUK PEMBAYARAN PAJAK PBB';
+              if (text.includes('pulsa') || text.includes('token')) return 'STRUK PEMBELIAN PULSA / TOKEN';
               if (receipt.rincianTagihan) return `STRUK PEMBAYARAN ${receipt.rincianTagihan.toUpperCase()}`;
-              return 'STRUK BUKTI PEMBAYARAN RESMI';
+              return 'STRUK PEMBAYARAN RESMI';
             })()}
           </div>
         </div>
@@ -178,9 +197,6 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           <div className="text-[10px] text-slate-600 uppercase font-bold">Total Pembayaran</div>
           <div className="text-base font-extrabold text-blue-900 mt-0.5">
             Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
-          </div>
-          <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center justify-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" /> LUNAS & TERVERIFIKASI
           </div>
         </div>
 
