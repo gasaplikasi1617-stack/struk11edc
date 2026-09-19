@@ -4,7 +4,7 @@ export interface GasScriptData {
   instructions: string[];
 }
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwp7frqV8EM-14lPPeJS59HbkaKUEg_-nj0ksIa4zxNmPzVA2N2FYyZeRXveb1F5Yl6/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzDItaqK1ZwUEJZfXdYwdlB5FG4pL-eONdVxawEBFImbZxd0psRHFKfaF3ZDX7zJFk/exec';
 
 export const DEFAULT_GAS_DATA: GasScriptData = {
   codeGs: `/**

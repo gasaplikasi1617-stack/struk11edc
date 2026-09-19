@@ -1,0 +1,20 @@
+[
+  {
+    "id": "TX-1789857173613",
+    "createdAt": "2026-09-19T22:32:53.613Z",
+    "tanggal": "20/9/2026",
+    "idpel": "541293847210",
+    "namaPelanggan": "BUDI SANTOSO",
+    "pemakaian": "145 kWh",
+    "standMeter": "014230 - 014380",
+    "rincianTagihan": "Tagihan Listrik PLN Pascabayar",
+    "bulanTagihan": "AGUSTUS 2026",
+    "rpTagihan": 150000,
+    "lainLain": 0,
+    "adminBank": 2500,
+    "totalBayar": 152500,
+    "namaAgen": "Agen Batara",
+    "alamat": "Bekasi",
+    "noHp": "081234567890"
+  }
+]
