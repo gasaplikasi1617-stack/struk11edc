@@ -99,12 +99,13 @@ Anda adalah sistem ekstraksi data resi pembayaran tagihan (PLN, PDAM, Indihome, 
 Ekstrak data dari teks mentah berikut ke dalam format JSON murni.
 
 Aturan Ekstraksi Sangat Penting:
-1. "pemakaian":
-   - Jika teks adalah PLN / Listrik / Token: format "pemakaian" HARUS menyertakan daya dengan "VA", contoh: "R1M/900 VA", "R1/450 VA", atau "900 VA". Jangan hanya kWh.
-   - Jika teks adalah PDAM / Air: format "pemakaian" HARUS mengandung "m3" (contoh: "23 m3"). JIKA TIDAK ADA "m3" pada teks PDAM, kosongkan ("").
-   - Untuk layanan lain (Indihome, dll), sesuaikan atau kosongkan jika tidak ada.
-2. "rpTagihan": Isi dengan nominal angka tagihan murni (Rp Tagihan) yang sesuai persis dengan data copy-paste.
-3. "totalBayar": Isi dengan nominal total pembayaran asli dari teks (atau rpTagihan + adminBank).
+1. "bulanTagihan": Ambil nama bulan dan tahun saja (contoh: "SEP26", "AGUSTUS 2026", "08/2026"). JANGAN sertakan kata "Rp" atau angka nominal uang setelahnya.
+2. "pemakaian":
+   - Jika teks adalah PLN / Listrik / Token: format "pemakaian" HARUS menyertakan daya dengan "VA", contoh: "R1M/900 VA".
+   - Jika teks adalah PDAM / Air: format "pemakaian" HARUS mengandung "m3" (contoh: "23 m3"). Kosongkan jika tidak ada.
+   - Untuk layanan lain, sesuaikan.
+3. "rpTagihan": Isi dengan nominal angka tagihan murni.
+4. "totalBayar": Isi dengan nominal total pembayaran asli.
 
 Field JSON yang harus dikembalikan:
 - tanggal: string
@@ -246,9 +247,16 @@ ${rawText}
     }
 
     if (!bulanTagihan) {
-      const periodMatch = rawText.match(/([A-Za-z]{3}\d{2}|\d{2}\/\d{4}|[A-Za-z]+\s+\d{4})/);
+      const periodMatch = rawText.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
       if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
-      else bulanTagihan = "BULAN INI";
+      else bulanTagihan = "SEP26";
+    }
+
+    if (bulanTagihan) {
+      const matchPeriod = bulanTagihan.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
+      if (matchPeriod) {
+        bulanTagihan = matchPeriod[0].toUpperCase();
+      }
     }
 
     if (!idpel) {

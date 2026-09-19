@@ -165,9 +165,16 @@ ADMIN BANK: 2500`
     }
 
     if (!bulanTagihan) {
-      const periodMatch = text.match(/([A-Za-z]{3}\d{2}|\d{2}\/\d{4}|[A-Za-z]+\s+\d{4})/);
+      const periodMatch = text.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
       if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
       else bulanTagihan = "SEP26";
+    }
+
+    if (bulanTagihan) {
+      const matchPeriod = bulanTagihan.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
+      if (matchPeriod) {
+        bulanTagihan = matchPeriod[0].toUpperCase();
+      }
     }
 
     if (!idpel) {
