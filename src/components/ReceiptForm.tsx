@@ -9,6 +9,7 @@ interface ReceiptFormProps {
   setAgentConfig: React.Dispatch<React.SetStateAction<AgentConfig>>;
   onSave: () => void;
   onPrint: () => void;
+  resetTrigger?: number;
 }
 
 export function ReceiptForm({
@@ -18,10 +19,18 @@ export function ReceiptForm({
   setAgentConfig,
   onSave,
   onPrint,
+  resetTrigger,
 }: ReceiptFormProps) {
   const [rawText, setRawText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseNote, setParseNote] = useState('');
+
+  // Clear rawText when resetTrigger changes
+  React.useEffect(() => {
+    if (resetTrigger !== undefined && resetTrigger > 0) {
+      setRawText('');
+    }
+  }, [resetTrigger]);
 
   const sampleTexts = [
     {
@@ -29,20 +38,20 @@ export function ReceiptForm({
       text: `STRUK PEMBAYARAN TAGIHAN LISTRIK PLN
 IDPEL: 541293847210
 NAMA: BUNG HATTA
-BLN/THN: AGUSTUS 2026
+BLN/THN: Sep26
 STAND METER: 014230 - 014380
-PEMAKAIAN: 150 kWh
+PEMAKAIAN: R1M/900 VA
 RP TAGIHAN: 165500
-ADMIN BANK: 3000
-TOTAL: 168500`
+ADMIN BANK: 4700
+TOTAL: 170200`
     },
     {
       label: "Contoh PDAM",
       text: `PDAM TIRTA PATRIOT BEKASI
 NO PELANGGAN: 88392011
 NAMA: SITI AMINAH
-PERIODE: AGUSTUS 2026
-METER AWAL/AKHIR: 45 - 68 (23 M3)
+PERIODE: SEP26
+METER AWAL/AKHIR: 45 - 68 (23 m3)
 TAGIHAN AIR: 115000
 DENDA / LAIN: 0
 ADMIN: 2500`
@@ -53,7 +62,7 @@ ADMIN: 2500`
 IDPEL: 122839401923
 NAMA PELANGGAN: AHMAD FAUZI
 LAYANAN: INTERNET + PHONE 30MBPS
-PERIODE: 08/2026
+PERIODE: SEP26
 RP TAGIHAN: 315000
 BIAYA LAIN: 0
 ADMIN BANK: 2500`
@@ -68,7 +77,7 @@ ADMIN BANK: 2500`
     let namaPelanggan = "BUDI SANTOSO";
     let rpTagihan = 150000;
     let totalBayar = 0;
-    let bulanTagihan = "AGUSTUS 2026";
+    let bulanTagihan = "";
     let standMeter = "014230 - 014380";
     let rincianTagihan = "Tagihan Pembayaran";
 
@@ -92,6 +101,8 @@ ADMIN BANK: 2500`
       }
     }
 
+    let adminBank = isPln ? 4700 : 2500;
+
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
@@ -109,6 +120,13 @@ ADMIN BANK: 2500`
           if (val > 1000) rpTagihan = val;
         }
       }
+      if (/admin|adm/.test(lower)) {
+        const numbers = line.replace(/[^0-9]/g, "");
+        if (numbers.length >= 3) {
+          const val = parseInt(numbers, 10);
+          if (val > 500 && val < 50000) adminBank = val;
+        }
+      }
       if (/total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
         if (numbers.length >= 4) {
@@ -116,10 +134,16 @@ ADMIN BANK: 2500`
           if (val > 1000) totalBayar = val;
         }
       }
-      if (/bln|bulan|periode/.test(lower)) {
+      if (/bln|bulan|periode|thn|tahun/.test(lower)) {
         const parts = line.split(/[:=]/);
         if (parts[1]) bulanTagihan = parts[1].trim().toUpperCase();
       }
+    }
+
+    if (!bulanTagihan) {
+      const periodMatch = text.match(/([A-Za-z]{3}\d{2}|\d{2}\/\d{4}|[A-Za-z]+\s+\d{4})/);
+      if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
+      else bulanTagihan = "SEP26";
     }
 
     if (!idpel) {
@@ -127,7 +151,6 @@ ADMIN BANK: 2500`
       if (match) idpel = match[0];
     }
 
-    const adminBank = 2500;
     const lainLain = 0;
     if (totalBayar === 0) {
       totalBayar = rpTagihan + lainLain + adminBank;

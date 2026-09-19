@@ -33,6 +33,7 @@ export default function App() {
 
   const [transactions, setTransactions] = useState<ReceiptData[]>([]);
   const [savedStatus, setSavedStatus] = useState(false);
+  const [resetTrigger, setResetTrigger] = useState(0);
 
   // Fetch transactions on mount
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function App() {
     if (recentDuplicate) {
       setIsSaving(false);
       setSavedStatus(true);
+      setResetTrigger(prev => prev + 1);
       setTimeout(() => setSavedStatus(false), 3000);
       return;
     }
@@ -104,6 +106,7 @@ export default function App() {
         if (data.success) {
           setSavedStatus(true);
           fetchTransactions();
+          setResetTrigger(prev => prev + 1);
           setTimeout(() => setSavedStatus(false), 3000);
           setIsSaving(false);
           return;
@@ -119,6 +122,7 @@ export default function App() {
       setTransactions(current);
       localStorage.setItem('agent_batara_txs', JSON.stringify(current));
       setSavedStatus(true);
+      setResetTrigger(prev => prev + 1);
       setTimeout(() => setSavedStatus(false), 3000);
     } catch (err) {}
     setIsSaving(false);
@@ -175,6 +179,7 @@ export default function App() {
                 setAgentConfig={setAgentConfig}
                 onSave={handleSaveTransaction}
                 onPrint={handlePrint}
+                resetTrigger={resetTrigger}
               />
             </div>
             <div className="lg:col-span-5 sticky top-24">

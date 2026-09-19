@@ -158,7 +158,7 @@ ${rawText}
     let namaPelanggan = "";
     let rpTagihan = 0;
     let totalBayar = 0;
-    let bulanTagihan = "BULAN INI";
+    let bulanTagihan = "";
     let standMeter = "-";
     let rincianTagihan = "Tagihan Pembayaran";
 
@@ -182,6 +182,8 @@ ${rawText}
       }
     }
 
+    let adminBank = isPln ? 4700 : 2500;
+
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
@@ -199,6 +201,13 @@ ${rawText}
           if (val > 1000 && rpTagihan === 0) rpTagihan = val;
         }
       }
+      if (/admin|adm/.test(lower)) {
+        const numbers = line.replace(/[^0-9]/g, "");
+        if (numbers.length >= 3) {
+          const val = parseInt(numbers, 10);
+          if (val > 500 && val < 50000) adminBank = val;
+        }
+      }
       if (/total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
         if (numbers.length >= 4) {
@@ -206,10 +215,17 @@ ${rawText}
           if (val > 1000) totalBayar = val;
         }
       }
-      if (/bln|bulan|periode/.test(lower)) {
+      if (/bln|bulan|periode|thn|tahun/.test(lower)) {
         const parts = line.split(/[:=]/);
         if (parts[1]) bulanTagihan = parts[1].trim().toUpperCase();
       }
+    }
+
+    if (!bulanTagihan) {
+      // Check for patterns like Sep26 or 08/2026 or similar in text
+      const periodMatch = rawText.match(/([A-Za-z]{3}\d{2}|\d{2}\/\d{4}|[A-Za-z]+\s+\d{4})/);
+      if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
+      else bulanTagihan = "BULAN INI";
     }
 
     if (!idpel) {
@@ -241,7 +257,6 @@ ${rawText}
     }
 
     const today = new Date().toLocaleDateString("id-ID");
-    const adminBank = 2500;
     const lainLain = 0;
     if (totalBayar === 0) {
       totalBayar = rpTagihan + lainLain + adminBank;
