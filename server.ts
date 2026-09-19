@@ -96,27 +96,33 @@ app.post("/api/parse-bill", async (req, res) => {
       const ai = new GoogleGenAI({ apiKey });
       const prompt = `
 Anda adalah sistem ekstraksi data resi pembayaran tagihan (PLN, PDAM, Indihome, BPJS, Telkom, dll).
-Ekstrak data dari teks mentah berikut ke dalam format JSON murni (tanpa markdown backticks jika memungkinkan, atau format JSON valid).
+Ekstrak data dari teks mentah berikut ke dalam format JSON murni.
 
-Field yang harus diekstrak:
-- tanggal: string (format DD/MM/YYYY atau YYYY-MM-DD, default hari ini jika tidak ada)
-- idpel: string (Nomor Pelanggan / ID Pelanggan / No Meter)
+Aturan Ekstraksi Sangat Penting:
+1. "pemakaian":
+   - Jika teks adalah PLN / Listrik / Token: format "pemakaian" HARUS menyertakan daya dengan "VA", contoh: "R1M/900 VA", "R1/450 VA", atau "900 VA". Jangan hanya kWh.
+   - Jika teks adalah PDAM / Air: format "pemakaian" HARUS mengandung "m3" (contoh: "23 m3"). JIKA TIDAK ADA "m3" pada teks PDAM, kosongkan ("").
+   - Untuk layanan lain (Indihome, dll), sesuaikan atau kosongkan jika tidak ada.
+2. "rpTagihan": Isi dengan nominal angka tagihan murni (Rp Tagihan) yang sesuai persis dengan data copy-paste.
+3. "totalBayar": Isi dengan nominal total pembayaran asli dari teks (atau rpTagihan + adminBank).
+
+Field JSON yang harus dikembalikan:
+- tanggal: string
+- idpel: string
 - namaPelanggan: string
-- pemakaian: string (misal: "145 kWh" atau "25 m3" atau "-")
-- standMeter: string (misal: "012345 - 012490" atau "-")
-- rincianTagihan: string (misal: "Tagihan Listrik PLN Pascabayar", "PDAM Tirta Patriot", "Indihome Fiber")
-- bulanTagihan: string (misal: "AGUSTUS 2026")
-- rpTagihan: number (angka murni tanpa Rp atau titik, misal 150000)
-- lainLain: number (angka murni, default 0)
-- adminBank: number (angka murni, misal 2500 atau 3000)
-- totalBayar: number (rpTagihan + lainLain + adminBank)
+- pemakaian: string
+- standMeter: string
+- rincianTagihan: string
+- bulanTagihan: string
+- rpTagihan: number
+- lainLain: number
+- adminBank: number
+- totalBayar: number
 
 Teks Mentah:
 """
 ${rawText}
 """
-
-Berikan HANYA format JSON valid dengan kunci di atas.
 `;
 
       const response = await ai.models.generateContent({
@@ -125,15 +131,17 @@ Berikan HANYA format JSON valid dengan kunci di atas.
       });
 
       let text = response.text || "";
-      // Clean up markdown code blocks if any
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsedData = JSON.parse(text);
 
-      // Ensure calculations
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
       const adminBank = Number(parsedData.adminBank) || 2500;
-      parsedData.totalBayar = rpTagihan + lainLain + adminBank;
+      const totalBayar = Number(parsedData.totalBayar) || (rpTagihan + lainLain + adminBank);
+      parsedData.rpTagihan = rpTagihan;
+      parsedData.lainLain = lainLain;
+      parsedData.adminBank = adminBank;
+      parsedData.totalBayar = totalBayar;
 
       return res.json({ success: true, data: parsedData });
     } catch (err: any) {
@@ -144,14 +152,35 @@ Berikan HANYA format JSON valid dengan kunci di atas.
   // Fallback Smart Regex Parser
   try {
     const lines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
+    const lowerText = rawText.toLowerCase();
     
     let idpel = "";
     let namaPelanggan = "";
     let rpTagihan = 0;
+    let totalBayar = 0;
     let bulanTagihan = "BULAN INI";
-    let pemakaian = "-";
     let standMeter = "-";
     let rincianTagihan = "Tagihan Pembayaran";
+
+    const isPln = /pln|listrik|token|kwh|pascabayar|prabayar/.test(lowerText);
+    const isPdam = /pdam|air|meter air/.test(lowerText);
+
+    let pemakaian = "";
+    if (isPln) {
+      const vaMatch = rawText.match(/([Rr]1[Mm]?\s*\/\s*\d+\s*VA|\d+\s*VA)/i);
+      pemakaian = vaMatch ? vaMatch[0].toUpperCase() : "R1M/900 VA";
+    } else if (isPdam) {
+      const m3Match = rawText.match(/(\d+\s*m3|\d+\s*M3)/i);
+      pemakaian = m3Match ? m3Match[0].toLowerCase() : "";
+    } else {
+      const m3Match = rawText.match(/(\d+\s*m3|\d+\s*M3)/i);
+      if (m3Match) {
+        pemakaian = m3Match[0].toLowerCase();
+      } else {
+        const vaMatch = rawText.match(/(\d+\s*VA)/i);
+        if (vaMatch) pemakaian = vaMatch[0].toUpperCase();
+      }
+    }
 
     for (const line of lines) {
       const lower = line.toLowerCase();
@@ -163,23 +192,26 @@ Berikan HANYA format JSON valid dengan kunci di atas.
         const parts = line.split(/[:=]/);
         if (parts[1] && parts[1].trim().length > 2) namaPelanggan = parts[1].trim();
       }
-      if (/tagihan|rp|jml|jumlah|total\s*tagihan/.test(lower)) {
+      if (/rp\s*tagihan|tagihan\s*air|jml\s*tagihan|jumlah\s*tagihan|tagihan/.test(lower) && !/admin|total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
         if (numbers.length >= 4) {
           const val = parseInt(numbers, 10);
-          if (val > rpTagihan) rpTagihan = val;
+          if (val > 1000 && rpTagihan === 0) rpTagihan = val;
+        }
+      }
+      if (/total/.test(lower)) {
+        const numbers = line.replace(/[^0-9]/g, "");
+        if (numbers.length >= 4) {
+          const val = parseInt(numbers, 10);
+          if (val > 1000) totalBayar = val;
         }
       }
       if (/bln|bulan|periode/.test(lower)) {
         const parts = line.split(/[:=]/);
         if (parts[1]) bulanTagihan = parts[1].trim().toUpperCase();
       }
-      if (/kwh|m3|meter|pakai/.test(lower)) {
-        pemakaian = line;
-      }
     }
 
-    // If idpel not found, search for standalone long number
     if (!idpel) {
       for (const line of lines) {
         const match = line.match(/\b\d{8,15}\b/);
@@ -195,7 +227,6 @@ Berikan HANYA format JSON valid dengan kunci di atas.
     }
 
     if (rpTagihan === 0) {
-      // Find any large number
       for (const line of lines) {
         const clean = line.replace(/\./g, "").replace(/,/g, "");
         const match = clean.match(/\b\d{4,8}\b/);
@@ -212,14 +243,16 @@ Berikan HANYA format JSON valid dengan kunci di atas.
     const today = new Date().toLocaleDateString("id-ID");
     const adminBank = 2500;
     const lainLain = 0;
-    const totalBayar = rpTagihan + lainLain + adminBank;
+    if (totalBayar === 0) {
+      totalBayar = rpTagihan + lainLain + adminBank;
+    }
 
     const fallbackData = {
       tanggal: today,
       idpel: idpel || "1234567890",
       namaPelanggan: namaPelanggan || "PELANGGAN UMUM",
-      pemakaian: pemakaian || "100 kWh",
-      standMeter: standMeter || "00000 - 00100",
+      pemakaian: pemakaian,
+      standMeter: standMeter,
       rincianTagihan: rincianTagihan || "Tagihan Layanan",
       bulanTagihan: bulanTagihan || "BULAN BERJALAN",
       rpTagihan: rpTagihan || 50000,

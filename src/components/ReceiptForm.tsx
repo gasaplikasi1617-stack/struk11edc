@@ -62,13 +62,35 @@ ADMIN BANK: 2500`
 
   const clientParse = (text: string) => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lowerText = text.toLowerCase();
+    
     let idpel = "541293847210";
     let namaPelanggan = "BUDI SANTOSO";
     let rpTagihan = 150000;
+    let totalBayar = 0;
     let bulanTagihan = "AGUSTUS 2026";
-    let pemakaian = "145 kWh";
     let standMeter = "014230 - 014380";
     let rincianTagihan = "Tagihan Pembayaran";
+
+    const isPln = /pln|listrik|token|kwh|pascabayar|prabayar/.test(lowerText);
+    const isPdam = /pdam|air|meter air/.test(lowerText);
+
+    let pemakaian = "";
+    if (isPln) {
+      const vaMatch = text.match(/([Rr]1[Mm]?\s*\/\s*\d+\s*VA|\d+\s*VA)/i);
+      pemakaian = vaMatch ? vaMatch[0].toUpperCase() : "R1M/900 VA";
+    } else if (isPdam) {
+      const m3Match = text.match(/(\d+\s*m3|\d+\s*M3)/i);
+      pemakaian = m3Match ? m3Match[0].toLowerCase() : "";
+    } else {
+      const m3Match = text.match(/(\d+\s*m3|\d+\s*M3)/i);
+      if (m3Match) {
+        pemakaian = m3Match[0].toLowerCase();
+      } else {
+        const vaMatch = text.match(/(\d+\s*VA)/i);
+        if (vaMatch) pemakaian = vaMatch[0].toUpperCase();
+      }
+    }
 
     for (const line of lines) {
       const lower = line.toLowerCase();
@@ -80,25 +102,35 @@ ADMIN BANK: 2500`
         const parts = line.split(/[:=]/);
         if (parts[1] && parts[1].trim().length > 2) namaPelanggan = parts[1].trim();
       }
-      if (/tagihan|rp|jml|jumlah|total/.test(lower)) {
+      if (/rp\s*tagihan|tagihan\s*air|jml\s*tagihan|jumlah\s*tagihan|tagihan/.test(lower) && !/admin|total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
         if (numbers.length >= 4) {
           const val = parseInt(numbers, 10);
           if (val > 1000) rpTagihan = val;
         }
       }
+      if (/total/.test(lower)) {
+        const numbers = line.replace(/[^0-9]/g, "");
+        if (numbers.length >= 4) {
+          const val = parseInt(numbers, 10);
+          if (val > 1000) totalBayar = val;
+        }
+      }
       if (/bln|bulan|periode/.test(lower)) {
         const parts = line.split(/[:=]/);
         if (parts[1]) bulanTagihan = parts[1].trim().toUpperCase();
-      }
-      if (/kwh|m3|meter|pakai/.test(lower)) {
-        pemakaian = line;
       }
     }
 
     if (!idpel) {
       const match = text.match(/\b\d{8,15}\b/);
       if (match) idpel = match[0];
+    }
+
+    const adminBank = 2500;
+    const lainLain = 0;
+    if (totalBayar === 0) {
+      totalBayar = rpTagihan + lainLain + adminBank;
     }
 
     return {
@@ -110,9 +142,9 @@ ADMIN BANK: 2500`
       rincianTagihan: rincianTagihan || "Tagihan Listrik / Layanan",
       bulanTagihan,
       rpTagihan,
-      lainLain: 0,
-      adminBank: 2500,
-      totalBayar: rpTagihan + 2500,
+      lainLain,
+      adminBank,
+      totalBayar,
     };
   };
 
