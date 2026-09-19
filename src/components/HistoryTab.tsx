@@ -18,12 +18,15 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
+import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
   onDeleteTransaction: (id: string) => void;
 }
+
+type ServiceFilterType = 'all' | BillCategory;
 
 type SortCriterion =
   | 'date-desc'
@@ -66,11 +69,29 @@ export function HistoryTab({
   onDeleteTransaction,
 }: HistoryTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [serviceFilter, setServiceFilter] = useState<'all' | 'pln' | 'pdam' | 'other'>('all');
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('all');
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
 
-  // Filter transactions by search term and service category
+  // Category counts across all transactions
+  const categoryCounts = useMemo(() => {
+    const counts: Record<ServiceFilterType, number> = {
+      all: transactions.length,
+      pln: 0,
+      pdam: 0,
+      bpjs: 0,
+      telkom: 0,
+      pascabayar: 0,
+      other: 0,
+    };
+    for (const t of transactions) {
+      const cat = getTransactionCategory(t);
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [transactions]);
+
+  // Filter transactions by search term and expanded service categories
   const filteredList = useMemo(() => {
     return transactions.filter((t) => {
       const q = searchTerm.toLowerCase().trim();
@@ -84,22 +105,10 @@ export function HistoryTab({
 
       if (!matchSearch) return false;
 
-      if (serviceFilter === 'pln') {
-        const text = `${t.rincianTagihan || ''} ${t.idpel || ''}`.toLowerCase();
-        return text.includes('pln') || text.includes('listrik') || text.includes('token');
-      }
-      if (serviceFilter === 'pdam') {
-        const text = `${t.rincianTagihan || ''} ${t.idpel || ''}`.toLowerCase();
-        return text.includes('pdam') || text.includes('air') || text.includes('pam') || text.includes('tirtanadi');
-      }
-      if (serviceFilter === 'other') {
-        const text = `${t.rincianTagihan || ''} ${t.idpel || ''}`.toLowerCase();
-        const isPln = text.includes('pln') || text.includes('listrik');
-        const isPdam = text.includes('pdam') || text.includes('air') || text.includes('pam');
-        return !isPln && !isPdam;
-      }
+      if (serviceFilter === 'all') return true;
 
-      return true;
+      const cat = getTransactionCategory(t);
+      return cat === serviceFilter;
     });
   }, [transactions, searchTerm, serviceFilter]);
 
@@ -174,11 +183,13 @@ export function HistoryTab({
     }
 
     const todayStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Riwayat_Transaksi_100_${todayStr}.xlsx`;
+    const filterTag = serviceFilter === 'all' ? 'Semua' : getCategoryLabel(serviceFilter).replace(/[\/\s]+/g, '_');
+    const fileName = `Riwayat_${filterTag}_${todayStr}.xlsx`;
+    const sheetName = serviceFilter === 'all' ? 'Riwayat Semua Transaksi' : `Riwayat ${getCategoryLabel(serviceFilter)}`;
 
     exportTransactionsToExcel(sortedAndFiltered, {
       fileName,
-      sheetName: 'Riwayat 100 Transaksi',
+      sheetName,
     });
 
     setExportSuccessNotice(
@@ -333,49 +344,100 @@ export function HistoryTab({
           </div>
 
           {/* Category Service Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 mr-1">
               <Filter className="w-3.5 h-3.5 text-slate-400" /> Filter:
             </span>
             <button
               onClick={() => setServiceFilter('all')}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
                 serviceFilter === 'all'
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
-              Semua ({transactions.length})
+              <span>Semua</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.all}
+              </span>
             </button>
             <button
               onClick={() => setServiceFilter('pln')}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
                 serviceFilter === 'pln'
-                  ? 'bg-blue-600 text-white shadow-2xs'
+                  ? 'bg-amber-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
-              Listrik / PLN
+              <span>Listrik / PLN</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pln' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.pln}
+              </span>
             </button>
             <button
               onClick={() => setServiceFilter('pdam')}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
                 serviceFilter === 'pdam'
-                  ? 'bg-blue-600 text-white shadow-2xs'
+                  ? 'bg-cyan-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
-              PDAM / Air
+              <span>PDAM / Air</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pdam' ? 'bg-cyan-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.pdam}
+              </span>
+            </button>
+            <button
+              onClick={() => setServiceFilter('bpjs')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                serviceFilter === 'bpjs'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span>BPJS</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'bpjs' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.bpjs}
+              </span>
+            </button>
+            <button
+              onClick={() => setServiceFilter('telkom')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                serviceFilter === 'telkom'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span>Speedy / Telkom</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'telkom' ? 'bg-rose-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.telkom}
+              </span>
+            </button>
+            <button
+              onClick={() => setServiceFilter('pascabayar')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                serviceFilter === 'pascabayar'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span>Paskabayar Baru</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pascabayar' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.pascabayar}
+              </span>
             </button>
             <button
               onClick={() => setServiceFilter('other')}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
                 serviceFilter === 'other'
-                  ? 'bg-blue-600 text-white shadow-2xs'
+                  ? 'bg-slate-700 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
-              Lainnya
+              <span>Lain-lain</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'other' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {categoryCounts.other}
+              </span>
             </button>
           </div>
         </div>
@@ -483,9 +545,52 @@ export function HistoryTab({
                         </p>
                       </td>
                       <td className="p-3">
-                        <p className="text-xs text-slate-700 font-medium">{tx.rincianTagihan || '-'}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {(() => {
+                            const cat = getTransactionCategory(tx);
+                            switch (cat) {
+                              case 'pln':
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                    PLN
+                                  </span>
+                                );
+                              case 'pdam':
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-300">
+                                    PDAM
+                                  </span>
+                                );
+                              case 'bpjs':
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    BPJS
+                                  </span>
+                                );
+                              case 'telkom':
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300">
+                                    TELKOM
+                                  </span>
+                                );
+                              case 'pascabayar':
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-300">
+                                    PASCABAYAR
+                                  </span>
+                                );
+                              default:
+                                return (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-300">
+                                    LAINNYA
+                                  </span>
+                                );
+                            }
+                          })()}
+                          <span className="text-xs text-slate-800 font-medium">{tx.rincianTagihan || '-'}</span>
+                        </div>
                         {tx.bulanTagihan && (
-                          <p className="text-[10px] text-slate-400">Periode: {tx.bulanTagihan}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Periode: {tx.bulanTagihan}</p>
                         )}
                       </td>
                       <td className="p-3 text-right">

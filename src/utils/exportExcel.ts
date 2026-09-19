@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { ReceiptData } from '../types';
+import { getTransactionCategory, getCategoryLabel } from './billParser';
 
 export interface ExportExcelOptions {
   fileName?: string;
@@ -35,8 +36,12 @@ export function exportTransactionsToExcel(
       } catch (err) {}
     }
 
+    const cat = getTransactionCategory(t);
+    const categoryName = getCategoryLabel(cat);
+
     return {
       'No': index + 1,
+      'Kategori': categoryName,
       'ID Transaksi': t.id || '-',
       'Tanggal': formattedDate,
       'Waktu Pencatatan': formattedTime,
@@ -65,6 +70,7 @@ export function exportTransactionsToExcel(
   // Append Total Row
   rows.push({
     'No': '' as any,
+    'Kategori': 'TOTAL' as any,
     'ID Transaksi': 'TOTAL KESELURUHAN',
     'Tanggal': '',
     'Waktu Pencatatan': '',
@@ -89,6 +95,7 @@ export function exportTransactionsToExcel(
   // Set column widths for readability
   worksheet['!cols'] = [
     { wch: 6 },  // No
+    { wch: 18 }, // Kategori
     { wch: 22 }, // ID Transaksi
     { wch: 14 }, // Tanggal
     { wch: 22 }, // Waktu Pencatatan

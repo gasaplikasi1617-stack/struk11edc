@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
-import { Wand2, Sparkles, RefreshCw, CheckCircle2, Building, MapPin, Phone } from 'lucide-react';
+import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer } from 'lucide-react';
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from '../utils/billParser';
 
 interface ReceiptFormProps {
@@ -587,16 +587,20 @@ ADMIN BANK: 2500`
           <button
             type="button"
             onClick={onSave}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm"
           >
+            <CheckCircle className="w-4 h-4" />
             <span>Simpan ke Database Riwayat</span>
           </button>
           <button
             type="button"
             onClick={onPrint}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm"
+            title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi"
           >
+            <Printer className="w-4 h-4" />
             <span>Cetak Resi A6 / Export PDF</span>
+            <span className="text-[11px] bg-blue-800/60 px-2 py-0.5 rounded-full font-normal">Auto Save</span>
           </button>
         </div>
       </div>

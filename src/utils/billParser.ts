@@ -160,3 +160,98 @@ export function formatPeriod3Chars(input: string): string {
   }
   return 'Sep26';
 }
+
+export type BillCategory = 'pln' | 'pdam' | 'bpjs' | 'telkom' | 'pascabayar' | 'other';
+
+export function getTransactionCategory(t: {
+  rincianTagihan?: string;
+  pemakaian?: string;
+  idpel?: string;
+  standMeter?: string;
+}): BillCategory {
+  const text = `${t.rincianTagihan || ''} ${t.pemakaian || ''} ${t.idpel || ''} ${t.standMeter || ''}`.toLowerCase();
+  
+  if (
+    text.includes('bpjs') ||
+    text.includes('kesehatan') ||
+    text.includes('ketenagakerjaan') ||
+    text.includes('jkn') ||
+    text.includes('polis') ||
+    text.includes('asuransi')
+  ) {
+    return 'bpjs';
+  }
+  
+  if (
+    text.includes('pascabayar baru') || 
+    text.includes('paskabayar baru') || 
+    text.includes('kartu halo') || 
+    text.includes('halo') || 
+    text.includes('matrix') || 
+    text.includes('xl prioritas') || 
+    text.includes('myfren') || 
+    text.includes('seluler pascabayar') ||
+    ((text.includes('pascabayar') || text.includes('paskabayar') || text.includes('postpaid')) && !text.includes('pln') && !text.includes('listrik'))
+  ) {
+    return 'pascabayar';
+  }
+
+  if (
+    text.includes('speedy') ||
+    text.includes('telkom') ||
+    text.includes('indihome') ||
+    text.includes('wifi') ||
+    text.includes('internet') ||
+    text.includes('fiber') ||
+    text.includes('telepon') ||
+    text.includes('telp')
+  ) {
+    return 'telkom';
+  }
+
+  if (
+    text.includes('pln') ||
+    text.includes('listrik') ||
+    text.includes('token') ||
+    text.includes('kwh') ||
+    text.includes('r1m') ||
+    /\bva\b/i.test(text) ||
+    text.includes('daya')
+  ) {
+    return 'pln';
+  }
+
+  if (
+    text.includes('pdam') ||
+    text.includes('air') ||
+    text.includes('pam') ||
+    text.includes('tirta') ||
+    text.includes('meter air') ||
+    text.includes('m3') ||
+    text.includes('tirtanadi') ||
+    text.includes('sambungan')
+  ) {
+    return 'pdam';
+  }
+
+  return 'other';
+}
+
+export function getCategoryLabel(cat: BillCategory): string {
+  switch (cat) {
+    case 'pln':
+      return 'Listrik / PLN';
+    case 'pdam':
+      return 'PDAM / Air';
+    case 'bpjs':
+      return 'BPJS';
+    case 'telkom':
+      return 'Speedy / Telkom';
+    case 'pascabayar':
+      return 'Pascabayar Baru';
+    case 'other':
+    default:
+      return 'Lain-lain';
+  }
+}
+
