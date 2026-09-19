@@ -17,7 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
-import { DEFAULT_GAS_DATA, GasScriptData } from '../data/gasTemplates';
+import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
 
 interface GasIntegrationTabProps {
   onSyncSuccess?: () => void;
@@ -26,7 +26,7 @@ interface GasIntegrationTabProps {
 export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
-  const [gasUrl, setGasUrl] = useState('');
+  const [gasUrl, setGasUrl] = useState(DEFAULT_GAS_URL);
   const [autoSync, setAutoSync] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
@@ -68,19 +68,21 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     fetch('/api/gas/config')
       .then((res) => res.json())
       .then((cfg: GasSyncConfig) => {
-        if (cfg.gasUrl) setGasUrl(cfg.gasUrl);
+        const urlToSet = cfg.gasUrl || DEFAULT_GAS_URL;
+        setGasUrl(urlToSet);
         if (typeof cfg.autoSync === 'boolean') setAutoSync(cfg.autoSync);
         if (cfg.lastSyncedAt) setLastSyncedAt(cfg.lastSyncedAt);
 
         // If URL exists, fetch preview
-        if (cfg.gasUrl) {
-          loadPreview(cfg.gasUrl);
+        if (urlToSet) {
+          loadPreview(urlToSet);
         }
       })
       .catch(() => {
         // Fallback local storage
         const savedUrl = localStorage.getItem('gas_web_app_url');
-        if (savedUrl) setGasUrl(savedUrl);
+        const urlToSet = savedUrl || DEFAULT_GAS_URL;
+        setGasUrl(urlToSet);
       });
   }, []);
 
@@ -171,7 +173,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     } catch (e: any) {
       setSyncNotice({
         type: 'error',
-        text: `Koneksi Gagal: ${e.message}. Pastikan Web App di-deploy dengan akses 'Anyone' (Siapa saja).`,
+        text: e.message || 'Koneksi Gagal. Pastikan Web App di-deploy dengan akses "Anyone" (Siapa saja).',
       });
     } finally {
       setIsTesting(false);
@@ -337,7 +339,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         {/* Sync Status / Notice Banner */}
         {syncNotice && (
           <div
-            className={`mt-4 p-4 rounded-xl text-xs flex items-start gap-2.5 transition-all shadow-xs ${
+            className={`mt-4 p-4 rounded-xl text-xs flex flex-col gap-2 transition-all shadow-xs ${
               syncNotice.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 : syncNotice.type === 'error'
@@ -345,14 +347,32 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                 : 'bg-blue-50 text-blue-800 border border-blue-200'
             }`}
           >
-            {syncNotice.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            ) : syncNotice.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            ) : (
-              <RefreshCw className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 animate-spin" />
+            <div className="flex items-start gap-2.5">
+              {syncNotice.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : syncNotice.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              ) : (
+                <RefreshCw className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 animate-spin" />
+              )}
+              <div className="flex-1 font-medium">{syncNotice.text}</div>
+            </div>
+
+            {syncNotice.type === 'error' && (syncNotice.text.includes('Anyone') || syncNotice.text.includes('Ditolak') || syncNotice.text.includes('JSON')) && (
+              <div className="mt-2 pt-2 border-t border-rose-200 bg-white/70 p-3 rounded-lg text-[11px] text-rose-900 space-y-1.5">
+                <p className="font-bold text-rose-950 flex items-center gap-1">
+                  💡 Cara Memperbaiki Pengaturan Hak Akses di Google Apps Script:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-700">
+                  <li>Buka project Google Apps Script Anda.</li>
+                  <li>Klik tombol biru <strong>Deploy &gt; Manage deployments</strong> (Kelola penerapan).</li>
+                  <li>Klik ikon <strong>Pensil (Edit)</strong> pada deployment Web App aktif Anda.</li>
+                  <li>Ubah kolom <strong>Version</strong> menjadi <em>New version</em> (Versi baru).</li>
+                  <li>Ubah kolom <strong>Who has access</strong> menjadi <strong className="text-emerald-700">"Anyone" (Siapa saja)</strong>.</li>
+                  <li>Klik <strong>Deploy</strong>, izinkan akses jika diminta, lalu coba uji kembali di sini.</li>
+                </ol>
+              </div>
             )}
-            <div className="flex-1 font-medium">{syncNotice.text}</div>
           </div>
         )}
 

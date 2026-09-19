@@ -13,6 +13,7 @@ app.use(express.json());
 // Path for storing transaction history locally
 const DATA_FILE = path.join(process.cwd(), "transactions.json");
 const GAS_CONFIG_FILE = path.join(process.cwd(), "gas_config.json");
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbwp7frqV8EM-14lPPeJS59HbkaKUEg_-nj0ksIa4zxNmPzVA2N2FYyZeRXveb1F5Yl6/exec";
 
 interface GasConfig {
   gasUrl: string;
@@ -26,7 +27,7 @@ function getGasConfig(): GasConfig {
       const data = fs.readFileSync(GAS_CONFIG_FILE, "utf-8");
       const parsed = JSON.parse(data);
       return {
-        gasUrl: parsed.gasUrl || process.env.GAS_WEB_APP_URL || "",
+        gasUrl: parsed.gasUrl || process.env.GAS_WEB_APP_URL || DEFAULT_GAS_URL,
         autoSync: parsed.autoSync !== false,
         lastSyncedAt: parsed.lastSyncedAt || undefined,
       };
@@ -35,7 +36,7 @@ function getGasConfig(): GasConfig {
     console.error("Error reading gas_config:", e);
   }
   return {
-    gasUrl: process.env.GAS_WEB_APP_URL || "",
+    gasUrl: process.env.GAS_WEB_APP_URL || DEFAULT_GAS_URL,
     autoSync: true,
     lastSyncedAt: undefined,
   };
@@ -56,9 +57,49 @@ function saveGasConfig(cfg: Partial<GasConfig>): GasConfig {
 }
 
 // Helpers for calling Google Apps Script Web App
+function parseGasResponse(text: string): any {
+  if (!text || !text.trim()) {
+    throw new Error("Google Apps Script mengembalikan respon kosong.");
+  }
+  const trimmed = text.trim();
+
+  // Detect if Google returned an HTML page (e.g. login redirect, error 404, authorization required)
+  if (
+    trimmed.startsWith("<!DOCTYPE") ||
+    trimmed.startsWith("<html") ||
+    trimmed.includes("accounts.google.com") ||
+    trimmed.includes("ServiceLogin") ||
+    trimmed.includes("The page cannot be found") ||
+    trimmed.includes("Google Drive – Akses Ditolak") ||
+    trimmed.includes("Sign in - Google Accounts")
+  ) {
+    throw new Error(
+      "Akses Google Apps Script Ditolak / Meminta Login. " +
+      "Penyebab: Web App belum di-deploy dengan izin 'Anyone' (Siapa saja). " +
+      "Solusi: Di Google Apps Script, klik Deploy > Manage Deployments (atau New Deployment) > ubah 'Who has access' menjadi 'Anyone' (Siapa saja) > Deploy ulang."
+    );
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch (err) {
+    if (trimmed.toLowerCase().includes("error") || trimmed.length < 300) {
+      return { success: true, message: trimmed };
+    }
+    throw new Error(
+      "Respon dari Google Apps Script bukan JSON yang valid. " +
+      "Pastikan Web App di-deploy dengan opsi 'Who has access: Anyone' dan file Code.gs sudah disimpan."
+    );
+  }
+}
+
 async function callGasPost(url: string, body: any): Promise<any> {
   const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
+
+  if (cleanUrl.includes("/edit") || cleanUrl.includes("/dev")) {
+    throw new Error("URL yang Anda masukkan adalah URL Editor/Dev. Silakan gunakan Web App URL yang berakhiran '/exec' dari menu Deploy.");
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout
@@ -76,11 +117,7 @@ async function callGasPost(url: string, body: any): Promise<any> {
     clearTimeout(timer);
 
     const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { success: true, message: text };
-    }
+    return parseGasResponse(text);
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
@@ -93,6 +130,10 @@ async function callGasPost(url: string, body: any): Promise<any> {
 async function callGasGet(url: string, params: Record<string, string> = {}): Promise<any> {
   const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
+
+  if (cleanUrl.includes("/edit") || cleanUrl.includes("/dev")) {
+    throw new Error("URL yang Anda masukkan adalah URL Editor/Dev. Silakan gunakan Web App URL yang berakhiran '/exec' dari menu Deploy.");
+  }
 
   const u = new URL(cleanUrl);
   for (const [k, v] of Object.entries(params)) {
@@ -111,11 +152,7 @@ async function callGasGet(url: string, params: Record<string, string> = {}): Pro
     clearTimeout(timer);
 
     const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { success: true, message: text };
-    }
+    return parseGasResponse(text);
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {

@@ -4,6 +4,8 @@ export interface GasScriptData {
   instructions: string[];
 }
 
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwp7frqV8EM-14lPPeJS59HbkaKUEg_-nj0ksIa4zxNmPzVA2N2FYyZeRXveb1F5Yl6/exec';
+
 export const DEFAULT_GAS_DATA: GasScriptData = {
   codeGs: `/**
  * Google Apps Script - Backend Code.gs untuk Sistem Cetak Resi Tagihan & Google Sheets
