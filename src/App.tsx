@@ -42,38 +42,64 @@ export default function App() {
   const fetchTransactions = async () => {
     try {
       const res = await fetch('/api/transactions');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setTransactions(data);
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setTransactions(data);
+          return;
+        }
       }
     } catch (e) {
-      console.error('Failed to fetch transactions:', e);
+      console.error('Failed to fetch transactions from server, using localStorage:', e);
     }
+    // Fallback to localStorage
+    try {
+      const local = localStorage.getItem('agent_batara_txs');
+      if (local) {
+        setTransactions(JSON.parse(local));
+      }
+    } catch (err) {}
   };
 
   const handleSaveTransaction = async () => {
-    try {
-      const payload = {
-        ...receipt,
-        namaAgen: agentConfig.namaAgen,
-        alamat: agentConfig.alamat,
-        noHp: agentConfig.noHp,
-      };
+    const payload = {
+      id: "TX-" + Date.now(),
+      createdAt: new Date().toISOString(),
+      ...receipt,
+      namaAgen: agentConfig.namaAgen,
+      alamat: agentConfig.alamat,
+      noHp: agentConfig.noHp,
+    };
 
+    try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (data.success) {
-        setSavedStatus(true);
-        fetchTransactions();
-        setTimeout(() => setSavedStatus(false), 3000);
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data.success) {
+          setSavedStatus(true);
+          fetchTransactions();
+          setTimeout(() => setSavedStatus(false), 3000);
+          return;
+        }
       }
     } catch (e: any) {
-      alert('Gagal menyimpan transaksi: ' + e.message);
+      console.error('Server save error, falling back to localStorage:', e);
     }
+
+    // LocalStorage fallback
+    try {
+      const current = [payload, ...transactions];
+      setTransactions(current);
+      localStorage.setItem('agent_batara_txs', JSON.stringify(current));
+      setSavedStatus(true);
+      setTimeout(() => setSavedStatus(false), 3000);
+    } catch (err) {}
   };
 
   const handlePrint = () => {

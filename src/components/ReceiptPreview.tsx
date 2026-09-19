@@ -48,8 +48,16 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           <h2 className="text-base font-extrabold tracking-wide uppercase">{receipt.namaAgen || 'AGEN BATARA'}</h2>
           <p className="text-[11px] text-slate-700 mt-0.5">{receipt.alamat || 'Bekasi'}</p>
           <p className="text-[11px] text-slate-700">Telp/WA: {receipt.noHp || '-'}</p>
-          <div className="mt-2 text-[10px] bg-slate-100 py-0.5 px-2 rounded inline-block font-bold">
-            STRUK BUKTI PEMBAYARAN RESMI
+          <div className="mt-2 text-[10px] bg-slate-100 py-1 px-2.5 rounded inline-block font-bold uppercase border border-slate-200">
+            {(() => {
+              const r = (receipt.rincianTagihan || '').toLowerCase();
+              if (r.includes('pln') || r.includes('listrik')) return 'STRUK PEMBAYARAN LISTRIK PLN';
+              if (r.includes('pdam') || r.includes('air')) return 'STRUK PEMBAYARAN PDAM AIR';
+              if (r.includes('indihome') || r.includes('telkom') || r.includes('internet')) return 'STRUK PEMBAYARAN INDIHOME / TELKOM';
+              if (r.includes('bpjs')) return 'STRUK PEMBAYARAN BPJS KESEHATAN';
+              if (receipt.rincianTagihan) return `STRUK PEMBAYARAN ${receipt.rincianTagihan.toUpperCase()}`;
+              return 'STRUK BUKTI PEMBAYARAN RESMI';
+            })()}
           </div>
         </div>
 
