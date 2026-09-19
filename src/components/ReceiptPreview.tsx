@@ -10,6 +10,71 @@ interface ReceiptPreviewProps {
 }
 
 export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: ReceiptPreviewProps) {
+  const handleDirectPrint = () => {
+    onSave(); // Save transaction
+    const receiptElement = document.getElementById('printable-receipt');
+    if (!receiptElement) {
+      onPrint();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=450,height=650');
+    if (!printWindow) {
+      onPrint();
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Cetak Resi A6 - ${receipt.namaPelanggan || 'Pelanggan'}</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <style>
+          @page {
+            size: A6 portrait;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            padding: 10mm;
+            background: white;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .receipt-box {
+            width: 100%;
+            max-width: 380px;
+            margin: 0 auto;
+            border: 2px solid #1e293b;
+            padding: 16px;
+            box-sizing: border-box;
+            background: #ffffff;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-box">
+          ${receiptElement.innerHTML}
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 350);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
       <div className="w-full flex justify-between items-center mb-4">
@@ -131,14 +196,14 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
 
       <div className="w-full mt-4 flex gap-3">
         <button
-          onClick={onPrint}
+          onClick={handleDirectPrint}
           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm shadow flex items-center justify-center gap-2 transition-all"
         >
           <Printer className="w-4 h-4" />
           <span>Cetak Langsung (A6)</span>
         </button>
         <button
-          onClick={onPrint}
+          onClick={handleDirectPrint}
           className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-xl text-sm shadow flex items-center justify-center gap-2 transition-all"
         >
           <Download className="w-4 h-4" />
