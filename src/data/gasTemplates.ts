@@ -16,11 +16,11 @@ export const DEFAULT_GAS_DATA: GasScriptData = {
 // 1. Tangani Request GET (Browser View atau API Read)
 function doGet(e) {
   try {
-    var action = e && e.parameter ? e.parameter.action : null;
-    var format = e && e.parameter ? e.parameter.format : null;
+    var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action) : "";
+    var format = (e && e.parameter && e.parameter.format) ? String(e.parameter.format) : "";
 
     // Tes Koneksi (Ping)
-    if (action === "ping") {
+    if (action === "ping" || action === "test") {
       return jsonResponse({
         success: true,
         status: "online",
@@ -30,7 +30,7 @@ function doGet(e) {
     }
 
     // Ambil Data Transaksi untuk Sinkronisasi ke Web App
-    if (action === "getTransactions" || action === "pull" || format === "json") {
+    if (action === "getTransactions" || action === "pull" || action === "read" || format === "json") {
       var data = getLastTransactions();
       return jsonResponse({
         success: true,
@@ -40,10 +40,18 @@ function doGet(e) {
     }
 
     // Tampilkan Web App Frontend jika dibuka langsung di Browser
-    return HtmlService.createHtmlOutputFromFile('Index')
-        .setTitle('Cetak Resi Tagihan - Agen Batara')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    try {
+      return HtmlService.createHtmlOutputFromFile('Index')
+          .setTitle('Cetak Resi Tagihan - Agen Batara')
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (htmlErr) {
+      // Fallback aman jika file Index.html belum dibuat oleh pengguna
+      var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>API Resi Agen Batara</title><style>body{font-family:system-ui,sans-serif;padding:40px;background:#f8fafc;color:#1e293b;text-align:center;} .box{max-width:540px;margin:30px auto;background:#fff;padding:28px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.06);border:1px solid #e2e8f0;} .badge{background:#dcfce7;color:#166534;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:14px;}</style></head><body><div class="box"><span class="badge">● Web App Google Apps Script Online</span><h2 style="margin:0 0 10px;color:#1e40af;">API Backend Resi Agen Batara</h2><p style="font-size:14px;color:#64748b;line-height:1.6;">Endpoint ini aktif dan siap menerima sinkronisasi data transaksi 2 arah dari aplikasi cetak resi.</p></div></body></html>';
+      return HtmlService.createHtmlOutput(html)
+          .setTitle('API Resi Agen Batara - Online')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
   } catch (err) {
     return jsonResponse({ success: false, error: err.toString() });
   }
@@ -63,10 +71,10 @@ function doPost(e) {
       payload = e.parameter;
     }
 
-    var action = payload.action || (e && e.parameter ? e.parameter.action : null);
+    var action = payload.action || (e && e.parameter ? e.parameter.action : "");
 
     // Tes Koneksi (Ping via POST)
-    if (action === "ping") {
+    if (action === "ping" || action === "test") {
       return jsonResponse({
         success: true,
         status: "online",
@@ -75,7 +83,6 @@ function doPost(e) {
     }
 
     // SINKRONISASI 2 ARAH (Two-Way Sync):
-    // Menggabungkan data dari Web App ke Sheet dan mengembalikan seluruh riwayat terkini
     if (action === "twoWaySync" || action === "syncTransactions") {
       var incomingTxs = payload.transactions || payload.data || [];
       var result = syncTwoWayTransactions(incomingTxs);
@@ -308,6 +315,14 @@ function deleteTransactionRow(id) {
   }
   return { success: false, error: "Transaksi dengan ID tersebut tidak ditemukan di sheet" };
 }
+
+// Fungsi Uji Coba Langsung di Editor Apps Script
+function testInitAndPing() {
+  var sheet = getOrCreateSheet();
+  Logger.log("Sheet berhasil disiapkan: " + sheet.getName());
+  var res = doGet({ parameter: { action: "ping" } });
+  Logger.log("Hasil Ping: " + res.getContent());
+}
 `,
   indexHtml: `<!DOCTYPE html>
 <html>
@@ -465,16 +480,16 @@ function deleteTransactionRow(id) {
 </html>
 `,
   instructions: [
-    "1. Buka Google Sheets baru di Google Drive Anda (misalnya beri nama 'Database Resi Agen Batara').",
+    "1. Buka Google Sheets baru di Google Drive Anda (beri nama misalnya 'Database Resi Agen Batara').",
     "2. Di menu atas, klik Extensions > Apps Script (Ekstensi > Apps Script).",
-    "3. Hapus seluruh isi default di file Code.gs, lalu salin (paste) kode Code.gs di bawah ini.",
-    "4. Klik ikon tanda tambah (+) di sebelah 'Files', pilih HTML, beri nama file Index (cukup tulis Index, jangan tambahkan .html), lalu paste kode Index.html di bawah ini.",
-    "5. Klik tombol biru Deploy > New deployment (Terapkan > Penerapan baru).",
-    "6. Klik ikon roda gigi (Select type), pilih Web app (Aplikasi web).",
-    "7. Isi Description: Sinkronisasi Resi 2 Arah.",
+    "3. Hapus seluruh isi default di file Code.gs, lalu salin (paste) kode Code.gs di tab ini.",
+    "4. (PENTING) Di toolbar atas Apps Script, pilih fungsi 'testInitAndPing' lalu klik tombol 'Run' (Jalankan) sekali. Klik 'Review permissions' > pilih akun Google > klik 'Advanced' (Lanjutan) > klik 'Go to [Nama Project] (unsafe)' > 'Allow' (Izinkan). Ini wajib agar Google mengaktifkan izin akses database Sheets.",
+    "5. (Opsional) Klik ikon (+) di sebelah Files > pilih HTML > beri nama Index > paste kode Index.html.",
+    "6. Di pojok kanan atas, klik tombol biru Deploy > New deployment (Terapkan > Penerapan baru).",
+    "7. Klik ikon roda gigi (Select type), pilih Web app (Aplikasi web).",
     "8. Atur Execute as: Me (email akun Google Anda).",
-    "9. Atur Who has access: Anyone (Siapa saja — ini penting agar aplikasi web dapat mengirim & mengambil data resi).",
-    "10. Klik Deploy, klik Authorize access (Berikan izin akses ke akun Anda, klik Lanjutan / Advanced > Buka [Nama Project]), lalu salin Web App URL yang berakhiran /exec.",
-    "11. Masukkan Web App URL tersebut ke form konfigurasi di atas, lalu klik Simpan URL!"
+    "9. Atur Who has access: Anyone (Siapa saja — WAJIB 'Anyone' agar tidak terblokir login Google).",
+    "10. Klik Deploy, salin Web App URL yang berakhiran /exec.",
+    "11. Tempel Web App URL tersebut ke form di atas, lalu klik 'Simpan URL' atau 'Uji Koneksi'!"
   ]
 };
