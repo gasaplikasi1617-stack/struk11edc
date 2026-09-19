@@ -151,9 +151,11 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             <span className="text-black">ID Pelanggan:</span>
             <span className="font-bold text-black">{receipt.idpel || '-'}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-black">Nama:</span>
-            <span className="font-bold uppercase text-black">{receipt.namaPelanggan || '-'}</span>
+          <div className="flex justify-between items-baseline gap-2">
+            <span className="text-black shrink-0">Nama:</span>
+            <span className="font-bold uppercase text-black text-right whitespace-nowrap overflow-hidden text-ellipsis max-w-[210px]" title={receipt.namaPelanggan}>
+              {receipt.namaPelanggan || '-'}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-black">Bulan/Periode:</span>

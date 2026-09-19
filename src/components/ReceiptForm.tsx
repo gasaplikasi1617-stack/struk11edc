@@ -95,7 +95,7 @@ ADMIN BANK: 2500`
       }
     }
 
-    const yearMatch = upper.match(/20\d{2}|\b\d{2}\b/);
+    const yearMatch = upper.match(/20\d{2}|\d{2}/);
     let yCode = '';
     if (yearMatch) {
       const y = yearMatch[0];
@@ -124,9 +124,9 @@ ADMIN BANK: 2500`
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     const lowerText = text.toLowerCase();
     
-    let idpel = "541293847210";
-    let namaPelanggan = "BUDI SANTOSO";
-    let rpTagihan = 150000;
+    let idpel = "";
+    let namaPelanggan = "";
+    let rpTagihan = 0;
     let totalBayar = 0;
     let bulanTagihan = "";
     let standMeter = "";
@@ -181,15 +181,43 @@ ADMIN BANK: 2500`
 
     let adminBank = isPln ? 4700 : 2500;
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const lower = line.toLowerCase();
       if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
         const parts = line.split(/[:=]/);
         if (parts[1]) idpel = parts[1].trim();
       }
-      if (/nama|pelanggan/.test(lower)) {
+      if (/nama|pelanggan/.test(lower) && !namaPelanggan) {
         const parts = line.split(/[:=]/);
-        if (parts[1] && parts[1].trim().length > 2) namaPelanggan = parts[1].trim();
+        let firstPart = parts.length > 1 ? parts.slice(1).join(":").trim() : "";
+        if (!firstPart && i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin)/i.test(nextLine)) {
+            firstPart = nextLine;
+            i++;
+          }
+        }
+
+        if (firstPart) {
+          namaPelanggan = firstPart;
+          // Check if there is a 2nd line of the name (tidak abaikan jika nama ada 2 baris)
+          while (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            const lowerNext = nextLine.toLowerCase();
+            const isLabelOrField = /[:=]/.test(nextLine) ||
+              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
+              /^\d+([\.,]\d+)*$/.test(nextLine.replace(/\s+/g, "")) ||
+              /^(rp\.?|idr)\s*\d+/i.test(nextLine);
+
+            if (!isLabelOrField && nextLine.length > 0 && nextLine.length < 50) {
+              namaPelanggan = `${namaPelanggan} ${nextLine}`;
+              i++;
+            } else {
+              break;
+            }
+          }
+        }
       }
       if (/rp\s*tagihan|tagihan\s*air|jml\s*tagihan|jumlah\s*tagihan|tagihan/.test(lower) && !/admin|total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
@@ -212,6 +240,10 @@ ADMIN BANK: 2500`
           if (val > 1000) totalBayar = val;
         }
       }
+    }
+
+    if (namaPelanggan) {
+      namaPelanggan = namaPelanggan.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
     }
 
     // Check line 1 (baris kedua) or any line for period
@@ -240,6 +272,18 @@ ADMIN BANK: 2500`
     if (!idpel) {
       const match = text.match(/\b\d{8,15}\b/);
       if (match) idpel = match[0];
+    }
+
+    if (!namaPelanggan && lines.length > 0) {
+      for (const line of lines) {
+        if (!/[:=]/.test(line) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|\d+)/i.test(line) && line.length >= 3) {
+          namaPelanggan = line.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+          break;
+        }
+      }
+      if (!namaPelanggan) {
+        namaPelanggan = "BUDI SANTOSO";
+      }
     }
 
     const lainLain = 0;
@@ -293,7 +337,7 @@ ADMIN BANK: 2500`
           ...prev,
           tanggal: d.tanggal || prev.tanggal,
           idpel: d.idpel || prev.idpel,
-          namaPelanggan: d.namaPelanggan || prev.namaPelanggan,
+          namaPelanggan: (d.namaPelanggan || prev.namaPelanggan || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase(),
           pemakaian: d.pemakaian || prev.pemakaian,
           standMeter: d.standMeter || prev.standMeter,
           rincianTagihan: d.rincianTagihan || prev.rincianTagihan,

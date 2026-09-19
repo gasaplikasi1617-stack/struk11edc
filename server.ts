@@ -106,6 +106,7 @@ Aturan Ekstraksi Sangat Penting:
    - Untuk layanan lain, sesuaikan.
 3. "rpTagihan": Isi dengan nominal angka tagihan murni.
 4. "totalBayar": Isi dengan nominal total pembayaran asli.
+5. "namaPelanggan": Ambil nama pelanggan lengkap dalam SATU baris. Jika nama pelanggan pada teks terpotong dalam 2 baris, JANGAN abaikan baris kedua. Satukan kedua baris tersebut menjadi satu baris nama lengkap tanpa enter/patah baris.
 
 Field JSON yang harus dikembalikan:
 - tanggal: string
@@ -127,13 +128,19 @@ ${rawText}
 `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
       });
 
       let text = response.text || "";
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsedData = JSON.parse(text);
+
+      parsedData.namaPelanggan = String(parsedData.namaPelanggan || "")
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
 
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
@@ -178,7 +185,7 @@ ${rawText}
         }
       }
 
-      const yearMatch = upper.match(/20\d{2}|\b\d{2}\b/);
+      const yearMatch = upper.match(/20\d{2}|\d{2}/);
       let yCode = '';
       if (yearMatch) {
         const y = yearMatch[0];
@@ -264,7 +271,8 @@ ${rawText}
 
     let adminBank = isPln ? 4700 : 2500;
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const lower = line.toLowerCase();
       if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
         const parts = line.split(/[:=]/);
@@ -272,7 +280,34 @@ ${rawText}
       }
       if (/nama|pelanggan/.test(lower) && !namaPelanggan) {
         const parts = line.split(/[:=]/);
-        if (parts[1] && parts[1].trim().length > 2) namaPelanggan = parts[1].trim();
+        let firstPart = parts.length > 1 ? parts.slice(1).join(":").trim() : "";
+        if (!firstPart && i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin)/i.test(nextLine)) {
+            firstPart = nextLine;
+            i++;
+          }
+        }
+
+        if (firstPart) {
+          namaPelanggan = firstPart;
+          // Check if there is a 2nd line of the name (tidak abaikan jika nama ada 2 baris)
+          while (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            const lowerNext = nextLine.toLowerCase();
+            const isLabelOrField = /[:=]/.test(nextLine) ||
+              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
+              /^\d+([\.,]\d+)*$/.test(nextLine.replace(/\s+/g, "")) ||
+              /^(rp\.?|idr)\s*\d+/i.test(nextLine);
+
+            if (!isLabelOrField && nextLine.length > 0 && nextLine.length < 50) {
+              namaPelanggan = `${namaPelanggan} ${nextLine}`;
+              i++;
+            } else {
+              break;
+            }
+          }
+        }
       }
       if (/rp\s*tagihan|tagihan\s*air|jml\s*tagihan|jumlah\s*tagihan|tagihan/.test(lower) && !/admin|total/.test(lower)) {
         const numbers = line.replace(/[^0-9]/g, "");
@@ -295,6 +330,10 @@ ${rawText}
           if (val > 1000) totalBayar = val;
         }
       }
+    }
+
+    if (namaPelanggan) {
+      namaPelanggan = namaPelanggan.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
     }
 
     // Check line 1 (baris kedua) or any line for period
@@ -331,7 +370,15 @@ ${rawText}
     }
 
     if (!namaPelanggan && lines.length > 0) {
-      namaPelanggan = lines[0].toUpperCase();
+      for (const line of lines) {
+        if (!/[:=]/.test(line) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|\d+)/i.test(line) && line.length >= 3) {
+          namaPelanggan = line.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+          break;
+        }
+      }
+      if (!namaPelanggan) {
+        namaPelanggan = lines[0].replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+      }
     }
 
     if (rpTagihan === 0) {
