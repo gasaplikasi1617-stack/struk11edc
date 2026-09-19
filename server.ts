@@ -160,8 +160,20 @@ ${rawText}
     let rpTagihan = 0;
     let totalBayar = 0;
     let bulanTagihan = "";
-    let standMeter = "-";
+    let standMeter = "";
     let rincianTagihan = "Tagihan Pembayaran";
+
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (/stand\s*meter|meter|sm|stand\s*awal|meter\s*awal/i.test(lower)) {
+        const parts = line.split(/[:=]/);
+        if (parts[1] && parts[1].trim().length > 2) {
+          standMeter = parts[1].trim();
+        } else {
+          standMeter = line.replace(/stand\s*meter|meter|sm/gi, "").replace(/[:=]/g, "").trim();
+        }
+      }
+    }
 
     for (const line of lines) {
       const lower = line.toLowerCase();
@@ -176,6 +188,11 @@ ${rawText}
 
     const isPln = /pln|listrik|token|kwh|pascabayar|prabayar/.test(lowerText);
     const isPdam = /pdam|air|meter air/.test(lowerText);
+
+    if (!standMeter && (isPln || isPdam)) {
+      const rangeMatch = rawText.match(/(\d+\s*-\s*\d+)/);
+      if (rangeMatch) standMeter = rangeMatch[0];
+    }
 
     let pemakaian = "";
     if (isPln) {

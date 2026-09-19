@@ -163,10 +163,12 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             <span className="text-black">Pemakaian:</span>
             <span className="text-black">{receipt.pemakaian || '-'}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-black">Stand Meter:</span>
-            <span className="text-black">{receipt.standMeter || '-'}</span>
-          </div>
+          {receipt.standMeter && (
+            <div className="flex justify-between">
+              <span className="text-black">Stand Meter:</span>
+              <span className="text-black">{receipt.standMeter}</span>
+            </div>
+          )}
         </div>
 
         {/* Bill Details */}

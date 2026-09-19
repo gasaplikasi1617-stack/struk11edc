@@ -78,7 +78,18 @@ ADMIN BANK: 2500`
     let rpTagihan = 150000;
     let totalBayar = 0;
     let bulanTagihan = "";
-    let standMeter = "014230 - 014380";
+    let standMeter = "";
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (/stand\s*meter|meter|sm|stand\s*awal|meter\s*awal/i.test(lower)) {
+        const parts = line.split(/[:=]/);
+        if (parts[1] && parts[1].trim().length > 2) {
+          standMeter = parts[1].trim();
+        } else {
+          standMeter = line.replace(/stand\s*meter|meter|sm/gi, "").replace(/[:=]/g, "").trim();
+        }
+      }
+    }
     let rincianTagihan = "Tagihan Pembayaran";
 
     for (const line of lines) {
@@ -94,6 +105,11 @@ ADMIN BANK: 2500`
 
     const isPln = /pln|listrik|token|kwh|pascabayar|prabayar/.test(lowerText);
     const isPdam = /pdam|air|meter air/.test(lowerText);
+
+    if (!standMeter && (isPln || isPdam)) {
+      const rangeMatch = text.match(/(\d+\s*-\s*\d+)/);
+      if (rangeMatch) standMeter = rangeMatch[0];
+    }
 
     let pemakaian = "";
     if (isPln) {
