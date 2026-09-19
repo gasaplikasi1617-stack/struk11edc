@@ -1,21 +1,28 @@
 @import "tailwindcss";
 
 @media print {
-  body * {
-    visibility: hidden;
+  body {
+    background: white !important;
   }
-  #printable-receipt, #printable-receipt * {
-    visibility: visible;
+  body > * {
+    display: none !important;
   }
   #printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 105mm;
-    height: 148mm;
-    margin: 0;
-    padding: 10mm;
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 105mm !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 8mm !important;
     border: none !important;
     box-shadow: none !important;
+    background: white !important;
+    z-index: 999999 !important;
+  }
+  #printable-receipt * {
+    visibility: visible !important;
   }
 }

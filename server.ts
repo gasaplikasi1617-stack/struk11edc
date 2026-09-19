@@ -46,10 +46,25 @@ app.get("/api/transactions", (req, res) => {
 // Save a new transaction
 app.post("/api/transactions", (req, res) => {
   const txs = getTransactions();
+  const incoming = req.body;
+
+  // Anti-duplicate check: if same idpel & totalBayar created within last 10 seconds, skip duplicate
+  const now = Date.now();
+  const duplicate = txs.find((t: any) => {
+    const isSameIdpel = t.idpel === incoming.idpel;
+    const isSameTotal = Number(t.totalBayar) === Number(incoming.totalBayar);
+    const timeDiff = incoming.createdAt ? Math.abs(new Date(incoming.createdAt).getTime() - new Date(t.createdAt || 0).getTime()) : 0;
+    return isSameIdpel && isSameTotal && timeDiff < 10000;
+  });
+
+  if (duplicate) {
+    return res.json({ success: true, transaction: duplicate, note: "Anti-duplicate prevented" });
+  }
+
   const newTx = {
-    id: "TX-" + Date.now(),
-    createdAt: new Date().toISOString(),
-    ...req.body,
+    id: incoming.id || ("TX-" + now),
+    createdAt: incoming.createdAt || new Date().toISOString(),
+    ...incoming,
   };
   txs.unshift(newTx); // Add to beginning
   // Keep last 500 max

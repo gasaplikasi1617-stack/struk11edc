@@ -112,10 +112,14 @@ export default function App() {
     if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) return;
     try {
       await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-      fetchTransactions();
-    } catch (e: any) {
-      alert('Gagal menghapus: ' + e.message);
-    }
+    } catch (e) {}
+
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
+    try {
+      localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
+    } catch (err) {}
+    fetchTransactions();
   };
 
   const handleSelectTransaction = (tx: ReceiptData) => {
