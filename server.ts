@@ -152,6 +152,57 @@ ${rawText}
 
   // Fallback Smart Regex Parser
   try {
+    const formatPeriod3Chars = (input: string): string => {
+      if (!input) return "Sep26";
+      const upper = input.toUpperCase();
+      const monthMap: Record<string, string> = {
+        JAN: 'Jan', JANUARI: 'Jan',
+        FEB: 'Feb', FEBRUARI: 'Feb',
+        MAR: 'Mar', MARET: 'Mar',
+        APR: 'Apr', APRIL: 'Apr',
+        MEI: 'Mei', MAY: 'Mei',
+        JUN: 'Jun', JUNI: 'Jun',
+        JUL: 'Jul', JULI: 'Jul',
+        AGT: 'Agt', AGS: 'Agt', AGUSTUS: 'Agt', AUG: 'Agt',
+        SEP: 'Sep', SEPTEMBER: 'Sep', SEPT: 'Sep',
+        OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
+        NOV: 'Nov', NOVEMBER: 'Nov',
+        DES: 'Des', DESEMBER: 'Des', DEC: 'Des'
+      };
+
+      let mCode = '';
+      for (const [key, val] of Object.entries(monthMap)) {
+        if (upper.includes(key)) {
+          mCode = val;
+          break;
+        }
+      }
+
+      const yearMatch = upper.match(/20\d{2}|\b\d{2}\b/);
+      let yCode = '';
+      if (yearMatch) {
+        const y = yearMatch[0];
+        yCode = y.length === 4 ? y.slice(2) : y;
+      }
+
+      if (mCode && yCode) {
+        return `${mCode}${yCode}`;
+      }
+
+      const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
+      if (numMatch) {
+        const mNum = parseInt(numMatch[1], 10);
+        const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+        if (mNum >= 1 && mNum <= 12) {
+          mCode = monthsArr[mNum];
+          const y = numMatch[2];
+          yCode = y.length === 4 ? y.slice(2) : y;
+          return `${mCode}${yCode}`;
+        }
+      }
+      return "Sep26";
+    };
+
     const lines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
     const lowerText = rawText.toLowerCase();
     
@@ -244,20 +295,20 @@ ${rawText}
           if (val > 1000) totalBayar = val;
         }
       }
-      if (/bln|bulan|periode|thn|tahun/.test(lower)) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) {
-          bulanTagihan = parts[1].trim().toUpperCase();
-        } else {
-          bulanTagihan = line.replace(/bln|bulan|periode|thn|tahun/gi, "").replace(/[:=]/g, "").trim().toUpperCase();
-        }
+    }
+
+    // Check line 1 (baris kedua) or any line for period
+    for (const idx of [1, 0, 2]) {
+      if (lines[idx] && /jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(lines[idx])) {
+        bulanTagihan = formatPeriod3Chars(lines[idx]);
+        break;
       }
     }
 
     if (!bulanTagihan) {
       for (const line of lines) {
-        if (/jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des|\d{2}\/\d{4}|\b202[0-9]\b/i.test(line)) {
-          bulanTagihan = line.replace(/periode|bulan|bln|thn|tahun/gi, "").replace(/[:=]/g, "").trim().toUpperCase();
+        if (/jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(line)) {
+          bulanTagihan = formatPeriod3Chars(line);
           break;
         }
       }
@@ -265,15 +316,8 @@ ${rawText}
 
     if (!bulanTagihan) {
       const periodMatch = rawText.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
-      if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
-      else bulanTagihan = "SEP26";
-    }
-
-    if (bulanTagihan) {
-      const matchPeriod = bulanTagihan.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
-      if (matchPeriod) {
-        bulanTagihan = matchPeriod[0].toUpperCase();
-      }
+      if (periodMatch) bulanTagihan = formatPeriod3Chars(periodMatch[0]);
+      else bulanTagihan = "Sep26";
     }
 
     if (!idpel) {
