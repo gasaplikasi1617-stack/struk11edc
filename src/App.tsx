@@ -118,7 +118,7 @@ export default function App() {
 
     // LocalStorage fallback
     try {
-      const current = [payload, ...transactions];
+      const current = [payload, ...transactions].slice(0, 100);
       setTransactions(current);
       localStorage.setItem('agent_batara_txs', JSON.stringify(current));
       setSavedStatus(true);

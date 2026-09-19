@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from "./src/utils/billParser";
 
 const app = express();
 const PORT = 3000;
@@ -37,10 +38,10 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Get all transactions
+// Get all transactions (up to 100)
 app.get("/api/transactions", (req, res) => {
   const txs = getTransactions();
-  res.json(txs);
+  res.json(txs.slice(0, 100));
 });
 
 // Save a new transaction
@@ -48,7 +49,7 @@ app.post("/api/transactions", (req, res) => {
   const txs = getTransactions();
   const incoming = req.body;
 
-  // Anti-duplicate check: if same idpel & totalBayar created within last 10 seconds, skip duplicate
+  // Anti-duplicate check: if same idpel & totalBayar created within last 60 seconds, skip duplicate
   const now = Date.now();
   const duplicate = txs.find((t: any) => {
     const isSameIdpel = t.idpel === incoming.idpel;
@@ -67,8 +68,8 @@ app.post("/api/transactions", (req, res) => {
     ...incoming,
   };
   txs.unshift(newTx); // Add to beginning
-  // Keep last 500 max
-  if (txs.length > 500) txs.pop();
+  // Keep last 100 max
+  if (txs.length > 100) txs.splice(100);
   saveTransactions(txs);
   res.json({ success: true, transaction: newTx });
 });
@@ -95,18 +96,31 @@ app.post("/api/parse-bill", async (req, res) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       const prompt = `
-Anda adalah sistem ekstraksi data resi pembayaran tagihan (PLN, PDAM, Indihome, BPJS, Telkom, dll).
+Anda adalah sistem ekstraksi data resi pembayaran tagihan (PLN, PDAM, Indihome, BPJS Kesehatan / Ketenagakerjaan, Telkom, Leasing / Multifinance, PBB, dll).
 Ekstrak data dari teks mentah berikut ke dalam format JSON murni.
 
 Aturan Ekstraksi Sangat Penting:
-1. "bulanTagihan": Ambil nama bulan dan tahun saja (contoh: "SEP26", "AGUSTUS 2026", "08/2026"). JANGAN sertakan kata "Rp" atau angka nominal uang setelahnya.
-2. "pemakaian":
+1. "idpel": Ekstrak nomor identitas pelanggan / ID Pelanggan. PENTING: Setiap instansi memiliki penamaan yang berbeda-beda, SEMUANYA bernilai SAMA dan WAJIB diekstrak ke dalam field "idpel":
+   - "Nomor Polis" / "No Polis" / "No. Polis" / "Polis" (Asuransi / BPJS Kesehatan)
+   - "No Pelanggan" / "Nomor Pelanggan" / "ID Pelanggan" / "IDPEL" / "ID Pel" (PLN / PDAM)
+   - "No Rekening" / "No. Rekening" / "No Rek" / "Nomor Rekening" (PDAM / Bank)
+   - "No Sambungan" / "Nomor Sambungan" / "No Sambung" (PDAM)
+   - "No Peserta" / "Nomor Peserta" / "No Kartu" / "No BPJS" (BPJS)
+   - "Nomor Kontrak" / "No Kontrak" / "No Perjanjian" (Leasing / Multifinance / Cicilan)
+   - "No Internet" / "No Telepon" / "No Telp" / "No IndiHome" / "No Speedy" (Telkom / IndiHome)
+   - "Nomor VA" / "No VA" / "Virtual Account"
+   - "NOP" / "Nomor Objek Pajak" (PBB)
+   - "No Meter" / "Nomor Meter" (PLN)
+   - "Customer ID" / "Cust ID" / "Account No"
+   Ambil nomor/kodenya secara bersih dan akurat (tanpa menyertakan label atau kata keterangan tambahan).
+2. "namaPelanggan": Ambil nama pelanggan / peserta / nasabah lengkap dalam SATU baris. Jika nama pelanggan pada teks terpotong dalam 2 baris, JANGAN abaikan baris kedua. Satukan kedua baris tersebut menjadi satu baris nama lengkap tanpa enter/patah baris.
+3. "bulanTagihan": Ambil nama bulan dan tahun saja (contoh: "SEP26", "AGUSTUS 2026", "08/2026"). JANGAN sertakan kata "Rp" atau angka nominal uang setelahnya.
+4. "pemakaian":
    - Jika teks adalah PLN / Listrik / Token: format "pemakaian" HARUS menyertakan daya dengan "VA", contoh: "R1M/900 VA".
    - Jika teks adalah PDAM / Air: format "pemakaian" HARUS mengandung "m3" (contoh: "23 m3"). Kosongkan jika tidak ada.
    - Untuk layanan lain, sesuaikan.
-3. "rpTagihan": Isi dengan nominal angka tagihan murni.
-4. "totalBayar": Isi dengan nominal total pembayaran asli.
-5. "namaPelanggan": Ambil nama pelanggan lengkap dalam SATU baris. Jika nama pelanggan pada teks terpotong dalam 2 baris, JANGAN abaikan baris kedua. Satukan kedua baris tersebut menjadi satu baris nama lengkap tanpa enter/patah baris.
+5. "rpTagihan": Isi dengan nominal angka tagihan murni.
+6. "totalBayar": Isi dengan nominal total pembayaran asli.
 
 Field JSON yang harus dikembalikan:
 - tanggal: string
@@ -142,6 +156,13 @@ ${rawText}
         .trim()
         .toUpperCase();
 
+      // Ensure idpel is populated & clean
+      let rawIdpel = parsedData.idpel ? String(parsedData.idpel).trim() : "";
+      if (!rawIdpel || rawIdpel === "-") {
+        rawIdpel = extractIdpelFromLines(rawText.split("\n"), rawText);
+      }
+      parsedData.idpel = cleanExtractedId(rawIdpel);
+
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
       const adminBank = Number(parsedData.adminBank) || 2500;
@@ -159,61 +180,10 @@ ${rawText}
 
   // Fallback Smart Regex Parser
   try {
-    const formatPeriod3Chars = (input: string): string => {
-      if (!input) return "Sep26";
-      const upper = input.toUpperCase();
-      const monthMap: Record<string, string> = {
-        JAN: 'Jan', JANUARI: 'Jan',
-        FEB: 'Feb', FEBRUARI: 'Feb',
-        MAR: 'Mar', MARET: 'Mar',
-        APR: 'Apr', APRIL: 'Apr',
-        MEI: 'Mei', MAY: 'Mei',
-        JUN: 'Jun', JUNI: 'Jun',
-        JUL: 'Jul', JULI: 'Jul',
-        AGT: 'Agt', AGS: 'Agt', AGUSTUS: 'Agt', AUG: 'Agt',
-        SEP: 'Sep', SEPTEMBER: 'Sep', SEPT: 'Sep',
-        OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
-        NOV: 'Nov', NOVEMBER: 'Nov',
-        DES: 'Des', DESEMBER: 'Des', DEC: 'Des'
-      };
-
-      let mCode = '';
-      for (const [key, val] of Object.entries(monthMap)) {
-        if (upper.includes(key)) {
-          mCode = val;
-          break;
-        }
-      }
-
-      const yearMatch = upper.match(/20\d{2}|\d{2}/);
-      let yCode = '';
-      if (yearMatch) {
-        const y = yearMatch[0];
-        yCode = y.length === 4 ? y.slice(2) : y;
-      }
-
-      if (mCode && yCode) {
-        return `${mCode}${yCode}`;
-      }
-
-      const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
-      if (numMatch) {
-        const mNum = parseInt(numMatch[1], 10);
-        const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-        if (mNum >= 1 && mNum <= 12) {
-          mCode = monthsArr[mNum];
-          const y = numMatch[2];
-          yCode = y.length === 4 ? y.slice(2) : y;
-          return `${mCode}${yCode}`;
-        }
-      }
-      return "Sep26";
-    };
-
     const lines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
     const lowerText = rawText.toLowerCase();
     
-    let idpel = "";
+    let idpel = extractIdpelFromLines(lines, rawText);
     let namaPelanggan = "";
     let rpTagihan = 0;
     let totalBayar = 0;
@@ -274,19 +244,26 @@ ${rawText}
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const lower = line.toLowerCase();
-      if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) idpel = parts[1].trim();
+      
+      if (!idpel) {
+        idpel = extractIdpelFromLines([line], line);
       }
-      if (/nama|pelanggan/.test(lower) && !namaPelanggan) {
+
+      const isIdLine = /(?:^|\b)(?:no\.?|nomor|id|idpel|kode)\s*(?:pelanggan|peserta|nasabah|konsumen|polis|rekening|rek|kontrak|sambungan|meter)/i.test(lower);
+      const isNameCandidate = !isIdLine && (/\bnama\b/i.test(lower) || /^(?:pelanggan|peserta|nasabah|konsumen)\s*[:=]/i.test(line));
+
+      if (isNameCandidate && !namaPelanggan) {
         const parts = line.split(/[:=]/);
         let firstPart = parts.length > 1 ? parts.slice(1).join(":").trim() : "";
         if (!firstPart && i + 1 < lines.length) {
           const nextLine = lines[i + 1].trim();
-          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin)/i.test(nextLine)) {
+          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin|polis|peserta|kartu|kontrak)/i.test(nextLine)) {
             firstPart = nextLine;
             i++;
           }
+        }
+        if (/^\d{5,}$/.test(firstPart.replace(/[^0-9]/g, "")) && firstPart.length < 15 && !/[a-zA-Z]/.test(firstPart)) {
+          firstPart = "";
         }
 
         if (firstPart) {
@@ -296,7 +273,7 @@ ${rawText}
             const nextLine = lines[i + 1].trim();
             const lowerNext = nextLine.toLowerCase();
             const isLabelOrField = /[:=]/.test(nextLine) ||
-              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
+              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|polis|kontrak|peserta|kartu|nop|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
               /^\d+([\.,]\d+)*$/.test(nextLine.replace(/\s+/g, "")) ||
               /^(rp\.?|idr)\s*\d+/i.test(nextLine);
 
@@ -360,13 +337,7 @@ ${rawText}
     }
 
     if (!idpel) {
-      for (const line of lines) {
-        const match = line.match(/\b\d{8,15}\b/);
-        if (match) {
-          idpel = match[0];
-          break;
-        }
-      }
+      idpel = extractIdpelFromLines(lines, rawText);
     }
 
     if (!namaPelanggan && lines.length > 0) {
@@ -403,7 +374,7 @@ ${rawText}
 
     const fallbackData = {
       tanggal: today,
-      idpel: idpel || "1234567890",
+      idpel: idpel || "",
       namaPelanggan: namaPelanggan || "PELANGGAN UMUM",
       pemakaian: pemakaian,
       standMeter: standMeter,
@@ -475,7 +446,7 @@ function saveTransaction(data) {
   return { success: true, txId: txId };
 }
 
-// Ambil 20 Riwayat Transaksi Terakhir
+// Ambil 100 Riwayat Transaksi Terakhir
 function getLastTransactions() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("RiwayatTransaksi");
@@ -485,7 +456,7 @@ function getLastTransactions() {
   if (lastRow <= 1) return [];
   
   // Ambil dari baris 2 sampai akhir (maksimal 100 terakhir)
-  const startRow = Math.max(2, lastRow - 50);
+  const startRow = Math.max(2, lastRow - 99);
   const numRows = lastRow - startRow + 1;
   const values = sheet.getRange(startRow, 1, numRows, 15).getValues();
   
@@ -644,7 +615,7 @@ function getLastTransactions() {
           return;
         }
         let html = '<table class="w-full text-left border-collapse"><thead><tr class="bg-slate-100 text-xs"> <th class="p-2">ID</th> <th class="p-2">Tanggal</th> <th class="p-2">Pelanggan</th> <th class="p-2">Total</th> </tr></thead><tbody>';
-        txs.slice(0, 20).forEach(t => {
+        txs.slice(0, 100).forEach(t => {
           html += \`<tr class="border-b hover:bg-slate-50"><td class="p-2 font-mono">\${t.id}</td><td class="p-2">\${t.tanggal}</td><td class="p-2">\${t.namaPelanggan}</td><td class="p-2 font-semibold">Rp \${Number(t.totalBayar).toLocaleString('id-ID')}</td></tr>\`;
         });
         html += '</tbody></table>';

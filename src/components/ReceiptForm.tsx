@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
 import { Wand2, Sparkles, RefreshCw, CheckCircle2, Building, MapPin, Phone } from 'lucide-react';
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from '../utils/billParser';
 
 interface ReceiptFormProps {
   receipt: ReceiptData;
@@ -34,7 +35,7 @@ export function ReceiptForm({
 
   const sampleTexts = [
     {
-      label: "Contoh PLN Pascabayar",
+      label: "Contoh PLN (Idpel)",
       text: `STRUK PEMBAYARAN TAGIHAN LISTRIK PLN
 IDPEL: 541293847210
 NAMA: BUNG HATTA
@@ -46,9 +47,19 @@ ADMIN BANK: 4700
 TOTAL: 170200`
     },
     {
-      label: "Contoh PDAM",
+      label: "Contoh BPJS (Nomor Polis)",
+      text: `BUKTI PEMBAYARAN BPJS KESEHATAN
+NOMOR POLIS: 0001234567891
+NAMA PESERTA: DEWI SARTIKA
+PERIODE: SEP26
+TAGIHAN: 70000
+BIAYA ADMIN: 2500
+TOTAL BAYAR: 72500`
+    },
+    {
+      label: "Contoh PDAM (No Pel/Sambungan)",
       text: `PDAM TIRTA PATRIOT BEKASI
-NO PELANGGAN: 88392011
+NOMOR SAMBUNGAN: 88392011
 NAMA: SITI AMINAH
 PERIODE: SEP26
 METER AWAL/AKHIR: 45 - 68 (23 m3)
@@ -57,9 +68,9 @@ DENDA / LAIN: 0
 ADMIN: 2500`
     },
     {
-      label: "Contoh Indihome",
+      label: "Contoh Indihome (No Internet)",
       text: `TELKOM INDIHOME FIBER
-IDPEL: 122839401923
+NO INTERNET: 122839401923
 NAMA PELANGGAN: AHMAD FAUZI
 LAYANAN: INTERNET + PHONE 30MBPS
 PERIODE: SEP26
@@ -69,62 +80,11 @@ ADMIN BANK: 2500`
     }
   ];
 
-  const formatPeriod3Chars = (input: string): string => {
-    if (!input) return "Sep26";
-    const upper = input.toUpperCase();
-    const monthMap: Record<string, string> = {
-      JAN: 'Jan', JANUARI: 'Jan',
-      FEB: 'Feb', FEBRUARI: 'Feb',
-      MAR: 'Mar', MARET: 'Mar',
-      APR: 'Apr', APRIL: 'Apr',
-      MEI: 'Mei', MAY: 'Mei',
-      JUN: 'Jun', JUNI: 'Jun',
-      JUL: 'Jul', JULI: 'Jul',
-      AGT: 'Agt', AGS: 'Agt', AGUSTUS: 'Agt', AUG: 'Agt',
-      SEP: 'Sep', SEPTEMBER: 'Sep', SEPT: 'Sep',
-      OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
-      NOV: 'Nov', NOVEMBER: 'Nov',
-      DES: 'Des', DESEMBER: 'Des', DEC: 'Des'
-    };
-
-    let mCode = '';
-    for (const [key, val] of Object.entries(monthMap)) {
-      if (upper.includes(key)) {
-        mCode = val;
-        break;
-      }
-    }
-
-    const yearMatch = upper.match(/20\d{2}|\d{2}/);
-    let yCode = '';
-    if (yearMatch) {
-      const y = yearMatch[0];
-      yCode = y.length === 4 ? y.slice(2) : y;
-    }
-
-    if (mCode && yCode) {
-      return `${mCode}${yCode}`;
-    }
-
-    const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
-    if (numMatch) {
-      const mNum = parseInt(numMatch[1], 10);
-      const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-      if (mNum >= 1 && mNum <= 12) {
-        mCode = monthsArr[mNum];
-        const y = numMatch[2];
-        yCode = y.length === 4 ? y.slice(2) : y;
-        return `${mCode}${yCode}`;
-      }
-    }
-    return "Sep26";
-  };
-
   const clientParse = (text: string) => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     const lowerText = text.toLowerCase();
     
-    let idpel = "";
+    let idpel = extractIdpelFromLines(lines, text);
     let namaPelanggan = "";
     let rpTagihan = 0;
     let totalBayar = 0;
@@ -184,19 +144,26 @@ ADMIN BANK: 2500`
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const lower = line.toLowerCase();
-      if (/idpel|id\s*pelanggan|no\.?\s*pelanggan|nomor\s*pelanggan/.test(lower)) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) idpel = parts[1].trim();
+      
+      if (!idpel) {
+        idpel = extractIdpelFromLines([line], line);
       }
-      if (/nama|pelanggan/.test(lower) && !namaPelanggan) {
+
+      const isIdLine = /(?:^|\b)(?:no\.?|nomor|id|idpel|kode)\s*(?:pelanggan|peserta|nasabah|konsumen|polis|rekening|rek|kontrak|sambungan|meter)/i.test(lower);
+      const isNameCandidate = !isIdLine && (/\bnama\b/i.test(lower) || /^(?:pelanggan|peserta|nasabah|konsumen)\s*[:=]/i.test(line));
+
+      if (isNameCandidate && !namaPelanggan) {
         const parts = line.split(/[:=]/);
         let firstPart = parts.length > 1 ? parts.slice(1).join(":").trim() : "";
         if (!firstPart && i + 1 < lines.length) {
           const nextLine = lines[i + 1].trim();
-          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin)/i.test(nextLine)) {
+          if (!/[:=]/.test(nextLine) && !/^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|no|rek|periode|bln|thn|tarif|daya|stand|meter|rp|total|admin|polis|peserta|kartu|kontrak)/i.test(nextLine)) {
             firstPart = nextLine;
             i++;
           }
+        }
+        if (/^\d{5,}$/.test(firstPart.replace(/[^0-9]/g, "")) && firstPart.length < 15 && !/[a-zA-Z]/.test(firstPart)) {
+          firstPart = "";
         }
 
         if (firstPart) {
@@ -206,7 +173,7 @@ ADMIN BANK: 2500`
             const nextLine = lines[i + 1].trim();
             const lowerNext = nextLine.toLowerCase();
             const isLabelOrField = /[:=]/.test(nextLine) ||
-              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
+              /^(info|struk|bukti|transaksi|pln|pdam|telkom|indihome|speedy|bpjs|pbb|idpel|id\s*pelanggan|no|nomor|polis|kontrak|peserta|kartu|nop|rek|rekening|periode|bln|bulan|thn|tahun|tarif|daya|kwh|va|gol|golongan|stand|meter|sm|rp|tagihan|total|admin|adm|denda|biaya|lain|alamat|jl|jalan|kec|kel|tgl|tanggal|jam|waktu|terbilang|status|petugas|sn|token)\b/i.test(lowerNext) ||
               /^\d+([\.,]\d+)*$/.test(nextLine.replace(/\s+/g, "")) ||
               /^(rp\.?|idr)\s*\d+/i.test(nextLine);
 
@@ -270,8 +237,7 @@ ADMIN BANK: 2500`
     }
 
     if (!idpel) {
-      const match = text.match(/\b\d{8,15}\b/);
-      if (match) idpel = match[0];
+      idpel = extractIdpelFromLines(lines, text);
     }
 
     if (!namaPelanggan && lines.length > 0) {
@@ -293,7 +259,7 @@ ADMIN BANK: 2500`
 
     return {
       tanggal: new Date().toLocaleDateString("id-ID"),
-      idpel,
+      idpel: cleanExtractedId(idpel),
       namaPelanggan: namaPelanggan.toUpperCase(),
       pemakaian,
       standMeter,
@@ -333,10 +299,16 @@ ADMIN BANK: 2500`
       const data = await res.json();
       if (data.success && data.data) {
         const d = data.data;
+        let finalIdpel = d.idpel ? String(d.idpel).trim() : '';
+        if (!finalIdpel || finalIdpel === '-') {
+          finalIdpel = extractIdpelFromLines(rawText.split('\n'), rawText);
+        }
+        finalIdpel = cleanExtractedId(finalIdpel);
+
         setReceipt((prev) => ({
           ...prev,
           tanggal: d.tanggal || prev.tanggal,
-          idpel: d.idpel || prev.idpel,
+          idpel: finalIdpel || prev.idpel,
           namaPelanggan: (d.namaPelanggan || prev.namaPelanggan || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase(),
           pemakaian: d.pemakaian || prev.pemakaian,
           standMeter: d.standMeter || prev.standMeter,
@@ -506,11 +478,15 @@ ADMIN BANK: 2500`
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">ID Pelanggan (Idpel)</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
+              <span>ID Pelanggan (Idpel)</span>
+              <span className="text-[10px] text-blue-600 font-medium">Polis = No. Pel = Idpel</span>
+            </label>
             <input
               type="text"
               value={receipt.idpel}
               onChange={(e) => handleInputChange('idpel', e.target.value)}
+              placeholder="Nomor Polis / IDPEL / No. Sambungan"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
             />
           </div>

@@ -47,7 +47,7 @@ export function Navbar({ activeTab, setActiveTab, historyCount }: NavbarProps) {
               <span>Riwayat</span>
               {historyCount > 0 && (
                 <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1">
-                  {historyCount > 20 ? '20+' : historyCount}
+                  {historyCount > 99 ? '99+' : historyCount}
                 </span>
               )}
             </button>
