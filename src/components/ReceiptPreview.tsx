@@ -132,15 +132,11 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           <p className="text-[11px] text-black">Telp/WA: {receipt.noHp || '-'}</p>
           <div className="mt-2 text-[10px] bg-slate-100 py-1 px-2.5 rounded inline-block font-bold uppercase border border-slate-300 text-black">
             {(() => {
-              const text = ((receipt.rincianTagihan || '') + ' ' + (receipt.pemakaian || '') + ' ' + (receipt.idpel || '')).toLowerCase();
-              if (text.includes('pln') || text.includes('listrik') || text.includes('kwh')) return 'STRUK PEMBAYARAN LISTRIK PLN';
-              if (text.includes('pdam') || text.includes('air') || text.includes('m3')) return 'STRUK PEMBAYARAN PDAM AIR';
-              if (text.includes('indihome') || text.includes('telkom') || text.includes('fiber') || text.includes('internet')) return 'STRUK PEMBAYARAN INDIHOME / TELKOM';
-              if (text.includes('bpjs') || text.includes('kesehatan')) return 'STRUK PEMBAYARAN BPJS KESEHATAN';
-              if (text.includes('pbb') || text.includes('pajak')) return 'STRUK PEMBAYARAN PAJAK PBB';
-              if (text.includes('pulsa') || text.includes('token')) return 'STRUK PEMBELIAN PULSA / TOKEN';
-              if (receipt.rincianTagihan) return `STRUK PEMBAYARAN ${receipt.rincianTagihan.toUpperCase()}`;
-              return 'STRUK PEMBAYARAN RESMI';
+              const raw = receipt.rincianTagihan || '';
+              const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
+              const title = clean || raw || 'PEMBAYARAN RESMI';
+              if (title.toUpperCase().includes('STRUK')) return title.toUpperCase();
+              return `STRUK PEMBAYARAN ${title.toUpperCase()}`;
             })()}
           </div>
         </div>

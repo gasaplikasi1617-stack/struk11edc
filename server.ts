@@ -162,6 +162,17 @@ ${rawText}
     let standMeter = "-";
     let rincianTagihan = "Tagihan Pembayaran";
 
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (/info\s*tagihan|tagihan\s*pembayaran|pdam|pln|indihome|bpjs|pbb|token|pulsa|telkom/.test(lower)) {
+        rincianTagihan = line.replace(/^info\s*tagihan/i, "").replace(/^tagihan/i, "").trim();
+        break;
+      }
+    }
+    if (rincianTagihan === "Tagihan Pembayaran" && lines.length > 0) {
+      rincianTagihan = lines[0].replace(/^info\s*tagihan/i, "").replace(/^tagihan/i, "").trim();
+    }
+
     const isPln = /pln|listrik|token|kwh|pascabayar|prabayar/.test(lowerText);
     const isPdam = /pdam|air|meter air/.test(lowerText);
 
@@ -217,12 +228,24 @@ ${rawText}
       }
       if (/bln|bulan|periode|thn|tahun/.test(lower)) {
         const parts = line.split(/[:=]/);
-        if (parts[1]) bulanTagihan = parts[1].trim().toUpperCase();
+        if (parts[1]) {
+          bulanTagihan = parts[1].trim().toUpperCase();
+        } else {
+          bulanTagihan = line.replace(/bln|bulan|periode|thn|tahun/gi, "").replace(/[:=]/g, "").trim().toUpperCase();
+        }
       }
     }
 
     if (!bulanTagihan) {
-      // Check for patterns like Sep26 or 08/2026 or similar in text
+      for (const line of lines) {
+        if (/jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des|\d{2}\/\d{4}|\b202[0-9]\b/i.test(line)) {
+          bulanTagihan = line.replace(/periode|bulan|bln|thn|tahun/gi, "").replace(/[:=]/g, "").trim().toUpperCase();
+          break;
+        }
+      }
+    }
+
+    if (!bulanTagihan) {
       const periodMatch = rawText.match(/([A-Za-z]{3}\d{2}|\d{2}\/\d{4}|[A-Za-z]+\s+\d{4})/);
       if (periodMatch) bulanTagihan = periodMatch[0].toUpperCase();
       else bulanTagihan = "BULAN INI";
