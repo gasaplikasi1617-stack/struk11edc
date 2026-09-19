@@ -1,7 +1,19 @@
 import React, { useState } from 'react';
 import { ReceiptData } from '../types';
-import { Printer, Download, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import {
+  Printer,
+  Download,
+  CheckCircle,
+  Image as ImageIcon,
+  Loader2,
+  ExternalLink,
+  Copy,
+  Check,
+  X,
+  Share2,
+} from 'lucide-react';
+import html2canvas from 'html2canvas-pro';
+import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 
 interface ReceiptPreviewProps {
   receipt: ReceiptData;
@@ -10,15 +22,23 @@ interface ReceiptPreviewProps {
   savedStatus: boolean;
 }
 
+interface DownloadedModalState {
+  url: string;
+  blob: Blob | null;
+  fileName: string;
+}
+
 export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: ReceiptPreviewProps) {
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [downloadedModal, setDownloadedModal] = useState<DownloadedModalState | null>(null);
+  const [copiedClipboard, setCopiedClipboard] = useState(false);
 
   const showActionNotice = (msg: string) => {
     setActionNotice(msg);
     setTimeout(() => {
       setActionNotice(null);
-    }, 4000);
+    }, 5000);
   };
 
   const handleDirectPrint = (isPdf = false) => {
@@ -117,36 +137,116 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handleDownloadImage = async () => {
-    // 1. Otomatis simpan data transaksi ke riwayat
+    // 1. Otomatis simpan data transaksi ke riwayat & Google Sheets
     onSave();
-    const receiptElement = document.getElementById('printable-receipt');
-    if (!receiptElement) return;
+
+    setIsDownloadingImage(true);
+    showActionNotice('Menyiapkan gambar struk resolusi tajam (A6)...');
+
+    const safeId = (receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeName = (receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+    const dateStr = (receipt.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
+    const fileName = `Struk_${safeId}_${safeName}_${dateStr}.png`;
 
     try {
-      setIsDownloadingImage(true);
-      showActionNotice('Menyiapkan file gambar struk & data otomatis tersimpan ke riwayat...');
+      let canvas: HTMLCanvasElement | null = null;
+      const receiptElement = document.getElementById('printable-receipt');
 
-      const canvas = await html2canvas(receiptElement, {
-        scale: 2.5,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
+      // 1. Coba render DOM melalui html2canvas-pro
+      if (receiptElement) {
+        try {
+          canvas = await html2canvas(receiptElement, {
+            scale: 2.5,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false,
+            allowTaint: true,
+            scrollX: 0,
+            scrollY: 0,
+          });
+        } catch (canvasErr) {
+          console.warn('html2canvas-pro warning, falling back to pure canvas drawer:', canvasErr);
+        }
+      }
+
+      // 2. Fallback jika html2canvas-pro tidak menghasilkan canvas
+      if (!canvas) {
+        canvas = drawReceiptToCanvas(receipt);
+      }
+
+      // 3. Konversi canvas ke Blob PNG
+      const blob: Blob | null = await new Promise((resolve) => {
+        canvas!.toBlob((b) => resolve(b), 'image/png', 1.0);
       });
 
-      const dataUrl = canvas.toDataURL('image/png');
+      const fileUrl = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+
+      // 4. Trigger auto-download via tag <a> ter-append ke DOM
       const link = document.createElement('a');
-      const safeId = (receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
-      const safeName = (receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
-      const dateStr = (receipt.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
-      link.href = dataUrl;
-      link.download = `Struk_${safeId}_${safeName}_${dateStr}.png`;
+      link.style.display = 'none';
+      link.href = fileUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
       link.click();
 
-      showActionNotice('Struk PNG berhasil di-download & data otomatis tersimpan ke riwayat!');
-    } catch (err) {
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+      }, 1500);
+
+      // 5. Buka modal opsi lengkap untuk user (Unduh Ulang, Buka di Tab Baru, Salin ke WhatsApp)
+      setDownloadedModal({
+        url: fileUrl,
+        blob: blob,
+        fileName: fileName,
+      });
+
+      showActionNotice('Struk PNG berhasil dibuat & unduhan otomatis dimulai!');
+    } catch (err: any) {
       console.error('Error generating image file:', err);
+
+      // Emergency fallback dengan pure canvas 2D
+      try {
+        const fallbackCanvas = drawReceiptToCanvas(receipt);
+        const dataUrl = fallbackCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = dataUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          if (document.body.contains(link)) document.body.removeChild(link);
+        }, 1500);
+
+        setDownloadedModal({
+          url: dataUrl,
+          blob: null,
+          fileName: fileName,
+        });
+        showActionNotice('Struk PNG berhasil dibuat & di-download!');
+      } catch (fallbackErr: any) {
+        showActionNotice(`Gagal membuat gambar PNG: ${fallbackErr.message || err.message}`);
+      }
     } finally {
       setIsDownloadingImage(false);
+    }
+  };
+
+  const handleCopyImageToClipboard = async () => {
+    if (!downloadedModal) return;
+    try {
+      if (downloadedModal.blob && navigator.clipboard && (window as any).ClipboardItem) {
+        const item = new (window as any).ClipboardItem({ 'image/png': downloadedModal.blob });
+        await navigator.clipboard.write([item]);
+        setCopiedClipboard(true);
+        setTimeout(() => setCopiedClipboard(false), 3000);
+      } else {
+        showActionNotice('Klik tombol "Buka Gambar", lalu klik kanan dan pilih "Salin Gambar".');
+      }
+    } catch (e) {
+      showActionNotice('Browser tidak mengizinkan salin gambar otomatis. Gunakan tombol "Buka Gambar".');
     }
   };
 
@@ -154,7 +254,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
       <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-          <span>4. Preview Resi Ukuran A6</span>
+          <span>Preview</span>
         </h3>
         <div className="flex items-center gap-2">
           {savedStatus && (
@@ -214,7 +314,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         </div>
 
         {/* Transaction Metadata */}
-        <div className="space-y-1 border-b border-dashed border-slate-400 pb-2 mb-3 text-[11px] text-black">
+        <div className="space-y-1 border-b border-dashed border-black pb-2 mb-3 text-[11px] text-black">
           <div className="flex justify-between">
             <span className="text-black">Tgl/Waktu:</span>
             <span className="font-semibold text-black">{receipt.tanggal || new Date().toLocaleDateString('id-ID')}</span>
@@ -298,6 +398,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           <span>Download PDF</span>
         </button>
         <button
+          id="btn-download-png"
           onClick={handleDownloadImage}
           disabled={isDownloadingImage}
           className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -308,7 +409,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           ) : (
             <ImageIcon className="w-4 h-4" />
           )}
-          <span>Download Gambar (PNG)</span>
+          <span>{isDownloadingImage ? 'Memproses PNG...' : 'Download Gambar (PNG)'}</span>
         </button>
       </div>
 
@@ -317,6 +418,85 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
         <span>Setiap tombol <b>Cetak</b> atau <b>Download</b> otomatis menyimpan data ke riwayat transaksi.</span>
       </p>
+
+      {/* Download PNG Success & Actions Modal */}
+      {downloadedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh]">
+            <button
+              onClick={() => setDownloadedModal(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="bg-emerald-100 text-emerald-700 p-2 rounded-xl">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800 text-base">Gambar Struk PNG Siap!</h4>
+                <p className="text-xs text-slate-500">Resolusi tinggi, siap dibagikan ke pelanggan atau dicetak.</p>
+              </div>
+            </div>
+
+            {/* Thumbnail Preview */}
+            <div className="my-3 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center overflow-auto max-h-56">
+              <img
+                src={downloadedModal.url}
+                alt="Preview Struk PNG"
+                className="max-h-48 rounded shadow-xs border border-slate-300 object-contain"
+              />
+            </div>
+
+            {/* Quick Actions for WhatsApp and saving */}
+            <div className="space-y-2 mt-2">
+              <a
+                href={downloadedModal.url}
+                download={downloadedModal.fileName}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer text-center"
+              >
+                <Download className="w-4 h-4" />
+                <span>Unduh File PNG ({downloadedModal.fileName})</span>
+              </a>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopyImageToClipboard}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Salin gambar agar dapat langsung di-paste (Ctrl+V) ke WhatsApp Web"
+                >
+                  {copiedClipboard ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Tersalin! Paste di WA</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Salin ke WhatsApp</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => window.open(downloadedModal.url, '_blank')}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Buka gambar di tab browser baru"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Buka Tab Baru</span>
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 text-center mt-3">
+              *Jika unduhan browser tidak langsung muncul otomatis, klik tombol <strong>Unduh File PNG</strong> di atas.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

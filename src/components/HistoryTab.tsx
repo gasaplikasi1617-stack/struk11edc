@@ -15,15 +15,21 @@ import {
   Receipt,
   Wallet,
   Building2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Database,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
+import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
   onDeleteTransaction: (id: string) => void;
+  onRefreshTransactions?: () => Promise<void> | void;
+  onNavigateToGasTab?: () => void;
 }
 
 type ServiceFilterType = 'all' | BillCategory;
@@ -67,11 +73,76 @@ export function HistoryTab({
   transactions,
   onSelectTransaction,
   onDeleteTransaction,
+  onRefreshTransactions,
+  onNavigateToGasTab,
 }: HistoryTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('all');
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
+  const [isSyncingGas, setIsSyncingGas] = useState(false);
+
+  const handleGasSyncClick = async () => {
+    setIsSyncingGas(true);
+    try {
+      const res = await fetch('/api/gas/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setExportSuccessNotice(
+          data.message || 'Sinkronisasi 2 arah dengan Google Sheets berhasil!'
+        );
+        if (onRefreshTransactions) {
+          await onRefreshTransactions();
+        }
+      } else {
+        if (data.error && data.error.includes('belum dikonfigurasi')) {
+          setExportSuccessNotice(
+            'URL Google Apps Script belum dikonfigurasi. Silakan atur URL di tab "Integrasi & Sinkron GAS".'
+          );
+        } else {
+          setExportSuccessNotice(`Sinkronisasi gagal: ${data.error || 'Terjadi kesalahan'}`);
+        }
+      }
+    } catch (e: any) {
+      setExportSuccessNotice(`Gagal sinkron: ${e.message}`);
+    } finally {
+      setIsSyncingGas(false);
+      setTimeout(() => setExportSuccessNotice(null), 6000);
+    }
+  };
+
+  const handleQuickDownloadPng = (tx: ReceiptData) => {
+    try {
+      const canvas = drawReceiptToCanvas(tx);
+      const safeId = (tx.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = (tx.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+      const dateStr = (tx.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
+      const fileName = `Struk_${safeId}_${safeName}_${dateStr}.png`;
+
+      canvas.toBlob((blob) => {
+        const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          if (document.body.contains(link)) document.body.removeChild(link);
+          if (blob) URL.revokeObjectURL(url);
+        }, 1500);
+      }, 'image/png');
+
+      setExportSuccessNotice(`Gambar struk PNG untuk ${tx.namaPelanggan || 'transaksi'} berhasil diunduh!`);
+      setTimeout(() => setExportSuccessNotice(null), 5000);
+    } catch (err: any) {
+      setExportSuccessNotice(`Gagal mengunduh gambar struk: ${err.message}`);
+    }
+  };
 
   // Category counts across all transactions
   const categoryCounts = useMemo(() => {
@@ -224,8 +295,19 @@ export function HistoryTab({
             </p>
           </div>
 
-          {/* Export to Excel Action Button */}
-          <div className="flex items-center gap-2">
+          {/* Export to Excel & GAS Two-Way Sync Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="btn-gas-sync-history"
+              onClick={handleGasSyncClick}
+              disabled={isSyncingGas}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all"
+              title="Sinkronisasi 2 arah dengan Google Sheets"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
+              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron 2 Arah Sheets'}</span>
+            </button>
+
             <button
               id="btn-export-excel"
               onClick={handleExportToExcel}
@@ -610,6 +692,14 @@ export function HistoryTab({
                           >
                             <Printer className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Cetak</span>
+                          </button>
+                          <button
+                            onClick={() => handleQuickDownloadPng(tx)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 font-medium transition-all"
+                            title="Unduh langsung gambar struk (PNG)"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">PNG</span>
                           </button>
                           {tx.id && (
                             <button

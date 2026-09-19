@@ -33,53 +33,6 @@ export function ReceiptForm({
     }
   }, [resetTrigger]);
 
-  const sampleTexts = [
-    {
-      label: "Contoh PLN (Idpel)",
-      text: `STRUK PEMBAYARAN TAGIHAN LISTRIK PLN
-IDPEL: 541293847210
-NAMA: BUNG HATTA
-BLN/THN: Sep26
-STAND METER: 014230 - 014380
-PEMAKAIAN: R1M/900 VA
-RP TAGIHAN: 165500
-ADMIN BANK: 4700
-TOTAL: 170200`
-    },
-    {
-      label: "Contoh BPJS (Nomor Polis)",
-      text: `BUKTI PEMBAYARAN BPJS KESEHATAN
-NOMOR POLIS: 0001234567891
-NAMA PESERTA: DEWI SARTIKA
-PERIODE: SEP26
-TAGIHAN: 70000
-BIAYA ADMIN: 2500
-TOTAL BAYAR: 72500`
-    },
-    {
-      label: "Contoh PDAM (No Pel/Sambungan)",
-      text: `PDAM TIRTA PATRIOT BEKASI
-NOMOR SAMBUNGAN: 88392011
-NAMA: SITI AMINAH
-PERIODE: SEP26
-METER AWAL/AKHIR: 45 - 68 (23 m3)
-TAGIHAN AIR: 115000
-DENDA / LAIN: 0
-ADMIN: 2500`
-    },
-    {
-      label: "Contoh Indihome (No Internet)",
-      text: `TELKOM INDIHOME FIBER
-NO INTERNET: 122839401923
-NAMA PELANGGAN: AHMAD FAUZI
-LAYANAN: INTERNET + PHONE 30MBPS
-PERIODE: SEP26
-RP TAGIHAN: 315000
-BIAYA LAIN: 0
-ADMIN BANK: 2500`
-    }
-  ];
-
   const clientParse = (text: string) => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     const lowerText = text.toLowerCase();
@@ -351,23 +304,9 @@ ADMIN BANK: 2500`
     <div className="space-y-6">
       {/* 1. Paste & Parse Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-bold text-slate-800">1. Input & Parsing Teks Mentah Otomatis</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {sampleTexts.map((s, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setRawText(s.text)}
-                className="text-xs bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-all font-medium"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center space-x-2 mb-4">
+          <Sparkles className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-bold text-slate-800">1. Input & Parsing Teks Mentah Otomatis</h2>
         </div>
 
         <p className="text-xs text-slate-500 mb-3">

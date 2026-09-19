@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, History, FileCode2, Receipt } from 'lucide-react';
+import { Printer, History, Receipt, RefreshCw } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'create' | 'history' | 'gas';
@@ -60,8 +60,8 @@ export function Navbar({ activeTab, setActiveTab, historyCount }: NavbarProps) {
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <FileCode2 className="w-4 h-4" />
-              <span>Kode Google Apps Script</span>
+              <RefreshCw className="w-4 h-4" />
+              <span>Integrasi & Sinkron GAS</span>
             </button>
           </nav>
         </div>

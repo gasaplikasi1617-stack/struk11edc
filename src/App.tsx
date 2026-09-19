@@ -198,10 +198,14 @@ export default function App() {
             transactions={transactions}
             onSelectTransaction={handleSelectTransaction}
             onDeleteTransaction={handleDeleteTransaction}
+            onRefreshTransactions={fetchTransactions}
+            onNavigateToGasTab={() => setActiveTab('gas')}
           />
         )}
 
-        {activeTab === 'gas' && <GasIntegrationTab />}
+        {activeTab === 'gas' && (
+          <GasIntegrationTab onSyncSuccess={fetchTransactions} />
+        )}
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
