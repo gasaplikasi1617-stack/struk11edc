@@ -1,0 +1,6 @@
+{
+  "name": "Cetak Resi Tagihan",
+  "description": "Aplikasi Cetak Resi Tagihan multi-institusi dengan parsing otomatis teks mentah, kustomisasi agen, cetak A6, export PDF, riwayat transaksi, dan Google Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
