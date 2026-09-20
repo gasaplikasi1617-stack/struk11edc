@@ -773,6 +773,33 @@ app.post("/api/gas/test", async (req, res) => {
   }
 });
 
+// Setup / Inisialisasi Database Google Sheets via Apps Script Web App
+app.post("/api/gas/setup", async (req, res) => {
+  try {
+    const gasCfg = getGasConfig();
+    const targetUrl = (req.body.gasUrl || gasCfg.gasUrl || "").trim();
+    if (!targetUrl) {
+      return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum diisi." });
+    }
+    let result: any;
+    try {
+      result = await callGasPost(targetUrl, { action: "setupDatabase" });
+    } catch (e1) {
+      result = await callGasGet(targetUrl, { action: "setupDatabase" });
+    }
+    return res.json({
+      success: true,
+      message: "Database Google Sheet berhasil disiapkan dan terhubung!",
+      detail: result,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: "Gagal inisialisasi database di Google Sheets: " + (err.message || String(err)),
+    });
+  }
+});
+
 // Full Two-Way Sync (Sinkron 2 Arah)
 app.post("/api/gas/sync", async (req, res) => {
   try {

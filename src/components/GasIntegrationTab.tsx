@@ -35,10 +35,12 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   // Operation states
   const [isTesting, setIsTesting] = useState(false);
+  const [isSettingUp, setIsSettingUp] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [sheetInfo, setSheetInfo] = useState<{ name?: string; url?: string } | null>(null);
 
   const [syncNotice, setSyncNotice] = useState<{
     type: 'success' | 'error' | 'info';
@@ -162,6 +164,9 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.detail && data.detail.spreadsheet) {
+          setSheetInfo(data.detail.spreadsheet);
+        }
         setSyncNotice({
           type: 'success',
           text: 'Koneksi BERHASIL! Google Apps Script Web App terhubung dan merespons dengan baik.',
@@ -177,6 +182,54 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  // Setup / Inisialisasi Database Google Sheets
+  const handleSetupDatabase = async () => {
+    if (!gasUrl.trim()) {
+      setSyncNotice({
+        type: 'error',
+        text: 'Silakan isi URL Web App Google Apps Script terlebih dahulu.',
+      });
+      return;
+    }
+
+    setIsSettingUp(true);
+    setSyncNotice({
+      type: 'info',
+      text: 'Menyiapkan database & tabel RiwayatTransaksi di Google Sheets...',
+    });
+
+    try {
+      const res = await fetch('/api/gas/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.detail) {
+          setSheetInfo({
+            name: data.detail.spreadsheetName,
+            url: data.detail.spreadsheetUrl,
+          });
+        }
+        setSyncNotice({
+          type: 'success',
+          text: 'Database Google Sheet BERHASIL disiapkan! Tab RiwayatTransaksi dan header 16 kolom siap digunakan.',
+        });
+        loadPreview(gasUrl.trim());
+      } else {
+        throw new Error(data.error || 'Gagal inisialisasi database');
+      }
+    } catch (e: any) {
+      setSyncNotice({
+        type: 'error',
+        text: `Gagal Setup Database: ${e.message}. Pastikan fungsi setupDatabase sudah diizinkan (Run di Apps Script).`,
+      });
+    } finally {
+      setIsSettingUp(false);
     }
   };
 
@@ -378,6 +431,30 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
         {/* Configuration Form */}
         <div className="mt-6 space-y-4">
+          {/* Active Sheet Card if detected */}
+          {sheetInfo && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-600" />
+                <div>
+                  <span className="text-slate-600">Spreadsheet Terhubung: </span>
+                  <strong className="text-emerald-900">{sheetInfo.name || 'Database Resi Agen Batara'}</strong>
+                </div>
+              </div>
+              {sheetInfo.url && (
+                <a
+                  href={sheetInfo.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                >
+                  <span>Buka Google Sheets</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
@@ -398,13 +475,22 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                 placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
                 className="flex-1 px-3.5 py-2.5 text-xs font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs text-slate-800"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleSaveConfig}
                   disabled={isSavingConfig}
-                  className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
+                  className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
                 >
                   {isSavingConfig ? 'Menyimpan...' : 'Simpan URL'}
+                </button>
+                <button
+                  onClick={handleSetupDatabase}
+                  disabled={isSettingUp || !gasUrl.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap flex items-center gap-1.5"
+                  title="Inisialisasi header dan tabel RiwayatTransaksi di Google Sheet"
+                >
+                  {isSettingUp ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>⚙️</span>}
+                  <span>{isSettingUp ? 'Menyiapkan...' : 'Setup Database'}</span>
                 </button>
                 <button
                   onClick={handleTestConnection}
