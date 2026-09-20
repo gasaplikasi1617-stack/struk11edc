@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, History, Receipt, RefreshCw, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import { Printer, History, Receipt, RefreshCw } from 'lucide-react';
 import { subscribeSyncState, SyncState, executeTwoWaySync, isAutoSyncEnabled } from '../services/gasClientSync';
 
 interface NavbarProps {
@@ -16,21 +16,11 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
     lastError: null,
     totalInSheet: 0,
   });
-  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeSyncState((state) => {
       setSyncState(state);
     });
-    
-    // Fetch sheet config for quick link
-    fetch('/api/gas/config')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.sheetUrl) setSheetUrl(data.sheetUrl);
-      })
-      .catch(() => {});
-
     return unsubscribe;
   }, []);
 
@@ -48,7 +38,7 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
   };
 
   return (
-    <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-50 border-b border-slate-800">
+    <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-3">
@@ -92,10 +82,10 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
             </div>
           </div>
 
-          <nav className="flex items-center space-x-1 sm:space-x-2">
+          <nav className="flex space-x-1 sm:space-x-2">
             <button
               onClick={() => setActiveTab('create')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'create'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -107,7 +97,7 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all relative ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
                 activeTab === 'history'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -124,15 +114,14 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
 
             <button
               onClick={() => setActiveTab('gas')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'gas'
-                  ? 'bg-emerald-600 text-white shadow-md border border-emerald-500'
-                  : 'text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/60 hover:text-emerald-200 border border-emerald-800/60'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
-              title="Menu Pengaturan & Link Data Google Sheet"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-              <span>Link Data Google Sheet</span>
+              <RefreshCw className="w-4 h-4" />
+              <span>Integrasi</span>
             </button>
           </nav>
         </div>
