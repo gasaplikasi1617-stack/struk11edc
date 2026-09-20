@@ -60,6 +60,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
   const [gasUrl, setGasUrl] = useState(DEFAULT_GAS_URL);
+  const [customSheetUrl, setCustomSheetUrl] = useState('');
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
   const [syncInterval, setSyncInterval] = useState(getAutoSyncInterval());
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -121,6 +122,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       .then((cfg: GasSyncConfig) => {
         const urlToSet = cfg.gasUrl || DEFAULT_GAS_URL;
         setGasUrl(urlToSet);
+        if (cfg.sheetUrl) setCustomSheetUrl(cfg.sheetUrl);
         if (typeof cfg.autoSync === 'boolean') setAutoSync(cfg.autoSync);
         if (cfg.lastSyncedAt) setLastSyncedAt(cfg.lastSyncedAt);
 
@@ -164,15 +166,18 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     setIsSavingConfig(true);
     try {
       setStoredGasUrl(gasUrl.trim());
+      if (customSheetUrl.trim()) {
+        localStorage.setItem('gas_custom_sheet_url', customSheetUrl.trim());
+      }
       const data = await safeFetchJson('/api/gas/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim(), autoSync }),
+        body: JSON.stringify({ gasUrl: gasUrl.trim(), sheetUrl: customSheetUrl.trim(), autoSync }),
       });
       if (data.success) {
         setSyncNotice({
           type: 'success',
-          text: 'Pengaturan Web App URL Google Apps Script berhasil disimpan!',
+          text: 'Pengaturan Link Data & Web App URL Google Sheets berhasil disimpan!',
         });
       } else {
         throw new Error(data.error || 'Gagal menyimpan pengaturan');
@@ -520,6 +525,61 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
             </div>
           )}
 
+          {/* 1. Link Data Google Sheet (Spreadsheet URL) */}
+          <div className="bg-emerald-50/60 border border-emerald-200/80 p-4 rounded-xl space-y-2">
+            <label className="block text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Database className="w-4 h-4 text-emerald-600" />
+                <span>Link Data Google Sheet (Spreadsheet URL)</span>
+              </span>
+              {(customSheetUrl || sheetInfo?.url) && (
+                <a
+                  href={customSheetUrl || sheetInfo?.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-emerald-700 font-bold hover:underline"
+                >
+                  <span>Buka File Google Sheet</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={customSheetUrl || sheetInfo?.url || ''}
+                onChange={(e) => setCustomSheetUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/1ABC.../edit"
+                className="flex-1 px-3.5 py-2.5 text-xs font-mono border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-slate-800 shadow-2xs"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSaveConfig}
+                  disabled={isSavingConfig}
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap flex items-center gap-1.5"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                  <span>{isSavingConfig ? 'Menyimpan...' : 'Simpan Link Data'}</span>
+                </button>
+                {(customSheetUrl || sheetInfo?.url) && (
+                  <a
+                    href={customSheetUrl || sheetInfo?.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all border border-emerald-300 whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Buka Sheet</span>
+                  </a>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-emerald-800">
+              *Masukkan link dokumen Google Sheet Anda di sini agar dapat langsung diakses &amp; dibuka dalam 1 klik.
+            </p>
+          </div>
+
+          {/* 2. Web App Deployment Exec URL */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
@@ -546,7 +606,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                   disabled={isSavingConfig}
                   className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
                 >
-                  {isSavingConfig ? 'Menyimpan...' : 'Simpan URL'}
+                  {isSavingConfig ? 'Menyimpan...' : 'Simpan Web App URL'}
                 </button>
                 <button
                   onClick={handleSetupDatabase}

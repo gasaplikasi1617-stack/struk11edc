@@ -25,6 +25,7 @@ export interface ReceiptData {
 
 export interface GasSyncConfig {
   gasUrl: string;
+  sheetUrl?: string;
   autoSync: boolean;
   lastSyncedAt?: string;
 }

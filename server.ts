@@ -18,6 +18,7 @@ const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbw3cU9AiiesdrYg
 
 interface GasConfig {
   gasUrl: string;
+  sheetUrl?: string;
   autoSync: boolean;
   lastSyncedAt?: string;
 }
@@ -29,6 +30,7 @@ function getGasConfig(): GasConfig {
       const parsed = JSON.parse(data);
       return {
         gasUrl: parsed.gasUrl || process.env.GAS_WEB_APP_URL || DEFAULT_GAS_URL,
+        sheetUrl: parsed.sheetUrl || undefined,
         autoSync: parsed.autoSync !== false,
         lastSyncedAt: parsed.lastSyncedAt || undefined,
       };
@@ -38,6 +40,7 @@ function getGasConfig(): GasConfig {
   }
   return {
     gasUrl: process.env.GAS_WEB_APP_URL || DEFAULT_GAS_URL,
+    sheetUrl: undefined,
     autoSync: true,
     lastSyncedAt: undefined,
   };
@@ -782,9 +785,10 @@ app.get("/api/gas/config", (req, res) => {
 });
 
 app.post("/api/gas/config", (req, res) => {
-  const { gasUrl, autoSync } = req.body;
+  const { gasUrl, sheetUrl, autoSync } = req.body;
   const updated = saveGasConfig({
     gasUrl: typeof gasUrl === "string" ? gasUrl.trim() : undefined,
+    sheetUrl: typeof sheetUrl === "string" ? sheetUrl.trim() : undefined,
     autoSync: typeof autoSync === "boolean" ? autoSync : undefined,
   });
   res.json({ success: true, config: updated });
