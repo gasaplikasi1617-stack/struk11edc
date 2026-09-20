@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
+import { formatReceiptDateTime } from '../utils/dateFormatter';
 
 interface ReceiptPreviewProps {
   receipt: ReceiptData;
@@ -317,7 +318,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         <div className="space-y-1 border-b border-dashed border-black pb-2 mb-3 text-[11px] text-black">
           <div className="flex justify-between">
             <span className="text-black">Tgl/Waktu:</span>
-            <span className="font-semibold text-black">{receipt.tanggal || new Date().toLocaleDateString('id-ID')}</span>
+            <span className="font-semibold text-black">{formatReceiptDateTime(receipt.tanggal)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-black">ID Pelanggan:</span>

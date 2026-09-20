@@ -6,6 +6,7 @@ import { ReceiptPreview } from './components/ReceiptPreview';
 import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
+import { formatReceiptDateTime } from './utils/dateFormatter';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
 import {
   getStoredTransactions,
@@ -23,7 +24,7 @@ export default function App() {
   });
 
   const [receipt, setReceipt] = useState<ReceiptData>({
-    tanggal: new Date().toLocaleDateString('id-ID'),
+    tanggal: formatReceiptDateTime(),
     idpel: '541293847210',
     namaPelanggan: 'BUDI SANTOSO',
     pemakaian: '145 kWh',

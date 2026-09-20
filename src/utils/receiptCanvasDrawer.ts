@@ -1,4 +1,5 @@
 import { ReceiptData } from '../types';
+import { formatReceiptDateTime } from './dateFormatter';
 
 /**
  * Pure HTML5 Canvas 2D renderer for A6 Receipt.
@@ -97,7 +98,7 @@ export function drawReceiptToCanvas(receipt: ReceiptData): HTMLCanvasElement {
   };
 
   // --- METADATA TRANSAKSI ---
-  drawRow('Tgl/Waktu:', receipt.tanggal || new Date().toLocaleDateString('id-ID'));
+  drawRow('Tgl/Waktu:', formatReceiptDateTime(receipt.tanggal));
   drawRow('ID Pelanggan:', receipt.idpel || '-', true);
   
   // Truncate name if too long

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
 import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer } from 'lucide-react';
+import { formatReceiptDateTime } from '../utils/dateFormatter';
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from '../utils/billParser';
 
 interface ReceiptFormProps {
@@ -211,7 +212,7 @@ export function ReceiptForm({
     }
 
     return {
-      tanggal: new Date().toLocaleDateString("id-ID"),
+      tanggal: formatReceiptDateTime(),
       idpel: cleanExtractedId(idpel),
       namaPelanggan: namaPelanggan.toUpperCase(),
       pemakaian,
