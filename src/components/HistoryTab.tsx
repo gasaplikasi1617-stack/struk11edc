@@ -20,6 +20,10 @@ import {
   Database,
   Image as ImageIcon,
   ShieldCheck,
+  X,
+  ExternalLink,
+  Check,
+  Share2,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -119,6 +123,14 @@ export function HistoryTab({
     }
   };
 
+  const [pngModalState, setPngModalState] = useState<{
+    url: string;
+    blob: Blob | null;
+    fileName: string;
+    transaction: ReceiptData;
+  } | null>(null);
+  const [copiedClipboard, setCopiedClipboard] = useState(false);
+
   const handleQuickDownloadPng = (tx: ReceiptData) => {
     try {
       const canvas = drawReceiptToCanvas(tx);
@@ -129,6 +141,13 @@ export function HistoryTab({
 
       canvas.toBlob((blob) => {
         const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
+        setPngModalState({
+          url,
+          blob,
+          fileName,
+          transaction: tx,
+        });
+
         const link = document.createElement('a');
         link.style.display = 'none';
         link.href = url;
@@ -137,15 +156,49 @@ export function HistoryTab({
         link.click();
         setTimeout(() => {
           if (document.body.contains(link)) document.body.removeChild(link);
-          if (blob) URL.revokeObjectURL(url);
         }, 1500);
       }, 'image/png');
 
-      setExportSuccessNotice(`Gambar struk PNG untuk ${tx.namaPelanggan || 'transaksi'} berhasil diunduh!`);
+      setExportSuccessNotice(`Gambar struk PNG untuk ${tx.namaPelanggan || 'transaksi'} berhasil dibuat!`);
       setTimeout(() => setExportSuccessNotice(null), 5000);
     } catch (err: any) {
-      setExportSuccessNotice(`Gagal mengunduh gambar struk: ${err.message}`);
+      setExportSuccessNotice(`Gagal membuat gambar struk: ${err.message}`);
     }
+  };
+
+  const handleCopyImageToClipboard = async () => {
+    if (!pngModalState) return;
+    try {
+      if (pngModalState.blob && navigator.clipboard && (window as any).ClipboardItem) {
+        const item = new (window as any).ClipboardItem({ 'image/png': pngModalState.blob });
+        await navigator.clipboard.write([item]);
+        setCopiedClipboard(true);
+        setTimeout(() => setCopiedClipboard(false), 3000);
+      } else {
+        setExportSuccessNotice('Gunakan tombol "Unduh File PNG" atau "Kirim via WhatsApp".');
+      }
+    } catch (e) {
+      setExportSuccessNotice('Browser tidak mengizinkan salin gambar otomatis.');
+    }
+  };
+
+  const handleSendWhatsAppText = (tx: ReceiptData) => {
+    const text = encodeURIComponent(
+      `*STRUK PEMBAYARAN RESMI*\n` +
+      `-----------------------------------\n` +
+      `Agen: ${tx.namaAgen || 'Agen Batara'}\n` +
+      `Alamat: ${tx.alamat || '-'}\n` +
+      `-----------------------------------\n` +
+      `Tanggal: ${tx.tanggal || '-'}\n` +
+      `ID Pelanggan: ${tx.idpel || '-'}\n` +
+      `Nama: ${tx.namaPelanggan || '-'}\n` +
+      `Layanan: ${tx.rincianTagihan || '-'}\n` +
+      `Periode: ${tx.bulanTagihan || '-'}\n` +
+      `Total Bayar: Rp ${Number(tx.totalBayar || 0).toLocaleString('id-ID')}\n` +
+      `-----------------------------------\n` +
+      `Terima kasih atas pembayaran Anda.`
+    );
+    window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   // Category counts across all transactions
@@ -752,6 +805,96 @@ export function HistoryTab({
           )}
         </div>
       </div>
+
+      {/* PNG & WhatsApp Modal */}
+      {pngModalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh]">
+            <button
+              onClick={() => setPngModalState(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="bg-emerald-100 text-emerald-700 p-2 rounded-xl">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800 text-base">Struk PNG & WhatsApp</h4>
+                <p className="text-xs text-slate-500">Pelanggan: {pngModalState.transaction.namaPelanggan || '-'}</p>
+              </div>
+            </div>
+
+            {/* Thumbnail Preview */}
+            <div className="my-3 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center overflow-auto max-h-56">
+              <img
+                src={pngModalState.url}
+                alt="Preview Struk PNG"
+                className="max-h-48 rounded shadow-xs border border-slate-300 object-contain"
+              />
+            </div>
+
+            {/* Quick Actions for WhatsApp and downloading */}
+            <div className="space-y-2 mt-2">
+              <a
+                href={pngModalState.url}
+                download={pngModalState.fileName}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer text-center"
+              >
+                <Download className="w-4 h-4" />
+                <span>Unduh File PNG ({pngModalState.fileName})</span>
+              </a>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopyImageToClipboard}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Salin gambar agar dapat langsung di-paste (Ctrl+V) ke WhatsApp Web"
+                >
+                  {copiedClipboard ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Tersalin! Paste di WA</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Salin Gambar WA</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => handleSendWhatsAppText(pngModalState.transaction)}
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                  title="Kirim detail transaksi ke WhatsApp"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Kirim Teks WA</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => window.open(pngModalState.url, '_blank')}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Buka gambar di tab browser baru"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Buka Gambar di Tab Baru</span>
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 text-center mt-3">
+              *Klik <strong>Salin Gambar WA</strong> lalu Paste di chat WhatsApp, atau gunakan <strong>Kirim Teks WA</strong>.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

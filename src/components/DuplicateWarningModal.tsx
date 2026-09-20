@@ -21,10 +21,27 @@ export function DuplicateWarningModal({
   onForceSave,
   onViewHistory,
 }: DuplicateWarningModalProps) {
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
       <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-amber-200 overflow-hidden">
         {/* Header */}
         <div className="bg-amber-500 px-6 py-4 flex items-center justify-between text-white">
@@ -38,8 +55,13 @@ export function DuplicateWarningModal({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            title="Tutup (Batalkan)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -102,7 +124,7 @@ export function DuplicateWarningModal({
                 onClose();
                 onViewHistory();
               }}
-              className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
+              className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <History className="w-4 h-4" />
               <span>Lihat di Riwayat</span>
@@ -112,7 +134,7 @@ export function DuplicateWarningModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-1.5"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Check className="w-4 h-4" />
             <span>Tutup (Batalkan Simpan)</span>
@@ -125,7 +147,7 @@ export function DuplicateWarningModal({
                 onClose();
                 onForceSave();
               }}
-              className="text-xs text-slate-400 hover:text-slate-600 underline text-center sm:self-center py-1"
+              className="text-xs text-slate-400 hover:text-slate-600 underline text-center sm:self-center py-1 cursor-pointer"
             >
               Tetap Simpan Sebagai Data Baru
             </button>
