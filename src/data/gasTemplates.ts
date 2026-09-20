@@ -237,70 +237,24 @@ function executeTwoWaySync(incomingTransactions) {
   };
 }
 
-// 9. HAPUS TRANSAKSI DI SHEET (PERMANEN)
-function deleteTransactionRow(id, idpel, bulanTagihan, tanggal) {
+// 9. HAPUS TRANSAKSI DI SHEET
+function deleteTransactionRow(id) {
+  if (!id) return { success: false, error: "ID tidak valid" };
   var sheet = getOrCreateSheet();
   var lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return { success: true, message: "Sheet sudah kosong" };
+  if (lastRow <= 1) return { success: false, error: "Sheet kosong" };
 
-  var numRows = lastRow - 1;
-  var data = sheet.getRange(2, 1, numRows, 8).getValues(); // Ambil ID, Tanggal, IDPEL, Nama, Pemakaian, Stand, Rincian, Bulan
-
-  var targetId = String(id || "").trim();
-  var targetIdpel = String(idpel || "").trim().toLowerCase();
-  var targetBulan = String(bulanTagihan || "").trim().toLowerCase().replace(/[\s\-_/.,]/g, "");
-  var targetTanggal = String(tanggal || "").trim().toLowerCase().replace(/[-.]/g, "/");
-
-  var deletedCount = 0;
-  // Loop dari bawah ke atas agar indeks baris tidak bergeser saat baris dihapus
-  for (var i = numRows - 1; i >= 0; i--) {
-    var rowId = String(data[i][0] || "").trim();
-    var rowTanggal = String(data[i][1] || "").trim().toLowerCase().replace(/[-.]/g, "/");
-    var rowIdpel = String(data[i][2] || "").trim().toLowerCase();
-    var rowBulan = String(data[i][7] || "").trim().toLowerCase().replace(/[\s\-_/.,]/g, "");
-
-    var matched = false;
-    if (targetId && rowId === targetId) {
-      matched = true;
-    } else if (targetIdpel && targetIdpel !== "-" && targetIdpel === rowIdpel) {
-      if (targetBulan && targetBulan === rowBulan) {
-        matched = true;
-      } else if (targetTanggal && targetTanggal === rowTanggal) {
-        matched = true;
-      }
-    }
-
-    if (matched) {
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(id)) {
       sheet.deleteRow(i + 2);
-      deletedCount++;
+      return { success: true, deletedId: id };
     }
   }
-
-  return {
-    success: true,
-    deletedCount: deletedCount,
-    message: deletedCount > 0
-      ? "Berhasil menghapus " + deletedCount + " baris transaksi permanen dari Google Sheets"
-      : "Data transaksi tidak ditemukan di Google Sheets (mungkin sudah terhapus)"
-  };
+  return { success: false, error: "Transaksi ID tidak ditemukan di Google Sheets" };
 }
 
-// 10. HAPUS SEMUA DATA TRANSAKSI DI SHEET (RESET / BERSIHKAN TOTAL)
-function clearAllTransactionsFromSheet() {
-  var sheet = getOrCreateSheet();
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.deleteRows(2, lastRow - 1);
-  }
-  return {
-    success: true,
-    message: "Semua riwayat transaksi di Google Sheets berhasil dibersihkan permanen!",
-    totalInSheet: 0,
-    timestamp: new Date().toISOString()
-  };
-}
-
-// 11. ENTRY POINT GET (Browser / API Read / Ping / Delete)
+// 10. ENTRY POINT GET (Browser / API Read / Ping)
 function doGet(e) {
   try {
     var p = (e && e.parameter) ? e.parameter : {};
@@ -329,14 +283,6 @@ function doGet(e) {
         data: txs,
         timestamp: new Date().toISOString()
       });
-    }
-
-    if (action === "deleteTransaction" || action === "delete") {
-      return jsonResponse(deleteTransactionRow(p.id, p.idpel, p.bulanTagihan, p.tanggal));
-    }
-
-    if (action === "clearAllTransactions" || action === "clearSheet" || action === "resetSheet") {
-      return jsonResponse(clearAllTransactionsFromSheet());
     }
 
     // Tampilkan Web App Index HTML
@@ -387,7 +333,7 @@ function doPost(e) {
       });
     }
 
-    if (action === "twoWaySync" || action === "sync" || action === "syncTransactions") {
+    if (action === "twoWaySync" || action === "sync") {
       var txList = payload.transactions || [];
       return jsonResponse(executeTwoWaySync(txList));
     }
@@ -403,11 +349,7 @@ function doPost(e) {
     }
 
     if (action === "deleteTransaction" || action === "delete") {
-      return jsonResponse(deleteTransactionRow(payload.id, payload.idpel, payload.bulanTagihan, payload.tanggal));
-    }
-
-    if (action === "clearAllTransactions" || action === "clearSheet" || action === "resetSheet") {
-      return jsonResponse(clearAllTransactionsFromSheet());
+      return jsonResponse(deleteTransactionRow(payload.id));
     }
 
     return jsonResponse({ success: false, error: "Action tidak dikenal: " + action });

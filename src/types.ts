@@ -13,7 +13,6 @@ export interface ReceiptData {
   standMeter: string;
   rincianTagihan: string;
   bulanTagihan: string;
-  tarifDaya?: string;
   rpTagihan: number;
   lainLain: number;
   adminBank: number;

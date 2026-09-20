@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @media print {
+  @page {
+    size: 105mm 148mm;
+    margin: 0;
+  }
   body {
     background: white !important;
     margin: 0 !important;
@@ -11,41 +15,11 @@
   body * {
     visibility: hidden !important;
   }
-
-  /* Dot Matrix Bukopin Mode: 21.6cm x 6.95cm (Strictly 1 Page) */
-  body.print-mode-dotmatrix #printable-dotmatrix-receipt,
-  body.print-mode-dotmatrix #printable-dotmatrix-receipt * {
+  #printable-receipt,
+  #printable-receipt * {
     visibility: visible !important;
   }
-  body.print-mode-dotmatrix #printable-dotmatrix-receipt {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 216mm !important;
-    height: 69.5mm !important;
-    max-height: 69.5mm !important;
-    margin: 0 !important;
-    padding: 2.5mm 5mm !important;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    overflow: hidden !important;
-    page-break-inside: avoid !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
-    break-inside: avoid !important;
-    break-after: avoid !important;
-    z-index: 9999999 !important;
-  }
-
-  /* Default / Standard A6 Mode */
-  body:not(.print-mode-dotmatrix) #printable-receipt,
-  body:not(.print-mode-dotmatrix) #printable-receipt * {
-    visibility: visible !important;
-  }
-  body:not(.print-mode-dotmatrix) #printable-receipt {
+  #printable-receipt {
     position: fixed !important;
     left: 0 !important;
     top: 0 !important;
@@ -61,4 +35,3 @@
     z-index: 9999999 !important;
   }
 }
-

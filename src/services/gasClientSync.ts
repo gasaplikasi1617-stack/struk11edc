@@ -14,8 +14,6 @@ const STORAGE_KEY_TXS = 'batara_transactions_backup';
 const STORAGE_KEY_LAST_SYNC = 'batara_last_synced_at';
 const STORAGE_KEY_AUTO_SYNC = 'batara_auto_sync_enabled';
 const STORAGE_KEY_SYNC_INTERVAL = 'batara_auto_sync_interval';
-const STORAGE_KEY_DELETED_IDS = 'batara_deleted_tx_ids';
-const STORAGE_KEY_DELETED_SIGS = 'batara_deleted_tx_sigs';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -80,41 +78,12 @@ export function setAutoSyncInterval(seconds: number): void {
   localStorage.setItem(STORAGE_KEY_SYNC_INTERVAL, String(clamped));
 }
 
-export function isValidGasUrl(url?: string): boolean {
-  if (!url || typeof url !== 'string') return false;
-  const trimmed = url.trim();
-  if (
-    trimmed.startsWith('<') ||
-    trimmed.includes('<html') ||
-    trimmed.includes('<!DOCTYPE') ||
-    trimmed.includes('<head') ||
-    trimmed.includes('<body')
-  ) {
-    return false;
-  }
-  return trimmed.startsWith('https://') || trimmed.startsWith('http://');
-}
-
 export function getStoredGasUrl(): string {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_URL);
-    if (stored && isValidGasUrl(stored)) {
-      return normalizeGasUrl(stored);
-    }
-    // Clean up corrupted HTML value in localStorage
-    if (stored && !isValidGasUrl(stored)) {
-      localStorage.removeItem(STORAGE_KEY_URL);
-    }
-  } catch {}
-  return DEFAULT_GAS_URL;
+  return localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_GAS_URL;
 }
 
 export function setStoredGasUrl(url: string): void {
-  if (isValidGasUrl(url)) {
-    localStorage.setItem(STORAGE_KEY_URL, normalizeGasUrl(url));
-  } else {
-    console.warn('URL GAS tidak valid diabaikan:', url?.slice(0, 50));
-  }
+  localStorage.setItem(STORAGE_KEY_URL, url.trim());
 }
 
 export function getLastSyncedTime(): string | null {
@@ -146,78 +115,12 @@ export function saveStoredTransactions(txs: ReceiptData[]): void {
   }
 }
 
-export function getDeletedIds(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_DELETED_IDS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function getDeletedSignatures(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_DELETED_SIGS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function createTransactionSignature(tx: Partial<ReceiptData>): string {
-  const idpel = (tx.idpel || '').trim().toLowerCase();
-  const bulan = (tx.bulanTagihan || '').toLowerCase().replace(/[\s\-_/.,]/g, '');
-  const tanggal = (tx.tanggal || '').toLowerCase().replace(/[-.]/g, '/');
-  return `${idpel}__${bulan}__${tanggal}`;
-}
-
-export function markTransactionDeleted(id: string, tx?: Partial<ReceiptData>): void {
-  try {
-    const ids = getDeletedIds();
-    if (id && !ids.includes(id)) {
-      ids.push(id);
-      localStorage.setItem(STORAGE_KEY_DELETED_IDS, JSON.stringify(ids.slice(-500)));
-    }
-    if (tx && tx.idpel && tx.idpel !== '-') {
-      const sig = createTransactionSignature(tx);
-      const sigs = getDeletedSignatures();
-      if (!sigs.includes(sig)) {
-        sigs.push(sig);
-        localStorage.setItem(STORAGE_KEY_DELETED_SIGS, JSON.stringify(sigs.slice(-500)));
-      }
-    }
-  } catch (e) {
-    console.error('Error marking transaction deleted:', e);
-  }
-}
-
-export function isTransactionDeleted(id?: string, tx?: Partial<ReceiptData>): boolean {
-  if (id) {
-    const ids = getDeletedIds();
-    if (ids.includes(id)) return true;
-  }
-  if (tx && tx.idpel && tx.idpel !== '-') {
-    const sig = createTransactionSignature(tx);
-    const sigs = getDeletedSignatures();
-    if (sigs.includes(sig)) return true;
-  }
-  return false;
-}
-
-export function clearDeletedBlacklist(): void {
-  localStorage.removeItem(STORAGE_KEY_DELETED_IDS);
-  localStorage.removeItem(STORAGE_KEY_DELETED_SIGS);
-}
-
 /**
  * Normalisasi URL Web App Google Apps Script
  */
 export function normalizeGasUrl(url: string): string {
-  if (!url || typeof url !== 'string') return DEFAULT_GAS_URL;
+  if (!url) return '';
   let clean = url.trim();
-  if (!isValidGasUrl(clean)) {
-    return DEFAULT_GAS_URL;
-  }
   clean = clean.replace(/\/edit.*$/, '/exec');
   clean = clean.replace(/\/dev.*$/, '/exec');
   if (!clean.includes('/exec') && clean.includes('script.google.com')) {
@@ -296,16 +199,13 @@ export async function directGasCall(
   const u = new URL(url);
   u.searchParams.set('action', action);
   if (payload.id) u.searchParams.set('id', String(payload.id));
-  if (payload.idpel) u.searchParams.set('idpel', String(payload.idpel));
-  if (payload.bulanTagihan) u.searchParams.set('bulanTagihan', String(payload.bulanTagihan));
-  if (payload.tanggal) u.searchParams.set('tanggal', String(payload.tanggal));
   const getRes = await fetch(u.toString(), { method: 'GET' });
   const getText = await getRes.text();
   return parseGasRawResponse(getText);
 }
 
 /**
- * Gabung daftar transaksi lokal & cloud tanpa duplikasi dan menyaring data terhapus
+ * Gabung daftar transaksi lokal & cloud tanpa duplikasi
  */
 export function mergeTransactions(
   localList: ReceiptData[],
@@ -313,18 +213,15 @@ export function mergeTransactions(
 ): ReceiptData[] {
   const map = new Map<string, ReceiptData>();
 
-  // Filter keluar transaksi yang ada di blacklist hapus permanen
-  const validRemote = remoteList.filter((t) => !isTransactionDeleted(t.id, t));
-
   // Masukkan data remote
-  validRemote.forEach((t) => {
+  remoteList.forEach((t) => {
     const id = t.id || `TX-${new Date(t.createdAt || Date.now()).getTime()}`;
     map.set(id, { ...t, id });
   });
 
-  // Masukkan/Pertahankan data lokal (yang tidak dihapus)
+  // Masukkan/Pertahankan data lokal
   localList.forEach((t) => {
-    if (t.id && !isTransactionDeleted(t.id, t) && !map.has(t.id)) {
+    if (t.id && !map.has(t.id)) {
       map.set(t.id, t);
     }
   });
@@ -335,102 +232,6 @@ export function mergeTransactions(
     const timeB = new Date(b.createdAt || 0).getTime();
     return timeB - timeA;
   });
-}
-
-/**
- * HAPUS TRANSAKSI PERMANEN DARI APLIKASI & GOOGLE SHEETS
- * - Memasukkan ID/signature ke blacklist terhapus permanen
- * - Menghapus dari server & storage lokal
- * - Mengirim perintah hapus baris ke Google Sheets (GAS)
- */
-export async function permanentDeleteTransaction(
-  id: string,
-  txData?: Partial<ReceiptData>
-): Promise<{ success: boolean; message: string }> {
-  // 1. Catat ke blacklist lokal agar tidak ditarik kembali oleh auto-sync
-  markTransactionDeleted(id, txData);
-
-  // 2. Hapus dari localStorage transaksi lokal
-  const current = getStoredTransactions();
-  const filtered = current.filter((t) => t.id !== id && !isTransactionDeleted(t.id, t));
-  saveStoredTransactions(filtered);
-  try {
-    localStorage.setItem('agent_batara_txs', JSON.stringify(filtered));
-  } catch {}
-  notifySyncListeners(
-    {
-      status: 'synced',
-      totalInSheet: Math.max(0, currentSyncState.totalInSheet - 1),
-    },
-    filtered
-  );
-
-  // 3. Panggil API Server backend
-  try {
-    await fetch(`/api/transactions/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  } catch (err: any) {
-    console.warn('Backend delete error:', err.message);
-  }
-
-  // 4. Panggil Google Apps Script untuk menghapus baris dari Google Sheets
-  const gasUrl = normalizeGasUrl(getStoredGasUrl());
-  if (gasUrl && isValidGasUrl(gasUrl)) {
-    try {
-      await directGasCall(gasUrl, 'deleteTransaction', {
-        id,
-        idpel: txData?.idpel,
-        bulanTagihan: txData?.bulanTagihan,
-        tanggal: txData?.tanggal,
-      });
-    } catch (gasErr: any) {
-      console.warn('Google Sheets delete row error:', gasErr.message);
-    }
-  }
-
-  return {
-    success: true,
-    message: `Transaksi '${txData?.namaPelanggan || id}' berhasil dihapus permanen dari aplikasi dan Google Sheets.`,
-  };
-}
-
-/**
- * BERSIHKAN / HAPUS TOTAL SEMUA RIWAYAT PERMANEN
- * - Mengosongkan data transaksi lokal & backend
- * - Mengosongkan semua baris data di Google Sheets (RiwayatTransaksi)
- */
-export async function permanentClearAllTransactions(): Promise<{
-  success: boolean;
-  message: string;
-}> {
-  // 1. Bersihkan local storage
-  saveStoredTransactions([]);
-  try {
-    localStorage.removeItem('agent_batara_txs');
-  } catch {}
-  clearDeletedBlacklist();
-  notifySyncListeners({ status: 'synced', totalInSheet: 0 }, []);
-
-  // 2. Bersihkan di backend server
-  try {
-    await fetch('/api/transactions/clear-all', { method: 'POST' });
-  } catch (err: any) {
-    console.warn('Backend clear all error:', err.message);
-  }
-
-  // 3. Bersihkan di Google Sheets via GAS
-  const gasUrl = normalizeGasUrl(getStoredGasUrl());
-  if (gasUrl && isValidGasUrl(gasUrl)) {
-    try {
-      await directGasCall(gasUrl, 'clearAllTransactions', {});
-    } catch (gasErr: any) {
-      console.warn('GAS clearAllTransactions error:', gasErr.message);
-    }
-  }
-
-  return {
-    success: true,
-    message: 'Semua riwayat transaksi berhasil dihapus total dari aplikasi & Google Sheets!',
-  };
 }
 
 let isSyncInProgress = false;
@@ -466,8 +267,7 @@ export async function executeTwoWaySync(
   notifySyncListeners({ status: 'syncing', lastError: null });
 
   const gasUrl = normalizeGasUrl(customGasUrl || getStoredGasUrl());
-  const rawList = currentLocalTxs || getStoredTransactions();
-  const localList = rawList.filter((t) => !isTransactionDeleted(t.id, t));
+  const localList = currentLocalTxs || getStoredTransactions();
 
   // 1. Coba lewat API backend internal terlebih dahulu
   try {
@@ -488,9 +288,6 @@ export async function executeTwoWaySync(
         
         const merged = mergeTransactions(localList, remoteData);
         saveStoredTransactions(merged);
-        try {
-          localStorage.setItem('agent_batara_txs', JSON.stringify(merged));
-        } catch {}
         const now = new Date().toISOString();
         setLastSyncedTime(now);
 
@@ -526,9 +323,6 @@ export async function executeTwoWaySync(
       const remoteData: ReceiptData[] = Array.isArray(gasRes.data) ? gasRes.data : [];
       const merged = mergeTransactions(localList, remoteData);
       saveStoredTransactions(merged);
-      try {
-        localStorage.setItem('agent_batara_txs', JSON.stringify(merged));
-      } catch {}
       const now = new Date().toISOString();
       setLastSyncedTime(now);
 
@@ -554,35 +348,10 @@ export async function executeTwoWaySync(
     }
     throw new Error(gasRes?.error || 'Gagal sinkronisasi');
   } catch (directErr: any) {
-    console.warn('Direct GAS sync failed, falling back to Local Storage Standalone Mode:', directErr.message);
-    
-    // Graceful Fallback: Simpan dan sinkronkan secara lokal agar aplikasi tidak pernah gagal
-    const merged = mergeTransactions(localList, getStoredTransactions());
-    saveStoredTransactions(merged);
-    try {
-      localStorage.setItem('agent_batara_txs', JSON.stringify(merged));
-    } catch {}
-    const now = new Date().toISOString();
-    setLastSyncedTime(now);
-
-    notifySyncListeners(
-      {
-        status: 'synced',
-        lastSyncedAt: now,
-        lastError: null,
-        totalInSheet: merged.length,
-      },
-      merged
-    );
+    const errMsg = directErr.message || 'Gagal terhubung ke Google Apps Script';
+    notifySyncListeners({ status: 'error', lastError: errMsg });
     isSyncInProgress = false;
-
-    return {
-      success: true,
-      message: 'Sinkronisasi lokal berhasil (Mode Offline / Cadangan Lokal Aktif). Data tersimpan aman di perangkat.',
-      mergedTransactions: merged,
-      pushedToSheet: 0,
-      totalInSheet: merged.length,
-    };
+    throw new Error(errMsg);
   }
 }
 

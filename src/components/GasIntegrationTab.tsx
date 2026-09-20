@@ -24,7 +24,6 @@ import {
   getStoredTransactions,
   saveStoredTransactions,
   setStoredGasUrl,
-  isValidGasUrl,
   isAutoSyncEnabled,
   setAutoSyncEnabled,
   getAutoSyncInterval,
@@ -162,22 +161,13 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   };
 
   const handleSaveConfig = async () => {
-    const clean = gasUrl.trim();
-    if (clean && !isValidGasUrl(clean)) {
-      setSyncNotice({
-        type: 'error',
-        text: 'Format URL tidak valid! Masukkan URL Web App yang berakhiran /exec (contoh: https://script.google.com/macros/s/.../exec). JANGAN menempelkan kode HTML atau kode skrip di kotak ini.',
-      });
-      return;
-    }
-
     setIsSavingConfig(true);
     try {
-      setStoredGasUrl(clean);
+      setStoredGasUrl(gasUrl.trim());
       const data = await safeFetchJson('/api/gas/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: clean, autoSync }),
+        body: JSON.stringify({ gasUrl: gasUrl.trim(), autoSync }),
       });
       if (data.success) {
         setSyncNotice({
@@ -188,7 +178,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data.error || 'Gagal menyimpan pengaturan');
       }
     } catch (e: any) {
-      setStoredGasUrl(clean);
+      setStoredGasUrl(gasUrl.trim());
       setSyncNotice({
         type: 'success',
         text: 'URL Web App berhasil disimpan ke memori lokal aplikasi.',
@@ -197,23 +187,6 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       setIsSavingConfig(false);
       setTimeout(() => setSyncNotice(null), 5000);
     }
-  };
-
-  const handleResetToDefaultUrl = async () => {
-    setGasUrl(DEFAULT_GAS_URL);
-    setStoredGasUrl(DEFAULT_GAS_URL);
-    try {
-      await safeFetchJson('/api/gas/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: DEFAULT_GAS_URL, autoSync }),
-      });
-    } catch {}
-    setSyncNotice({
-      type: 'success',
-      text: 'URL Web App berhasil dikembalikan ke URL standar teruji Agen Batara!',
-    });
-    setTimeout(() => setSyncNotice(null), 4000);
   };
 
   const handleTestConnection = async () => {
@@ -391,14 +364,10 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data?.error || 'Gagal menarik data');
       }
     } catch (e: any) {
-      console.warn('Pull failed, using local storage fallback:', e.message);
-      const localTxs = getStoredTransactions();
       setSyncNotice({
-        type: 'success',
-        text: `Berhasil memuat ${localTxs.length} data dari penyimpanan lokal (Mode Cadangan Lokal).`,
+        type: 'error',
+        text: `Gagal menarik data: ${e.message}`,
       });
-      setPreviewData(localTxs.slice(0, 10));
-      if (onSyncSuccess) onSyncSuccess();
     } finally {
       setIsPulling(false);
     }
@@ -431,13 +400,10 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data?.error || 'Gagal mengirim data');
       }
     } catch (e: any) {
-      console.warn('Push failed, data saved locally:', e.message);
-      const localTxs = getStoredTransactions();
       setSyncNotice({
-        type: 'success',
-        text: 'Data tersimpan aman di penyimpanan lokal perangkat (Mode Offline / Cadangan Lokal).',
+        type: 'error',
+        text: `Gagal mengirim data: ${e.message}`,
       });
-      loadPreview(gasUrl.trim());
     } finally {
       setIsPushing(false);
     }
@@ -581,14 +547,6 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                   className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
                 >
                   {isSavingConfig ? 'Menyimpan...' : 'Simpan URL'}
-                </button>
-                <button
-                  onClick={handleResetToDefaultUrl}
-                  type="button"
-                  className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold px-3 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
-                  title="Kembalikan ke URL Google Apps Script standar Agen Batara"
-                >
-                  Reset URL Standar
                 </button>
                 <button
                   onClick={handleSetupDatabase}

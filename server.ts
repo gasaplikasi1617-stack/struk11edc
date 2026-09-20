@@ -1,13 +1,10 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import dns from "node:dns";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from "./src/utils/billParser";
 import { DEFAULT_GAS_DATA } from "./src/data/gasTemplates";
-
-dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const PORT = 3000;
@@ -16,98 +13,8 @@ app.use(express.json());
 
 // Path for storing transaction history locally
 const DATA_FILE = path.join(process.cwd(), "transactions.json");
-const DELETED_FILE = path.join(process.cwd(), "deleted_transactions.json");
 const GAS_CONFIG_FILE = path.join(process.cwd(), "gas_config.json");
 const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbw3cU9AiiesdrYgp-q1W56Ekph0wewoRd-14sZksQcmXb8PEP2enpTRSePCnLtNr_X1zA/exec";
-
-function isValidGasUrl(url?: string): boolean {
-  if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim();
-  if (
-    trimmed.startsWith("<") ||
-    trimmed.includes("<html") ||
-    trimmed.includes("<!DOCTYPE") ||
-    trimmed.includes("<head") ||
-    trimmed.includes("<body")
-  ) {
-    return false;
-  }
-  return trimmed.startsWith("https://") || trimmed.startsWith("http://");
-}
-
-function sanitizeGasUrl(url?: string): string {
-  if (!url || typeof url !== "string") return DEFAULT_GAS_URL;
-  let clean = url.trim();
-  if (!isValidGasUrl(clean)) {
-    return DEFAULT_GAS_URL;
-  }
-  clean = clean.replace(/\/edit.*$/, "/exec");
-  clean = clean.replace(/\/dev.*$/, "/exec");
-  if (!clean.includes("/exec") && clean.includes("script.google.com")) {
-    clean = clean.replace(/\/?$/, "/exec");
-  }
-  return clean;
-}
-
-function getDeletedRecords(): { ids: string[]; sigs: string[] } {
-  try {
-    if (fs.existsSync(DELETED_FILE)) {
-      const data = fs.readFileSync(DELETED_FILE, "utf-8");
-      const parsed = JSON.parse(data);
-      return {
-        ids: Array.isArray(parsed.ids) ? parsed.ids : [],
-        sigs: Array.isArray(parsed.sigs) ? parsed.sigs : [],
-      };
-    }
-  } catch (e) {
-    console.error("Error reading deleted records:", e);
-  }
-  return { ids: [], sigs: [] };
-}
-
-function saveDeletedRecords(records: { ids: string[]; sigs: string[] }) {
-  try {
-    fs.writeFileSync(DELETED_FILE, JSON.stringify(records, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving deleted records:", e);
-  }
-}
-
-function addDeletedRecord(id: string, tx?: any) {
-  const records = getDeletedRecords();
-  if (id && !records.ids.includes(id)) {
-    records.ids.push(id);
-  }
-  if (tx) {
-    const idpel = cleanStr(tx.idpel);
-    const bulan = cleanPeriod(tx.bulanTagihan);
-    const tanggal = cleanDate(tx.tanggal);
-    if (idpel && idpel !== "-") {
-      const sig = `${idpel}__${bulan}__${tanggal}`;
-      if (!records.sigs.includes(sig)) {
-        records.sigs.push(sig);
-      }
-    }
-  }
-  if (records.ids.length > 500) records.ids = records.ids.slice(-500);
-  if (records.sigs.length > 500) records.sigs = records.sigs.slice(-500);
-  saveDeletedRecords(records);
-}
-
-function isRecordDeleted(id?: string, tx?: any): boolean {
-  const records = getDeletedRecords();
-  if (id && records.ids.includes(id)) return true;
-  if (tx) {
-    const idpel = cleanStr(tx.idpel);
-    const bulan = cleanPeriod(tx.bulanTagihan);
-    const tanggal = cleanDate(tx.tanggal);
-    if (idpel && idpel !== "-") {
-      const sig = `${idpel}__${bulan}__${tanggal}`;
-      if (records.sigs.includes(sig)) return true;
-    }
-  }
-  return false;
-}
 
 interface GasConfig {
   gasUrl: string;
@@ -219,8 +126,12 @@ function parseGasResponse(text: string): any {
 }
 
 async function callGasPost(url: string, body: any): Promise<any> {
-  const cleanUrl = sanitizeGasUrl(url);
+  const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
+
+  if (cleanUrl.includes("/edit") || cleanUrl.includes("/dev")) {
+    throw new Error("URL yang Anda masukkan adalah URL Editor/Dev. Silakan gunakan Web App URL yang berakhiran '/exec' dari menu Deploy.");
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout
@@ -242,26 +153,21 @@ async function callGasPost(url: string, body: any): Promise<any> {
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
-      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik). Periksa kembali koneksi internet atau status Web App Google Apps Script.");
+      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik)");
     }
-    throw new Error(
-      "Gagal terhubung ke Google Apps Script (" + (err.message || String(err)) + "). " +
-      "Pastikan URL Web App benar, aktif, dan disetel dengan akses 'Anyone' (Siapa saja)."
-    );
+    throw err;
   }
 }
 
 async function callGasGet(url: string, params: Record<string, string> = {}): Promise<any> {
-  const cleanUrl = sanitizeGasUrl(url);
+  const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
 
-  let u: URL;
-  try {
-    u = new URL(cleanUrl);
-  } catch {
-    u = new URL(DEFAULT_GAS_URL);
+  if (cleanUrl.includes("/edit") || cleanUrl.includes("/dev")) {
+    throw new Error("URL yang Anda masukkan adalah URL Editor/Dev. Silakan gunakan Web App URL yang berakhiran '/exec' dari menu Deploy.");
   }
 
+  const u = new URL(cleanUrl);
   for (const [k, v] of Object.entries(params)) {
     u.searchParams.set(k, v);
   }
@@ -282,12 +188,9 @@ async function callGasGet(url: string, params: Record<string, string> = {}): Pro
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
-      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik). Periksa kembali koneksi internet atau status Web App Google Apps Script.");
+      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik)");
     }
-    throw new Error(
-      "Gagal terhubung ke Google Apps Script (" + (err.message || String(err)) + "). " +
-      "Pastikan URL Web App benar, aktif, dan disetel dengan akses 'Anyone' (Siapa saja)."
-    );
+    throw err;
   }
 }
 
@@ -411,18 +314,13 @@ function deduplicateList(list: any[]): { cleaned: any[]; removedCount: number } 
 
 // Two-way merge helper without duplicates
 function mergeTransactions(localList: any[], sheetList: any[]) {
-  // Exclude permanently deleted items
-  const activeLocal = localList.filter((l) => !isRecordDeleted(l.id, l));
-  const activeSheet = sheetList.filter((s) => !isRecordDeleted(s.id, s));
-
-  const localDedupe = deduplicateList(activeLocal).cleaned;
-  const sheetDedupe = deduplicateList(activeSheet).cleaned;
+  const localDedupe = deduplicateList(localList).cleaned;
+  const sheetDedupe = deduplicateList(sheetList).cleaned;
 
   const merged: any[] = [...localDedupe];
   const newFromSheet: any[] = [];
 
   for (const s of sheetDedupe) {
-    if (isRecordDeleted(s.id, s)) continue;
     const dupCheck = findDuplicateTransaction(s, merged);
     if (!dupCheck.isDuplicate) {
       merged.push(s);
@@ -432,7 +330,6 @@ function mergeTransactions(localList: any[], sheetList: any[]) {
 
   const newFromLocal: any[] = [];
   for (const l of localDedupe) {
-    if (isRecordDeleted(l.id, l)) continue;
     const dupCheck = findDuplicateTransaction(l, sheetDedupe);
     if (!dupCheck.isDuplicate) {
       newFromLocal.push(l);
@@ -549,63 +446,13 @@ app.post("/api/transactions/deduplicate", (req, res) => {
   });
 });
 
-// Delete a transaction permanently from local & Google Sheets
-app.delete("/api/transactions/:id", async (req, res) => {
+// Delete a transaction
+app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
   const id = req.params.id;
-  const targetTx = txs.find((t: any) => t.id === id);
-
-  // 1. Mark as deleted permanently in blacklist
-  addDeletedRecord(id, targetTx);
-
-  // 2. Remove from local transactions file
   txs = txs.filter((t: any) => t.id !== id);
   saveTransactions(txs);
-
-  // 3. Delete from Google Sheets if GAS is configured
-  const gasCfg = getGasConfig();
-  if (gasCfg.gasUrl) {
-    try {
-      await callGasPost(gasCfg.gasUrl, {
-        action: "deleteTransaction",
-        id,
-        idpel: targetTx?.idpel,
-        bulanTagihan: targetTx?.bulanTagihan,
-        tanggal: targetTx?.tanggal,
-      });
-    } catch (gasErr: any) {
-      console.warn("GAS background row deletion warning:", gasErr.message);
-    }
-  }
-
-  res.json({
-    success: true,
-    message: `Transaksi '${targetTx?.namaPelanggan || id}' berhasil dihapus permanen.`,
-  });
-});
-
-// Clear all transactions permanently from local & Google Sheets
-app.post("/api/transactions/clear-all", async (req, res) => {
-  // 1. Clear local transactions file
-  saveTransactions([]);
-
-  // 2. Reset deleted records
-  saveDeletedRecords({ ids: [], sigs: [] });
-
-  // 3. Clear all rows in Google Sheets if GAS is configured
-  const gasCfg = getGasConfig();
-  if (gasCfg.gasUrl) {
-    try {
-      await callGasPost(gasCfg.gasUrl, { action: "clearAllTransactions" });
-    } catch (gasErr: any) {
-      console.warn("GAS background clearAll warning:", gasErr.message);
-    }
-  }
-
-  res.json({
-    success: true,
-    message: "Semua riwayat transaksi berhasil dihapus total dari server & Google Sheets.",
-  });
+  res.json({ success: true });
 });
 
 // Parse raw bill text using Gemini or smart fallback
@@ -993,10 +840,7 @@ app.post("/api/gas/sync", async (req, res) => {
       return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum dikonfigurasi." });
     }
 
-    const diskTxs = getTransactions();
-    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
-    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
-
+    const localTxs = getTransactions();
     let remoteTxs: any[] = [];
     let pushedCount = 0;
 
@@ -1079,9 +923,7 @@ app.post("/api/gas/pull", async (req, res) => {
     }
     const getRes = await callGasGet(targetUrl, { action: "getTransactions" });
     const sheetTxs = Array.isArray(getRes?.data) ? getRes.data : (Array.isArray(getRes) ? getRes : []);
-    const diskTxs = getTransactions();
-    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
-    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
+    const localTxs = getTransactions();
     const { merged, newFromSheet } = mergeTransactions(localTxs, sheetTxs);
     saveTransactions(merged);
     const now = new Date().toISOString();
@@ -1110,9 +952,7 @@ app.post("/api/gas/push", async (req, res) => {
     if (!targetUrl) {
       return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum dikonfigurasi." });
     }
-    const diskTxs = getTransactions();
-    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
-    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
+    const localTxs = getTransactions();
     const pushRes = await callGasPost(targetUrl, {
       action: "syncTransactions",
       transactions: localTxs,

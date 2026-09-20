@@ -12,8 +12,6 @@ import {
   saveStoredTransactions,
   startAutoSync,
   executeTwoWaySync,
-  permanentDeleteTransaction,
-  permanentClearAllTransactions,
 } from './services/gasClientSync';
 
 export default function App() {
@@ -207,15 +205,6 @@ export default function App() {
     setIsSaving(false);
   };
 
-  const handleCloseDuplicateModal = () => {
-    setDuplicateModal({
-      isOpen: false,
-      reason: '',
-      incoming: {},
-      matched: undefined,
-    });
-  };
-
   const handlePrint = () => {
     // Check if it's already in history before saving on print
     const dupResult = checkDuplicateTransaction(receipt, transactions);
@@ -225,59 +214,18 @@ export default function App() {
     window.print();
   };
 
-  const handleDeleteTransaction = async (id: string, tx?: ReceiptData) => {
-    const targetTx = tx || transactions.find((t) => t.id === id);
-    const label = targetTx?.namaPelanggan
-      ? `"${targetTx.namaPelanggan}" (${targetTx.idpel || id})`
-      : `ID ${id}`;
-    if (
-      !confirm(
-        `Hapus permanen transaksi ${label}?\n\n` +
-          `• Data akan dihapus dari aplikasi & baris Google Sheets.\n` +
-          `• ID & rincian transaksi akan dimasukkan ke blacklist agar TIDAK MASUK LAGI saat sinkronisasi 2 arah.`
-      )
-    ) {
-      return;
-    }
-
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) return;
     try {
-      await permanentDeleteTransaction(id, targetTx);
-      const updated = transactions.filter((t) => t.id !== id);
-      setTransactions(updated);
-      saveStoredTransactions(updated);
-      try {
-        localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
-      } catch (err) {}
-      await fetchTransactions();
-    } catch (e) {
-      console.error('Gagal menghapus transaksi permanen:', e);
-    }
-  };
+      await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+    } catch (e) {}
 
-  const handleClearAllTransactions = async () => {
-    if (
-      !confirm(
-        '⚠️ PERINGATAN HAPUS SEMUA DATA PERMANEN:\n\n' +
-          'Apakah Anda yakin ingin MENGHAPUS SEMUA RIWAYAT TRANSAKSI secara permanen?\n\n' +
-          '• Seluruh transaksi di aplikasi akan dikosongkan.\n' +
-          '• Semua baris data di Google Sheets (tab RiwayatTransaksi) akan dibersihkan total.\n' +
-          '• Riwayat tidak akan bisa ditarik kembali saat sinkronisasi.\n\nTindakan ini tidak dapat dibatalkan.'
-      )
-    ) {
-      return;
-    }
-
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
     try {
-      await permanentClearAllTransactions();
-      setTransactions([]);
-      saveStoredTransactions([]);
-      try {
-        localStorage.removeItem('agent_batara_txs');
-      } catch (err) {}
-      await fetchTransactions();
-    } catch (e) {
-      console.error('Gagal membersihkan semua transaksi:', e);
-    }
+      localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
+    } catch (err) {}
+    fetchTransactions();
   };
 
   const handleSelectTransaction = (tx: ReceiptData) => {
@@ -331,7 +279,6 @@ export default function App() {
             transactions={transactions}
             onSelectTransaction={handleSelectTransaction}
             onDeleteTransaction={handleDeleteTransaction}
-            onClearAllTransactions={handleClearAllTransactions}
             onRefreshTransactions={fetchTransactions}
             onNavigateToGasTab={() => setActiveTab('gas')}
           />
@@ -344,18 +291,12 @@ export default function App() {
 
       <DuplicateWarningModal
         isOpen={duplicateModal.isOpen}
-        onClose={handleCloseDuplicateModal}
+        onClose={() => setDuplicateModal(prev => ({ ...prev, isOpen: false }))}
         reason={duplicateModal.reason}
         incoming={duplicateModal.incoming}
         matched={duplicateModal.matched}
-        onForceSave={() => {
-          handleCloseDuplicateModal();
-          handleSaveTransaction(true);
-        }}
-        onViewHistory={() => {
-          handleCloseDuplicateModal();
-          setActiveTab('history');
-        }}
+        onForceSave={() => handleSaveTransaction(true)}
+        onViewHistory={() => setActiveTab('history')}
       />
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
