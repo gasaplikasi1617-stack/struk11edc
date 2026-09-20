@@ -12,6 +12,71 @@ import { ReceiptData } from '../types';
 const STORAGE_KEY_URL = 'gas_web_app_url';
 const STORAGE_KEY_TXS = 'batara_transactions_backup';
 const STORAGE_KEY_LAST_SYNC = 'batara_last_synced_at';
+const STORAGE_KEY_AUTO_SYNC = 'batara_auto_sync_enabled';
+const STORAGE_KEY_SYNC_INTERVAL = 'batara_auto_sync_interval';
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+
+export interface SyncState {
+  status: SyncStatus;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  totalInSheet: number;
+}
+
+type SyncListener = (state: SyncState, transactions?: ReceiptData[]) => void;
+const syncListeners: Set<SyncListener> = new Set();
+
+let currentSyncState: SyncState = {
+  status: 'idle',
+  lastSyncedAt: getLastSyncedTime(),
+  lastError: null,
+  totalInSheet: 0,
+};
+
+export function subscribeSyncState(listener: SyncListener): () => void {
+  syncListeners.add(listener);
+  // Emit current state immediately
+  listener(currentSyncState);
+  return () => {
+    syncListeners.delete(listener);
+  };
+}
+
+function notifySyncListeners(state: Partial<SyncState>, transactions?: ReceiptData[]) {
+  currentSyncState = { ...currentSyncState, ...state };
+  syncListeners.forEach((l) => {
+    try {
+      l(currentSyncState, transactions);
+    } catch (e) {
+      console.error('Error in sync listener:', e);
+    }
+  });
+}
+
+export function isAutoSyncEnabled(): boolean {
+  const val = localStorage.getItem(STORAGE_KEY_AUTO_SYNC);
+  if (val === null) return true; // Default true
+  return val === 'true';
+}
+
+export function setAutoSyncEnabled(enabled: boolean): void {
+  localStorage.setItem(STORAGE_KEY_AUTO_SYNC, String(enabled));
+}
+
+export function getAutoSyncInterval(): number {
+  const val = localStorage.getItem(STORAGE_KEY_SYNC_INTERVAL);
+  if (val) {
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && num >= 15) return num;
+  }
+  return 30; // Default 30 detik
+}
+
+export function setAutoSyncInterval(seconds: number): void {
+  const clamped = Math.max(15, seconds);
+  localStorage.setItem(STORAGE_KEY_SYNC_INTERVAL, String(clamped));
+}
 
 export function getStoredGasUrl(): string {
   return localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_GAS_URL;
@@ -169,6 +234,9 @@ export function mergeTransactions(
   });
 }
 
+let isSyncInProgress = false;
+let autoSyncTimerId: any = null;
+
 /**
  * SINKRONISASI 2 ARAH CERDAS (TWO-WAY SYNC)
  * 1. Kirim transaksi lokal ke Google Sheets (Sheets menambah yang belum ada).
@@ -185,6 +253,19 @@ export async function executeTwoWaySync(
   pushedToSheet: number;
   totalInSheet: number;
 }> {
+  if (isSyncInProgress) {
+    return {
+      success: true,
+      message: 'Sinkronisasi sedang berlangsung...',
+      mergedTransactions: currentLocalTxs || getStoredTransactions(),
+      pushedToSheet: 0,
+      totalInSheet: currentSyncState.totalInSheet,
+    };
+  }
+
+  isSyncInProgress = true;
+  notifySyncListeners({ status: 'syncing', lastError: null });
+
   const gasUrl = normalizeGasUrl(customGasUrl || getStoredGasUrl());
   const localList = currentLocalTxs || getStoredTransactions();
 
@@ -210,12 +291,24 @@ export async function executeTwoWaySync(
         const now = new Date().toISOString();
         setLastSyncedTime(now);
 
+        const total = data.totalInSheet ?? merged.length;
+        notifySyncListeners(
+          {
+            status: 'synced',
+            lastSyncedAt: now,
+            lastError: null,
+            totalInSheet: total,
+          },
+          merged
+        );
+        isSyncInProgress = false;
+
         return {
           success: true,
           message: data.message || 'Sinkronisasi 2 arah berhasil dengan Google Sheets!',
           mergedTransactions: merged,
           pushedToSheet: data.pushedToSheet ?? 0,
-          totalInSheet: data.totalInSheet ?? merged.length,
+          totalInSheet: total,
         };
       }
     }
@@ -233,16 +326,84 @@ export async function executeTwoWaySync(
       const now = new Date().toISOString();
       setLastSyncedTime(now);
 
+      const total = gasRes.totalInSheet ?? merged.length;
+      notifySyncListeners(
+        {
+          status: 'synced',
+          lastSyncedAt: now,
+          lastError: null,
+          totalInSheet: total,
+        },
+        merged
+      );
+      isSyncInProgress = false;
+
       return {
         success: true,
         message: 'Sinkronisasi 2 arah berhasil langsung dengan Google Sheets!',
         mergedTransactions: merged,
         pushedToSheet: gasRes.pushedToSheet ?? 0,
-        totalInSheet: gasRes.totalInSheet ?? merged.length,
+        totalInSheet: total,
       };
     }
     throw new Error(gasRes?.error || 'Gagal sinkronisasi');
   } catch (directErr: any) {
-    throw new Error(directErr.message || 'Gagal terhubung ke Google Apps Script');
+    const errMsg = directErr.message || 'Gagal terhubung ke Google Apps Script';
+    notifySyncListeners({ status: 'error', lastError: errMsg });
+    isSyncInProgress = false;
+    throw new Error(errMsg);
   }
+}
+
+/**
+ * START BACKGROUND AUTO-SYNC TIMER
+ */
+export function startAutoSync(
+  getCurrentTxs: () => ReceiptData[],
+  onUpdate: (merged: ReceiptData[]) => void
+) {
+  if (autoSyncTimerId) {
+    clearInterval(autoSyncTimerId);
+    autoSyncTimerId = null;
+  }
+
+  if (!isAutoSyncEnabled()) return;
+
+  const runSync = async () => {
+    if (!isAutoSyncEnabled()) return;
+    try {
+      const current = getCurrentTxs();
+      const res = await executeTwoWaySync(undefined, current);
+      if (res && res.success && Array.isArray(res.mergedTransactions)) {
+        onUpdate(res.mergedTransactions);
+      }
+    } catch (e) {
+      // Background auto-sync handles errors silently in state
+    }
+  };
+
+  // Run initial auto-sync after 1.5 seconds
+  setTimeout(runSync, 1500);
+
+  // Set recurring interval (e.g. 30 seconds)
+  const intervalMs = getAutoSyncInterval() * 1000;
+  autoSyncTimerId = setInterval(runSync, intervalMs);
+
+  // Also sync on window focus / visibility change
+  const handleVisibility = () => {
+    if (document.visibilityState === 'visible' && isAutoSyncEnabled()) {
+      runSync();
+    }
+  };
+  window.addEventListener('focus', handleVisibility);
+  document.addEventListener('visibilitychange', handleVisibility);
+
+  return () => {
+    if (autoSyncTimerId) {
+      clearInterval(autoSyncTimerId);
+      autoSyncTimerId = null;
+    }
+    window.removeEventListener('focus', handleVisibility);
+    document.removeEventListener('visibilitychange', handleVisibility);
+  };
 }

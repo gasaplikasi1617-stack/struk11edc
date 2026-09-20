@@ -24,6 +24,12 @@ import {
   getStoredTransactions,
   saveStoredTransactions,
   setStoredGasUrl,
+  isAutoSyncEnabled,
+  setAutoSyncEnabled,
+  getAutoSyncInterval,
+  setAutoSyncInterval,
+  subscribeSyncState,
+  SyncState,
 } from '../services/gasClientSync';
 
 interface GasIntegrationTabProps {
@@ -54,8 +60,15 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
   const [gasUrl, setGasUrl] = useState(DEFAULT_GAS_URL);
-  const [autoSync, setAutoSync] = useState(true);
+  const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
+  const [syncInterval, setSyncInterval] = useState(getAutoSyncInterval());
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [liveSyncState, setLiveSyncState] = useState<SyncState>({
+    status: 'idle',
+    lastSyncedAt: null,
+    lastError: null,
+    totalInSheet: 0,
+  });
 
   const [copiedGs, setCopiedGs] = useState(false);
   const [copiedHtml, setCopiedHtml] = useState(false);
@@ -77,6 +90,15 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   // Preview of live data from GAS/Sheet
   const [previewData, setPreviewData] = useState<ReceiptData[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Subscribe to live sync events
+  useEffect(() => {
+    const unsub = subscribeSyncState((state) => {
+      setLiveSyncState(state);
+      if (state.lastSyncedAt) setLastSyncedAt(state.lastSyncedAt);
+    });
+    return unsub;
+  }, []);
 
   // Load config and code on mount
   useEffect(() => {
@@ -550,33 +572,89 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
             </p>
           </div>
 
-          {/* Auto Sync Toggle */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-            <div className="pr-4">
-              <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Otomatis Kirim ke Google Sheets (Auto-Sync)</span>
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Setiap kali Anda menekan <em>"Simpan Resi"</em> atau <em>"Cetak Resi"</em>, transaksi langsung tersimpan ke Google Sheets di latar belakang.
-              </p>
+          {/* Auto Sync Toggle & Configuration */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="pr-4">
+                <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Sinkronisasi Otomatis 2 Arah (Auto 2-Way Sync)</span>
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Secara periodik menyamakan data antara aplikasi &amp; Google Sheets secara otomatis di latar belakang tanpa menekan tombol.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoSync}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setAutoSync(val);
+                    setAutoSyncEnabled(val);
+                    fetch('/api/gas/config', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ autoSync: val }),
+                    }).catch(() => {});
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSync}
-                onChange={(e) => {
-                  setAutoSync(e.target.checked);
-                  fetch('/api/gas/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ autoSync: e.target.checked }),
-                  });
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
+
+            {autoSync && (
+              <div className="pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="text-[11px] font-medium">Interval Sinkronisasi Otomatis:</span>
+                  <select
+                    value={syncInterval}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value, 10);
+                      setSyncInterval(num);
+                      setAutoSyncInterval(num);
+                    }}
+                    className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-blue-500 font-semibold"
+                  >
+                    <option value={15}>Setiap 15 Detik (Sangat Cepat)</option>
+                    <option value={30}>Setiap 30 Detik (Direkomendasikan)</option>
+                    <option value={60}>Setiap 1 Menit</option>
+                    <option value={120}>Setiap 2 Menit</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500">Status Terakhir:</span>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                      liveSyncState.status === 'syncing'
+                        ? 'bg-blue-100 text-blue-700'
+                        : liveSyncState.status === 'error'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
+                    {liveSyncState.status === 'syncing' ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>Sinkron Berjalan</span>
+                      </>
+                    ) : liveSyncState.status === 'error' ? (
+                      <>
+                        <AlertCircle className="w-3 h-3" />
+                        <span>Koneksi Gagal</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Tersinkronisasi Otomatis</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Two-Way Sync Actions */}

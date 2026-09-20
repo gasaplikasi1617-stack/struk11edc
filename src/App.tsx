@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AgentConfig, ReceiptData } from './types';
 import { Navbar } from './components/Navbar';
 import { ReceiptForm } from './components/ReceiptForm';
@@ -7,7 +7,12 @@ import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
-import { getStoredTransactions, saveStoredTransactions } from './services/gasClientSync';
+import {
+  getStoredTransactions,
+  saveStoredTransactions,
+  startAutoSync,
+  executeTwoWaySync,
+} from './services/gasClientSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'gas'>('create');
@@ -35,6 +40,9 @@ export default function App() {
   });
 
   const [transactions, setTransactions] = useState<ReceiptData[]>([]);
+  const transactionsRef = useRef<ReceiptData[]>([]);
+  transactionsRef.current = transactions;
+
   const [savedStatus, setSavedStatus] = useState(false);
   const [resetTrigger, setResetTrigger] = useState(0);
 
@@ -50,9 +58,21 @@ export default function App() {
     incoming: {},
   });
 
-  // Fetch transactions on mount
+  // Fetch transactions and start background 2-way auto-sync
   useEffect(() => {
     fetchTransactions();
+
+    // Start background auto-sync orchestrator
+    const stopSync = startAutoSync(
+      () => transactionsRef.current,
+      (merged) => {
+        const { cleaned } = deduplicateTransactionList(merged);
+        setTransactions(cleaned);
+        saveStoredTransactions(cleaned);
+      }
+    );
+
+    return stopSync;
   }, []);
 
   const fetchTransactions = async () => {
@@ -144,6 +164,16 @@ export default function App() {
           setResetTrigger(prev => prev + 1);
           setTimeout(() => setSavedStatus(false), 3000);
           setIsSaving(false);
+
+          // Trigger instant background 2-way sync to Google Sheets
+          executeTwoWaySync(undefined, [payload, ...transactionsRef.current])
+            .then((syncRes) => {
+              if (syncRes && Array.isArray(syncRes.mergedTransactions)) {
+                const { cleaned } = deduplicateTransactionList(syncRes.mergedTransactions);
+                setTransactions(cleaned);
+              }
+            })
+            .catch(() => {});
           return;
         }
       }
@@ -156,10 +186,21 @@ export default function App() {
       const current = [payload, ...transactions];
       const { cleaned } = deduplicateTransactionList(current);
       setTransactions(cleaned.slice(0, 100));
+      saveStoredTransactions(cleaned.slice(0, 100));
       localStorage.setItem('agent_batara_txs', JSON.stringify(cleaned.slice(0, 100)));
       setSavedStatus(true);
       setResetTrigger(prev => prev + 1);
       setTimeout(() => setSavedStatus(false), 3000);
+
+      // Trigger instant background 2-way sync to Google Sheets
+      executeTwoWaySync(undefined, cleaned)
+        .then((syncRes) => {
+          if (syncRes && Array.isArray(syncRes.mergedTransactions)) {
+            const { cleaned: deduped } = deduplicateTransactionList(syncRes.mergedTransactions);
+            setTransactions(deduped);
+          }
+        })
+        .catch(() => {});
     } catch (err) {}
     setIsSaving(false);
   };
@@ -205,6 +246,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         historyCount={transactions.length}
+        onSyncTrigger={fetchTransactions}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
