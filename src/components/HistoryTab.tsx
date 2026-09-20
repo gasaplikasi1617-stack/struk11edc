@@ -57,8 +57,8 @@ function getTransactionTimestamp(tx: ReceiptData): number {
     const t = new Date(tx.createdAt).getTime();
     if (!isNaN(t) && t > 0) return t;
   }
-  if (tx.id && tx.id.startsWith('TX-')) {
-    const num = Number(tx.id.replace('TX-', ''));
+  if (tx.id && String(tx.id).startsWith('TX-')) {
+    const num = Number(String(tx.id).replace('TX-', ''));
     if (!isNaN(num) && num > 1000000) return num;
   }
   if (tx.tanggal) {
@@ -134,9 +134,9 @@ export function HistoryTab({
   const handleQuickDownloadPng = (tx: ReceiptData) => {
     try {
       const canvas = drawReceiptToCanvas(tx);
-      const safeId = (tx.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
-      const safeName = (tx.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
-      const dateStr = (tx.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
+      const safeId = String(tx.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = String(tx.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+      const dateStr = String(tx.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
       const fileName = `Struk_${safeId}_${safeName}_${dateStr}.png`;
 
       canvas.toBlob((blob) => {
@@ -225,11 +225,12 @@ export function HistoryTab({
       const q = searchTerm.toLowerCase().trim();
       const matchSearch =
         !q ||
-        (t.id && t.id.toLowerCase().includes(q)) ||
-        (t.idpel && t.idpel.toLowerCase().includes(q)) ||
-        (t.namaPelanggan && t.namaPelanggan.toLowerCase().includes(q)) ||
-        (t.rincianTagihan && t.rincianTagihan.toLowerCase().includes(q)) ||
-        (t.bulanTagihan && t.bulanTagihan.toLowerCase().includes(q));
+        (t.id != null && String(t.id).toLowerCase().includes(q)) ||
+        (t.idpel != null && String(t.idpel).toLowerCase().includes(q)) ||
+        (t.namaPelanggan != null && String(t.namaPelanggan).toLowerCase().includes(q)) ||
+        (t.rincianTagihan != null && String(t.rincianTagihan).toLowerCase().includes(q)) ||
+        (t.bulanTagihan != null && String(t.bulanTagihan).toLowerCase().includes(q)) ||
+        (t.totalBayar != null && String(t.totalBayar).includes(q));
 
       if (!matchSearch) return false;
 
@@ -251,21 +252,21 @@ export function HistoryTab({
         case 'date-asc':
           return getTransactionTimestamp(a) - getTransactionTimestamp(b);
         case 'name-asc':
-          return (a.namaPelanggan || '').localeCompare(b.namaPelanggan || '', 'id');
+          return String(a.namaPelanggan || '').localeCompare(String(b.namaPelanggan || ''), 'id');
         case 'name-desc':
-          return (b.namaPelanggan || '').localeCompare(a.namaPelanggan || '', 'id');
+          return String(b.namaPelanggan || '').localeCompare(String(a.namaPelanggan || ''), 'id');
         case 'total-desc':
           return (Number(b.totalBayar) || 0) - (Number(a.totalBayar) || 0);
         case 'total-asc':
           return (Number(a.totalBayar) || 0) - (Number(b.totalBayar) || 0);
         case 'idpel-asc':
-          return (a.idpel || '').localeCompare(b.idpel || '', undefined, { numeric: true });
+          return String(a.idpel || '').localeCompare(String(b.idpel || ''), undefined, { numeric: true });
         case 'idpel-desc':
-          return (b.idpel || '').localeCompare(a.idpel || '', undefined, { numeric: true });
+          return String(b.idpel || '').localeCompare(String(a.idpel || ''), undefined, { numeric: true });
         case 'service-asc':
-          return (a.rincianTagihan || '').localeCompare(b.rincianTagihan || '', 'id');
+          return String(a.rincianTagihan || '').localeCompare(String(b.rincianTagihan || ''), 'id');
         case 'service-desc':
-          return (b.rincianTagihan || '').localeCompare(a.rincianTagihan || '', 'id');
+          return String(b.rincianTagihan || '').localeCompare(String(a.rincianTagihan || ''), 'id');
         default:
           return 0;
       }

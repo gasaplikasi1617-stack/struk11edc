@@ -120,7 +120,8 @@ export function DuplicateWarningModal({
           {onViewHistory && (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 onClose();
                 onViewHistory();
               }}

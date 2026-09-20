@@ -143,9 +143,9 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     setIsDownloadingImage(true);
     showActionNotice('Menyiapkan gambar struk resolusi tajam (A6)...');
 
-    const safeId = (receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
-    const safeName = (receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
-    const dateStr = (receipt.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
+    const safeId = String(receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeName = String(receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+    const dateStr = String(receipt.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
     const fileName = `Struk_${safeId}_${safeName}_${dateStr}.png`;
 
     try {
