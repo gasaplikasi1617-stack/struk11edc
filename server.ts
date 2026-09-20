@@ -705,7 +705,7 @@ ${rawText}
     if (!bulanTagihan) {
       const periodMatch = rawText.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
       if (periodMatch) bulanTagihan = formatPeriod3Chars(periodMatch[0]);
-      else bulanTagihan = "Sep26";
+      else bulanTagihan = "";
     }
 
     if (!idpel) {

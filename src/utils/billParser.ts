@@ -111,7 +111,7 @@ export function extractIdpelFromLines(lines: string[], rawText?: string): string
 }
 
 export function formatPeriod3Chars(input: string): string {
-  if (!input) return 'Sep26';
+  if (!input) return '';
   const upper = input.toUpperCase();
   const monthMap: Record<string, string> = {
     JAN: 'Jan', JANUARI: 'Jan',
@@ -136,10 +136,10 @@ export function formatPeriod3Chars(input: string): string {
     }
   }
 
-  const yearMatch = upper.match(/20\d{2}|\d{2}/);
+  const yearMatch = upper.match(/20(\d{2})|\b(\d{2})\b/);
   let yCode = '';
   if (yearMatch) {
-    const y = yearMatch[0];
+    const y = yearMatch[1] || yearMatch[2];
     yCode = y.length === 4 ? y.slice(2) : y;
   }
 
@@ -158,7 +158,13 @@ export function formatPeriod3Chars(input: string): string {
       return `${mCode}${yCode}`;
     }
   }
-  return 'Sep26';
+
+  if (mCode) {
+    const currentYY = String(new Date().getFullYear()).slice(2);
+    return `${mCode}${currentYY}`;
+  }
+
+  return '';
 }
 
 export type BillCategory = 'pln' | 'pdam' | 'bpjs' | 'telkom' | 'pascabayar' | 'other';
