@@ -770,15 +770,19 @@ export function HistoryTab({
                             <ImageIcon className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">PNG</span>
                           </button>
-                          {tx.id && (
-                            <button
-                              onClick={() => onDeleteTransaction(tx.id!)}
-                              className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs p-1.5 rounded-lg transition-all"
-                              title="Hapus riwayat ini"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const deleteKey = tx.id || tx.idpel || tx.namaPelanggan || '';
+                              if (deleteKey) {
+                                onDeleteTransaction(deleteKey);
+                              }
+                            }}
+                            className="bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 text-xs p-1.5 rounded-lg transition-all border border-rose-200 cursor-pointer"
+                            title="Hapus riwayat transaksi ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

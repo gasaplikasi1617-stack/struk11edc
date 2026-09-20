@@ -121,7 +121,7 @@ export function formatPeriod3Chars(input: string): string {
     MEI: 'Mei', MAY: 'Mei',
     JUN: 'Jun', JUNI: 'Jun',
     JUL: 'Jul', JULI: 'Jul',
-    AGT: 'Agt', AGS: 'Agt', AGUSTUS: 'Agt', AUG: 'Agt',
+    AGUS: 'Agus', AGT: 'Agus', AGS: 'Agus', AGUSTUS: 'Agus', AUG: 'Agus',
     SEP: 'Sep', SEPTEMBER: 'Sep', SEPT: 'Sep',
     OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
     NOV: 'Nov', NOVEMBER: 'Nov',
@@ -165,6 +165,69 @@ export function formatPeriod3Chars(input: string): string {
   }
 
   return '';
+}
+
+export function getPreviousMonthPeriod(periodStr?: string): string {
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agus', 'Sep', 'Okt', 'Nov', 'Des'];
+  
+  let month = 0;
+  let year = new Date().getFullYear();
+
+  if (periodStr && periodStr.trim()) {
+    const formatted = formatPeriod3Chars(periodStr);
+    if (formatted) {
+      const mStr = formatted.replace(/\d+$/, '');
+      const yStr = formatted.slice(mStr.length);
+      if (yStr) {
+        year = 2000 + (parseInt(yStr, 10) || (year % 100));
+      }
+
+      const monthMap: Record<string, number> = {
+        Jan: 1, Feb: 2, Mar: 3, Apr: 4, Mei: 5, Jun: 6,
+        Jul: 7, Agus: 8, Agt: 8, Sep: 9, Okt: 10, Nov: 11, Des: 12
+      };
+      month = monthMap[mStr] || 0;
+    }
+  }
+
+  // If no month found in input periodStr, default to current month
+  if (month === 0) {
+    const now = new Date();
+    month = now.getMonth() + 1; // 1 to 12
+    year = now.getFullYear();
+  }
+
+  let prevMonth = month - 1;
+  let prevYear = year;
+  if (prevMonth < 1) {
+    prevMonth = 12;
+    prevYear = year - 1;
+  }
+
+  const prevMStr = monthsArr[prevMonth];
+  const prevYStr = String(prevYear).slice(-2);
+
+  return `${prevMStr}${prevYStr}`;
+}
+
+export function isPdamBill(t: {
+  rincianTagihan?: string;
+  pemakaian?: string;
+  idpel?: string;
+  standMeter?: string;
+  rawText?: string;
+}): boolean {
+  const text = `${t.rincianTagihan || ''} ${t.pemakaian || ''} ${t.idpel || ''} ${t.standMeter || ''} ${t.rawText || ''}`.toLowerCase();
+  return (
+    text.includes('pdam') ||
+    text.includes('air') ||
+    text.includes('pam') ||
+    text.includes('tirta') ||
+    text.includes('meter air') ||
+    text.includes('m3') ||
+    text.includes('tirtanadi') ||
+    text.includes('sambungan')
+  );
 }
 
 export type BillCategory = 'pln' | 'pdam' | 'bpjs' | 'telkom' | 'pascabayar' | 'other';

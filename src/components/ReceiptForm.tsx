@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
-import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer } from 'lucide-react';
+import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
-import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from '../utils/billParser';
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, isPdamBill } from '../utils/billParser';
 
 interface ReceiptFormProps {
   receipt: ReceiptData;
@@ -26,6 +26,24 @@ export function ReceiptForm({
   const [rawText, setRawText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseNote, setParseNote] = useState('');
+
+  const handleClearAll = () => {
+    setRawText('');
+    setParseNote('');
+    setReceipt((prev) => ({
+      ...prev,
+      idpel: '',
+      namaPelanggan: '',
+      pemakaian: '',
+      standMeter: '',
+      rincianTagihan: 'Tagihan Pembayaran',
+      bulanTagihan: '',
+      rpTagihan: 0,
+      lainLain: 0,
+      adminBank: 2500,
+      totalBayar: 2500,
+    }));
+  };
 
   // Clear rawText when resetTrigger changes
   React.useEffect(() => {
@@ -190,6 +208,10 @@ export function ReceiptForm({
       else bulanTagihan = "";
     }
 
+    if (isPdam || isPdamBill({ rincianTagihan, rawText: text })) {
+      bulanTagihan = getPreviousMonthPeriod(bulanTagihan);
+    }
+
     if (!idpel) {
       idpel = extractIdpelFromLines(lines, text);
     }
@@ -259,20 +281,27 @@ export function ReceiptForm({
         }
         finalIdpel = cleanExtractedId(finalIdpel);
 
-        setReceipt((prev) => ({
-          ...prev,
-          tanggal: d.tanggal || prev.tanggal,
-          idpel: finalIdpel || prev.idpel,
-          namaPelanggan: (d.namaPelanggan || prev.namaPelanggan || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase(),
-          pemakaian: d.pemakaian || prev.pemakaian,
-          standMeter: d.standMeter || prev.standMeter,
-          rincianTagihan: d.rincianTagihan || prev.rincianTagihan,
-          bulanTagihan: d.bulanTagihan || prev.bulanTagihan,
-          rpTagihan: Number(d.rpTagihan) || 0,
-          lainLain: Number(d.lainLain) || 0,
-          adminBank: Number(d.adminBank) || 2500,
-          totalBayar: (Number(d.rpTagihan) || 0) + (Number(d.lainLain) || 0) + (Number(d.adminBank) || 2500),
-        }));
+        setReceipt((prev) => {
+          let finalBulanTagihan = d.bulanTagihan || prev.bulanTagihan;
+          if (isPdamBill({ ...d, rawText })) {
+            finalBulanTagihan = getPreviousMonthPeriod(finalBulanTagihan);
+          }
+
+          return {
+            ...prev,
+            tanggal: d.tanggal || prev.tanggal,
+            idpel: finalIdpel || prev.idpel,
+            namaPelanggan: (d.namaPelanggan || prev.namaPelanggan || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase(),
+            pemakaian: d.pemakaian || prev.pemakaian,
+            standMeter: d.standMeter || prev.standMeter,
+            rincianTagihan: d.rincianTagihan || prev.rincianTagihan,
+            bulanTagihan: finalBulanTagihan,
+            rpTagihan: Number(d.rpTagihan) || 0,
+            lainLain: Number(d.lainLain) || 0,
+            adminBank: Number(d.adminBank) || 2500,
+            totalBayar: (Number(d.rpTagihan) || 0) + (Number(d.lainLain) || 0) + (Number(d.adminBank) || 2500),
+          };
+        });
         setParseNote(data.note ? `Berhasil diparsing (${data.note})` : 'Berhasil diparsing otomatis!');
       } else {
         const d = clientParse(rawText);
@@ -322,7 +351,7 @@ export function ReceiptForm({
           className="w-full font-mono text-xs sm:text-sm p-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50/50"
         />
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             {parseNote && (
               <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
@@ -330,24 +359,35 @@ export function ReceiptForm({
               </span>
             )}
           </div>
-          <button
-            type="button"
-            disabled={isParsing}
-            onClick={handleParse}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50"
-          >
-            {isParsing ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Memproses AI...</span>
-              </>
-            ) : (
-              <>
-                <Wand2 className="w-4 h-4" />
-                <span>Input</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300"
+              title="Bersihkan teks input dan kosongkan isian form"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-500" />
+              <span>Clear / Reset</span>
+            </button>
+            <button
+              type="button"
+              disabled={isParsing}
+              onClick={handleParse}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+            >
+              {isParsing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Memproses AI...</span>
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  <span>Input</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -405,7 +445,18 @@ export function ReceiptForm({
 
       {/* 3. Editor Data Resi Lengkap */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h2 className="text-lg font-bold text-slate-800 mb-4">2 & 3. Editor Detail Resi Tagihan</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-800">2 & 3. Editor Detail Resi Tagihan</h2>
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-all"
+            title="Kosongkan seluruh isian form resi"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Bersihkan Form</span>
+          </button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Tanggal Transaksi</label>

@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from "./src/utils/billParser";
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, isPdamBill } from "./src/utils/billParser";
 import { DEFAULT_GAS_DATA } from "./src/data/gasTemplates";
 
 const app = express();
@@ -449,10 +449,11 @@ app.post("/api/transactions/deduplicate", (req, res) => {
 // Delete a transaction
 app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
-  const id = req.params.id;
-  txs = txs.filter((t: any) => t.id !== id);
+  const targetKey = decodeURIComponent(req.params.id || "");
+  const initialLength = txs.length;
+  txs = txs.filter((t: any) => t.id !== targetKey && t.idpel !== targetKey && t.namaPelanggan !== targetKey);
   saveTransactions(txs);
-  res.json({ success: true });
+  res.json({ success: true, removed: initialLength - txs.length, total: txs.length });
 });
 
 // Parse raw bill text using Gemini or smart fallback
@@ -534,6 +535,13 @@ ${rawText}
         rawIdpel = extractIdpelFromLines(rawText.split("\n"), rawText);
       }
       parsedData.idpel = cleanExtractedId(rawIdpel);
+
+      // If PDAM, format period as previous month (e.g., September -> Agus26)
+      if (isPdamBill({ ...parsedData, rawText })) {
+        parsedData.bulanTagihan = getPreviousMonthPeriod(parsedData.bulanTagihan);
+      } else if (parsedData.bulanTagihan) {
+        parsedData.bulanTagihan = formatPeriod3Chars(parsedData.bulanTagihan);
+      }
 
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
@@ -706,6 +714,10 @@ ${rawText}
       const periodMatch = rawText.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
       if (periodMatch) bulanTagihan = formatPeriod3Chars(periodMatch[0]);
       else bulanTagihan = "";
+    }
+
+    if (isPdam || isPdamBill({ rincianTagihan, rawText })) {
+      bulanTagihan = getPreviousMonthPeriod(bulanTagihan);
     }
 
     if (!idpel) {

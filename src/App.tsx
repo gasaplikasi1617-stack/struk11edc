@@ -30,7 +30,7 @@ export default function App() {
     pemakaian: '145 kWh',
     standMeter: '014230 - 014380',
     rincianTagihan: 'Tagihan Listrik PLN Pascabayar',
-    bulanTagihan: 'AGUSTUS 2026',
+    bulanTagihan: 'Agus26',
     rpTagihan: 150000,
     lainLain: 0,
     adminBank: 2500,
@@ -215,18 +215,29 @@ export default function App() {
     window.print();
   };
 
-  const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) return;
-    try {
-      await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-    } catch (e) {}
+  const handleDeleteTransaction = async (targetKey: string) => {
+    if (!targetKey) return;
+    if (!confirm('Apakah Anda yakin ingin menghapus data transaksi ini dari riwayat?')) return;
 
-    const updated = transactions.filter((t) => t.id !== id);
+    // Filter local state by id, idpel, or namaPelanggan
+    const updated = transactions.filter((t) => {
+      if (t.id && t.id === targetKey) return false;
+      if (t.idpel && t.idpel === targetKey) return false;
+      if (t.namaPelanggan && t.namaPelanggan === targetKey) return false;
+      return true;
+    });
+
     setTransactions(updated);
+    saveStoredTransactions(updated);
     try {
       localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
     } catch (err) {}
-    fetchTransactions();
+
+    try {
+      await fetch(`/api/transactions/${encodeURIComponent(targetKey)}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Server delete error:', e);
+    }
   };
 
   const handleSelectTransaction = (tx: ReceiptData) => {
