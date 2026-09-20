@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ReceiptData } from '../types';
 import {
   History,
@@ -20,16 +20,29 @@ import {
   Database,
   Image as ImageIcon,
   ShieldCheck,
+  Share2,
+  Copy,
+  Check,
+  ExternalLink,
+  X,
+  MessageSquare,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
-import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
+import { drawReceiptToCanvas, drawDotMatrixToCanvas } from '../utils/receiptCanvasDrawer';
 import { executeTwoWaySync } from '../services/gasClientSync';
+import {
+  formatReceiptForWhatsApp,
+  getWhatsAppShareUrl,
+  copyImageBlobToClipboard,
+  copyTextToClipboard,
+} from '../utils/whatsappFormatter';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
-  onDeleteTransaction: (id: string) => void;
+  onDeleteTransaction: (id: string, tx?: ReceiptData) => void;
+  onClearAllTransactions?: () => void;
   onRefreshTransactions?: () => Promise<void> | void;
   onNavigateToGasTab?: () => void;
 }
@@ -71,10 +84,19 @@ function getTransactionTimestamp(tx: ReceiptData): number {
   return 0;
 }
 
+interface PngActionModalData {
+  tx: ReceiptData;
+  dataUrl: string;
+  blob: Blob | null;
+  fileName: string;
+  layout: 'dotmatrix' | 'a6';
+}
+
 export function HistoryTab({
   transactions,
   onSelectTransaction,
   onDeleteTransaction,
+  onClearAllTransactions,
   onRefreshTransactions,
   onNavigateToGasTab,
 }: HistoryTabProps) {
@@ -83,6 +105,24 @@ export function HistoryTab({
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
+
+  // PNG & WhatsApp Modal State
+  const [pngModal, setPngModal] = useState<PngActionModalData | null>(null);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied-img' | 'copied-text'>('idle');
+  const [targetWaPhone, setTargetWaPhone] = useState('');
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!pngModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setPngModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pngModal]);
 
   const handleGasSyncClick = async () => {
     setIsSyncingGas(true);
@@ -119,32 +159,118 @@ export function HistoryTab({
     }
   };
 
-  const handleQuickDownloadPng = (tx: ReceiptData) => {
+  const switchPngModalLayout = (newLayout: 'dotmatrix' | 'a6') => {
+    if (!pngModal) return;
     try {
-      const canvas = drawReceiptToCanvas(tx);
+      const tx = pngModal.tx;
+      const canvas = newLayout === 'dotmatrix' ? drawDotMatrixToCanvas(tx) : drawReceiptToCanvas(tx);
       const safeId = (tx.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
       const safeName = (tx.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
       const dateStr = (tx.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
-      const fileName = `Struk_${safeId}_${safeName}_${dateStr}.png`;
+      const fileName = newLayout === 'dotmatrix'
+        ? `Struk_DotMatrix_Bukopin_${safeId}_${safeName}_${dateStr}.png`
+        : `Struk_${safeId}_${safeName}_${dateStr}.png`;
+      const dataUrl = canvas.toDataURL('image/png');
 
       canvas.toBlob((blob) => {
-        const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.style.display = 'none';
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          if (document.body.contains(link)) document.body.removeChild(link);
-          if (blob) URL.revokeObjectURL(url);
-        }, 1500);
+        setPngModal({
+          tx,
+          dataUrl,
+          blob: blob || null,
+          fileName,
+          layout: newLayout,
+        });
+      }, 'image/png');
+    } catch (err) {
+      console.error('Error switching modal layout:', err);
+    }
+  };
+
+  const handleOpenPngModal = (tx: ReceiptData, autoDownload = true) => {
+    try {
+      // Default ke Dot Matrix 21,6 x 6,95 cm horizontal
+      const canvas = drawDotMatrixToCanvas(tx);
+      const safeId = (tx.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = (tx.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+      const dateStr = (tx.tanggal || '').replace(/[^a-zA-Z0-9]/g, '_') || Date.now();
+      const fileName = `Struk_DotMatrix_Bukopin_${safeId}_${safeName}_${dateStr}.png`;
+      const dataUrl = canvas.toDataURL('image/png');
+
+      canvas.toBlob((blob) => {
+        setPngModal({
+          tx,
+          dataUrl,
+          blob: blob || null,
+          fileName,
+          layout: 'dotmatrix',
+        });
       }, 'image/png');
 
-      setExportSuccessNotice(`Gambar struk PNG untuk ${tx.namaPelanggan || 'transaksi'} berhasil diunduh!`);
-      setTimeout(() => setExportSuccessNotice(null), 5000);
+      setTargetWaPhone(tx.noHp || '');
+      setCopyStatus('idle');
+
+      // Attempt immediate direct browser download
+      if (autoDownload) {
+        try {
+          const link = document.createElement('a');
+          link.style.display = 'none';
+          link.href = dataUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => {
+            if (document.body.contains(link)) document.body.removeChild(link);
+          }, 1200);
+        } catch (dlErr) {
+          console.warn('Auto download error, fallback modal ready:', dlErr);
+        }
+      }
+
+      setExportSuccessNotice(`Gambar struk Dot Matrix Bukopin untuk "${tx.namaPelanggan || 'transaksi'}" siap!`);
+      setTimeout(() => setExportSuccessNotice(null), 4000);
     } catch (err: any) {
-      setExportSuccessNotice(`Gagal mengunduh gambar struk: ${err.message}`);
+      setExportSuccessNotice(`Gagal menyiapkan gambar struk: ${err.message}`);
+    }
+  };
+
+  const handleCopyPngImage = async () => {
+    if (!pngModal) return;
+    let ok = false;
+    if (pngModal.blob) {
+      ok = await copyImageBlobToClipboard(pngModal.blob);
+    }
+    if (ok) {
+      setCopyStatus('copied-img');
+      setExportSuccessNotice('Gambar struk PNG berhasil disalin! Silakan langsung Paste (Ctrl+V) di chat WhatsApp.');
+      setTimeout(() => setCopyStatus('idle'), 3500);
+    } else {
+      // Fallback: copy formatted WhatsApp text
+      const waText = formatReceiptForWhatsApp(pngModal.tx);
+      const textOk = await copyTextToClipboard(waText);
+      if (textOk) {
+        setCopyStatus('copied-text');
+        setExportSuccessNotice('Browser membatasi salin gambar langsung. Teks rincian WhatsApp telah disalin! Tinggal Paste di WA.');
+        setTimeout(() => setCopyStatus('idle'), 4000);
+      } else {
+        setExportSuccessNotice('Gunakan tombol "Buka Gambar di Tab Baru" lalu klik kanan Salin Gambar.');
+      }
+    }
+  };
+
+  const handleSendViaWhatsApp = () => {
+    if (!pngModal) return;
+    const url = getWhatsAppShareUrl(pngModal.tx, targetWaPhone);
+    window.open(url, '_blank');
+  };
+
+  const handleCopyWaText = async () => {
+    if (!pngModal) return;
+    const waText = formatReceiptForWhatsApp(pngModal.tx);
+    const ok = await copyTextToClipboard(waText);
+    if (ok) {
+      setCopyStatus('copied-text');
+      setExportSuccessNotice('Format teks struk WhatsApp berhasil disalin ke clipboard!');
+      setTimeout(() => setCopyStatus('idle'), 3000);
     }
   };
 
@@ -338,6 +464,26 @@ export function HistoryTab({
                 </span>
               )}
             </button>
+
+            {onClearAllTransactions && transactions.length > 0 && (
+              <button
+                id="btn-clear-all-history"
+                onClick={onClearAllTransactions}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-semibold px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all"
+                title="Hapus semua riwayat transaksi secara permanen (Lokal & Google Sheets)"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Hapus Semua</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Info Banner: Permanent Deletion Protection */}
+        <div className="mt-4 p-3 bg-blue-50/70 border border-blue-100 text-blue-900 rounded-xl text-xs flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="flex-1 leading-relaxed">
+            <span className="font-bold">Proteksi Hapus Permanen Aktif:</span> Menghapus transaksi akan otomatis membersihkan baris di Google Sheets dan mencatat ID ke sistem blacklist agar data terhapus <span className="font-semibold text-blue-700 underline">tidak akan pernah masuk kembali saat sinkronisasi 2 arah</span>.
           </div>
         </div>
 
@@ -709,18 +855,26 @@ export function HistoryTab({
                             <span className="hidden sm:inline">Cetak</span>
                           </button>
                           <button
-                            onClick={() => handleQuickDownloadPng(tx)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 font-medium transition-all"
+                            onClick={() => handleOpenPngModal(tx, true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 font-medium transition-all cursor-pointer"
                             title="Unduh langsung gambar struk (PNG)"
                           >
                             <ImageIcon className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">PNG</span>
                           </button>
+                          <button
+                            onClick={() => handleOpenPngModal(tx, false)}
+                            className="bg-teal-600 hover:bg-teal-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 font-medium transition-all cursor-pointer"
+                            title="Salin ke WhatsApp / Kirim Struk"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">WA</span>
+                          </button>
                           {tx.id && (
                             <button
-                              onClick={() => onDeleteTransaction(tx.id!)}
-                              className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs p-1.5 rounded-lg transition-all"
-                              title="Hapus riwayat ini"
+                              onClick={() => onDeleteTransaction(tx.id!, tx)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs p-1.5 rounded-lg transition-all cursor-pointer"
+                              title="Hapus permanen transaksi ini dari aplikasi & Google Sheets"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -752,6 +906,195 @@ export function HistoryTab({
           )}
         </div>
       </div>
+
+      {/* Modal Aksi PNG & Berbagi WhatsApp */}
+      {pngModal && (
+        <div
+          id="png-history-modal-backdrop"
+          onClick={() => setPngModal(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+        >
+          <div
+            id="png-history-modal-container"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] cursor-default relative"
+          >
+            {/* Modal Header */}
+            <div className="bg-emerald-600 text-white px-5 py-4 flex items-center justify-between select-none">
+              <div className="flex items-center space-x-2.5">
+                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-xs">
+                  <ImageIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Struk PNG & Berbagi WhatsApp</h3>
+                  <p className="text-xs text-emerald-100">
+                    {pngModal.tx.namaPelanggan || 'Pelanggan'} • {pngModal.tx.idpel || '-'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPngModal(null)}
+                className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center text-white bg-white/20 hover:bg-white/35 active:bg-white/50 rounded-xl transition-all cursor-pointer shadow-xs focus:outline-none"
+                aria-label="Tutup"
+                title="Tutup (Esc)"
+              >
+                <X className="w-5 h-5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
+              {/* Layout Switcher Tabs */}
+              <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => switchPngModalLayout('dotmatrix')}
+                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    pngModal.layout === 'dotmatrix'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/80'
+                  }`}
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Dot Matrix (21,6 x 6,95 cm)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchPngModalLayout('a6')}
+                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    pngModal.layout === 'a6'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/80'
+                  }`}
+                >
+                  <span>Resi A6 Portrait</span>
+                </button>
+              </div>
+
+              {/* Thumbnail Preview Struk */}
+              <div className="bg-slate-100 border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center">
+                <div className="max-h-56 overflow-auto rounded-lg shadow-sm border border-slate-300 bg-white p-1">
+                  <img
+                    src={pngModal.dataUrl}
+                    alt="Preview Struk PNG"
+                    className={`h-auto object-contain mx-auto ${
+                      pngModal.layout === 'dotmatrix' ? 'w-full max-w-[420px]' : 'w-auto max-w-[260px]'
+                    }`}
+                  />
+                </div>
+                <span className="text-[11px] text-slate-500 mt-2 font-medium">
+                  {pngModal.layout === 'dotmatrix'
+                    ? 'Format Continuous Form Bukopin 21,6 x 6,95 cm (1 Lembar Pas)'
+                    : 'Format standar A6 Portrait siap cetak atau dikirim via WhatsApp'}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2.5">
+                {/* 1. Unduh File PNG (Native Direct Download Link) */}
+                <a
+                  href={pngModal.dataUrl}
+                  download={pngModal.fileName}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer text-center"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh File PNG ({pngModal.fileName})</span>
+                </a>
+
+                {/* 2. Salin Gambar & Salin Teks */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyPngImage}
+                    className="w-full bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    title="Salin gambar agar dapat langsung di-paste (Ctrl+V) ke chat WhatsApp"
+                  >
+                    {copyStatus === 'copied-img' ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Gambar Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-slate-600" />
+                        <span>Salin Gambar (WA)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyWaText}
+                    className="w-full bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-semibold py-2 px-3 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    title="Salin teks rincian struk rapi untuk pesan WhatsApp"
+                  >
+                    {copyStatus === 'copied-text' ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Teks Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4 text-slate-600" />
+                        <span>Salin Teks Struk</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* 3. Kirim via WhatsApp */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase">
+                    Kirim ke WhatsApp (Opsional Nomor Tujuan):
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={targetWaPhone}
+                      onChange={(e) => setTargetWaPhone(e.target.value)}
+                      placeholder="Contoh: 081234567890"
+                      className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendViaWhatsApp}
+                      className="bg-[#25D366] hover:bg-[#1EBE5D] active:bg-[#199E4B] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Buka WhatsApp</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    *Membuka WhatsApp dengan rincian struk otomatis terformat.
+                  </p>
+                </div>
+
+                {/* 4. Opsi Buka Gambar di Tab Baru */}
+                <button
+                  type="button"
+                  onClick={() => window.open(pngModal.dataUrl, '_blank')}
+                  className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Buka gambar di tab baru jika ingin klik kanan simpan manual"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Buka Gambar di Tab Baru</span>
+                </button>
+              </div>
+
+              {/* Tips Petunjuk */}
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 leading-relaxed">
+                💡 <strong>Cara mudah kirim ke WhatsApp:</strong>
+                <ol className="list-decimal list-inside mt-1 space-y-0.5 text-emerald-800">
+                  <li>Klik tombol <strong>Salin Gambar (WA)</strong>.</li>
+                  <li>Buka chat WhatsApp pelanggan, lalu tekan <strong>Ctrl + V</strong> (Paste) dan kirim.</li>
+                  <li>Atau klik <strong>Buka WhatsApp</strong> untuk mengirim rincian teks struk otomatis.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
