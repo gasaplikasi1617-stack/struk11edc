@@ -24,6 +24,7 @@ import {
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
+import { executeTwoWaySync } from '../services/gasClientSync';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
@@ -86,27 +87,10 @@ export function HistoryTab({
   const handleGasSyncClick = async () => {
     setIsSyncingGas(true);
     try {
-      const res = await fetch('/api/gas/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setExportSuccessNotice(
-          data.message || 'Sinkronisasi 2 arah dengan Google Sheets berhasil!'
-        );
-        if (onRefreshTransactions) {
-          await onRefreshTransactions();
-        }
-      } else {
-        if (data.error && data.error.includes('belum dikonfigurasi')) {
-          setExportSuccessNotice(
-            'URL Google Apps Script belum dikonfigurasi. Silakan atur URL di tab "Integrasi".'
-          );
-        } else {
-          setExportSuccessNotice(`Sinkronisasi gagal: ${data.error || 'Terjadi kesalahan'}`);
-        }
+      const res = await executeTwoWaySync(undefined, transactions);
+      setExportSuccessNotice(res.message);
+      if (onRefreshTransactions) {
+        await onRefreshTransactions();
       }
     } catch (e: any) {
       setExportSuccessNotice(`Gagal sinkron: ${e.message}`);

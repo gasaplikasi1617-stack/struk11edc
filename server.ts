@@ -64,27 +64,58 @@ function parseGasResponse(text: string): any {
   }
   const trimmed = text.trim();
 
-  // Detect if Google returned an HTML page (e.g. login redirect, error 404, authorization required)
+  // 1. Direct JSON test
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (e: any) {
+      console.warn("JSON.parse failed on JSON-like string:", e.message);
+    }
+  }
+
+  // 2. Detect Google Login / Auth / 404 / HTML error pages
+  const lower = trimmed.toLowerCase();
   if (
-    trimmed.startsWith("<!DOCTYPE") ||
+    trimmed.startsWith("<!") ||
     trimmed.startsWith("<html") ||
-    trimmed.includes("accounts.google.com") ||
-    trimmed.includes("ServiceLogin") ||
-    trimmed.includes("The page cannot be found") ||
-    trimmed.includes("Google Drive – Akses Ditolak") ||
-    trimmed.includes("Sign in - Google Accounts")
+    trimmed.startsWith("<head") ||
+    trimmed.startsWith("<body") ||
+    trimmed.startsWith("<div") ||
+    trimmed.includes("<title>") ||
+    lower.includes("the page") ||
+    lower.includes("accounts.google.com") ||
+    lower.includes("servicelogin") ||
+    lower.includes("authorization required") ||
+    lower.includes("script error") ||
+    lower.includes("akses ditolak") ||
+    lower.includes("access denied") ||
+    lower.includes("google drive") ||
+    lower.includes("cannot be found") ||
+    lower.includes("not found")
   ) {
+    if (lower.includes("the page you requested requires authorization") || lower.includes("servicelogin") || lower.includes("accounts.google.com")) {
+      throw new Error(
+        "Akses Google Apps Script Memerlukan Login / Otorisasi. " +
+        "Cara Mengatasi: Di editor Google Apps Script, klik menu 'Deploy' > 'Manage deployments' > Edit (ikon pensil) > pilih Version: 'New version' > ubah 'Who has access' menjadi 'Anyone' (Siapa saja) > klik 'Deploy'."
+      );
+    }
+    if (lower.includes("the page cannot be found") || lower.includes("not found")) {
+      throw new Error(
+        "Halaman Web App Google Apps Script tidak ditemukan (404). " +
+        "Pastikan URL yang dimasukkan adalah Web App URL yang berakhiran '/exec', bukan link editor."
+      );
+    }
     throw new Error(
-      "Akses Google Apps Script Ditolak / Meminta Login. " +
-      "Penyebab: Web App belum di-deploy dengan izin 'Anyone' (Siapa saja). " +
-      "Solusi: Di Google Apps Script, klik Deploy > Manage Deployments (atau New Deployment) > ubah 'Who has access' menjadi 'Anyone' (Siapa saja) > Deploy ulang."
+      "Google Apps Script mengembalikan halaman HTML/Error. " +
+      "Pastikan script Code.gs sudah di-deploy sebagai Web App dengan akses 'Anyone' (Siapa saja) dan fungsi 'setupDatabase' atau 'testInitAndPing' sudah di-Run sekali di editor Apps Script untuk menyetujui izin Google Sheets."
     );
   }
 
+  // 3. Fallback try JSON parse or return message
   try {
     return JSON.parse(trimmed);
   } catch (err) {
-    if (trimmed.toLowerCase().includes("error") || trimmed.length < 300) {
+    if (trimmed.length < 300) {
       return { success: true, message: trimmed };
     }
     throw new Error(

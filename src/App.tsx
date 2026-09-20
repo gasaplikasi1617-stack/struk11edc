@@ -7,6 +7,7 @@ import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
+import { getStoredTransactions, saveStoredTransactions } from './services/gasClientSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'gas'>('create');
@@ -63,6 +64,7 @@ export default function App() {
         if (Array.isArray(data)) {
           const { cleaned } = deduplicateTransactionList(data);
           setTransactions(cleaned);
+          saveStoredTransactions(cleaned);
           return;
         }
       }
@@ -71,11 +73,18 @@ export default function App() {
     }
     // Fallback to localStorage
     try {
+      const stored = getStoredTransactions();
+      if (stored.length > 0) {
+        const { cleaned } = deduplicateTransactionList(stored);
+        setTransactions(cleaned);
+        return;
+      }
       const local = localStorage.getItem('agent_batara_txs');
       if (local) {
         const parsed = JSON.parse(local);
         const { cleaned } = deduplicateTransactionList(parsed);
         setTransactions(cleaned);
+        saveStoredTransactions(cleaned);
       }
     } catch (err) {}
   };

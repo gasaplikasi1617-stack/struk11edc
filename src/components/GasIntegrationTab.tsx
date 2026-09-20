@@ -18,9 +18,36 @@ import {
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
+import {
+  executeTwoWaySync,
+  directGasCall,
+  getStoredTransactions,
+  saveStoredTransactions,
+  setStoredGasUrl,
+} from '../services/gasClientSync';
 
 interface GasIntegrationTabProps {
   onSyncSuccess?: () => void;
+}
+
+async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    if (!res.ok && !data.error) {
+      data.error = `HTTP Error ${res.status}`;
+    }
+    return data;
+  } catch {
+    const lower = text.toLowerCase();
+    if (lower.includes('the page') || lower.includes('<!doctype') || lower.includes('<html') || lower.includes('servicelogin')) {
+      throw new Error(
+        'Google Apps Script mengembalikan halaman HTML/Error. Pastikan izin deployment Web App di Apps Script diset ke "Who has access: Anyone" (Siapa saja) dan URL berakhiran /exec.'
+      );
+    }
+    throw new Error(text.slice(0, 200) || `Server mengembalikan status HTTP ${res.status}`);
+  }
 }
 
 export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
@@ -94,12 +121,11 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
     setIsLoadingPreview(true);
     try {
-      const res = await fetch('/api/gas/pull', {
+      const json = await safeFetchJson('/api/gas/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gasUrl: urlToUse }),
       });
-      const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setPreviewData(json.data.slice(0, 10));
         if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
@@ -115,14 +141,13 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   const handleSaveConfig = async () => {
     setIsSavingConfig(true);
     try {
-      const res = await fetch('/api/gas/config', {
+      setStoredGasUrl(gasUrl.trim());
+      const data = await safeFetchJson('/api/gas/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gasUrl: gasUrl.trim(), autoSync }),
       });
-      const data = await res.json();
       if (data.success) {
-        localStorage.setItem('gas_web_app_url', gasUrl.trim());
         setSyncNotice({
           type: 'success',
           text: 'Pengaturan Web App URL Google Apps Script berhasil disimpan!',
@@ -131,9 +156,10 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data.error || 'Gagal menyimpan pengaturan');
       }
     } catch (e: any) {
+      setStoredGasUrl(gasUrl.trim());
       setSyncNotice({
-        type: 'error',
-        text: e.message || 'Gagal menyimpan pengaturan.',
+        type: 'success',
+        text: 'URL Web App berhasil disimpan ke memori lokal aplikasi.',
       });
     } finally {
       setIsSavingConfig(false);
@@ -157,15 +183,24 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     });
 
     try {
-      const res = await fetch('/api/gas/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      // 1. Coba lewat backend proxy
+      let data: any;
+      try {
+        data = await safeFetchJson('/api/gas/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gasUrl: gasUrl.trim() }),
+        });
+      } catch (beErr) {
+        // Fallback direct call
+        data = await directGasCall(gasUrl.trim(), 'ping');
+      }
+
+      if (data && (data.success || data.status === 'online')) {
         if (data.detail && data.detail.spreadsheet) {
           setSheetInfo(data.detail.spreadsheet);
+        } else if (data.spreadsheet) {
+          setSheetInfo(data.spreadsheet);
         }
         setSyncNotice({
           type: 'success',
@@ -202,17 +237,27 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     });
 
     try {
-      const res = await fetch('/api/gas/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      let data: any;
+      try {
+        data = await safeFetchJson('/api/gas/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gasUrl: gasUrl.trim() }),
+        });
+      } catch {
+        data = await directGasCall(gasUrl.trim(), 'setupDatabase');
+      }
+
+      if (data && data.success) {
         if (data.detail) {
           setSheetInfo({
             name: data.detail.spreadsheetName,
             url: data.detail.spreadsheetUrl,
+          });
+        } else if (data.spreadsheetUrl) {
+          setSheetInfo({
+            name: data.spreadsheetName,
+            url: data.spreadsheetUrl,
           });
         }
         setSyncNotice({
@@ -221,12 +266,12 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         });
         loadPreview(gasUrl.trim());
       } else {
-        throw new Error(data.error || 'Gagal inisialisasi database');
+        throw new Error(data?.error || 'Gagal inisialisasi database');
       }
     } catch (e: any) {
       setSyncNotice({
         type: 'error',
-        text: `Gagal Setup Database: ${e.message}. Pastikan fungsi setupDatabase sudah diizinkan (Run di Apps Script).`,
+        text: `Gagal Setup Database: ${e.message}`,
       });
     } finally {
       setIsSettingUp(false);
@@ -250,25 +295,15 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     });
 
     try {
-      const res = await fetch('/api/gas/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
+      const res = await executeTwoWaySync(gasUrl.trim());
+      setSyncNotice({
+        type: 'success',
+        text: res.message || 'Sinkronisasi 2 arah berhasil dijalankan!',
       });
-      const data = await res.json();
-      if (data.success) {
-        setSyncNotice({
-          type: 'success',
-          text: data.message || 'Sinkronisasi 2 arah berhasil dijalankan!',
-        });
-        if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
-        if (Array.isArray(data.data)) {
-          setPreviewData(data.data.slice(0, 10));
-        }
-        if (onSyncSuccess) onSyncSuccess();
-      } else {
-        throw new Error(data.error || 'Sinkronisasi gagal');
+      if (Array.isArray(res.mergedTransactions)) {
+        setPreviewData(res.mergedTransactions.slice(0, 10));
       }
+      if (onSyncSuccess) onSyncSuccess();
     } catch (e: any) {
       setSyncNotice({
         type: 'error',
@@ -284,24 +319,27 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     if (!gasUrl.trim()) return;
     setIsPulling(true);
     try {
-      const res = await fetch('/api/gas/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      let data: any;
+      try {
+        data = await safeFetchJson('/api/gas/pull', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gasUrl: gasUrl.trim() }),
+        });
+      } catch {
+        data = await directGasCall(gasUrl.trim(), 'getTransactions');
+      }
+
+      const txs = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      if (data && (data.success || Array.isArray(txs))) {
         setSyncNotice({
           type: 'success',
-          text: data.message || 'Berhasil menarik data dari Google Sheets!',
+          text: `Berhasil menarik ${txs.length} data dari Google Sheets!`,
         });
-        if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
-        if (Array.isArray(data.data)) {
-          setPreviewData(data.data.slice(0, 10));
-        }
+        setPreviewData(txs.slice(0, 10));
         if (onSyncSuccess) onSyncSuccess();
       } else {
-        throw new Error(data.error || 'Gagal menarik data');
+        throw new Error(data?.error || 'Gagal menarik data');
       }
     } catch (e: any) {
       setSyncNotice({
@@ -318,21 +356,26 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     if (!gasUrl.trim()) return;
     setIsPushing(true);
     try {
-      const res = await fetch('/api/gas/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: gasUrl.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const localTxs = getStoredTransactions();
+      let data: any;
+      try {
+        data = await safeFetchJson('/api/gas/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gasUrl: gasUrl.trim(), transactions: localTxs }),
+        });
+      } catch {
+        data = await directGasCall(gasUrl.trim(), 'twoWaySync', { transactions: localTxs });
+      }
+
+      if (data && data.success) {
         setSyncNotice({
           type: 'success',
           text: data.message || 'Berhasil mengirim transaksi lokal ke Google Sheets!',
         });
-        if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
         loadPreview(gasUrl.trim());
       } else {
-        throw new Error(data.error || 'Gagal mengirim data');
+        throw new Error(data?.error || 'Gagal mengirim data');
       }
     } catch (e: any) {
       setSyncNotice({
