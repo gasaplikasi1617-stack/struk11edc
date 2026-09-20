@@ -242,9 +242,12 @@ async function callGasPost(url: string, body: any): Promise<any> {
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
-      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik)");
+      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik). Periksa kembali koneksi internet atau status Web App Google Apps Script.");
     }
-    throw err;
+    throw new Error(
+      "Gagal terhubung ke Google Apps Script (" + (err.message || String(err)) + "). " +
+      "Pastikan URL Web App benar, aktif, dan disetel dengan akses 'Anyone' (Siapa saja)."
+    );
   }
 }
 
@@ -279,9 +282,12 @@ async function callGasGet(url: string, params: Record<string, string> = {}): Pro
   } catch (err: any) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
-      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik)");
+      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik). Periksa kembali koneksi internet atau status Web App Google Apps Script.");
     }
-    throw err;
+    throw new Error(
+      "Gagal terhubung ke Google Apps Script (" + (err.message || String(err)) + "). " +
+      "Pastikan URL Web App benar, aktif, dan disetel dengan akses 'Anyone' (Siapa saja)."
+    );
   }
 }
 
