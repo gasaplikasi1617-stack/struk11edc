@@ -12,10 +12,11 @@ import {
   X,
   Share2,
   MessageSquare,
+  FileText,
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas, drawDotMatrixToCanvas } from '../utils/receiptCanvasDrawer';
-import { DotMatrixReceipt } from './DotMatrixReceipt';
+import { DotMatrixReceipt, generateDotMatrixText } from './DotMatrixReceipt';
 import {
   formatReceiptForWhatsApp,
   getWhatsAppShareUrl,
@@ -383,6 +384,30 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     }
   };
 
+  const handleDownloadDotMatrixText = () => {
+    onSave();
+    try {
+      const textContent = generateDotMatrixText(receipt);
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const safeId = (receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeName = (receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+      link.download = `Struk_DotMatrix_Text_${safeId}_${safeName}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
+      setActionNotice('Format Teks Dot Matrix (.txt) High-Speed Draft Font #9 berhasil di-download! Hasil cetak maksimal & tajam.');
+      setTimeout(() => setActionNotice(null), 4000);
+    } catch (err: any) {
+      alert('Gagal mendownload teks: ' + err.message);
+    }
+  };
+
   // Close modal on Escape key
   useEffect(() => {
     if (!downloadedModal) return;
@@ -630,18 +655,13 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             </span>
           </button>
           <button
-            id="btn-download-png"
-            onClick={handleDownloadImage}
-            disabled={isDownloadingImage}
-            className="flex-1 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            title="Download struk format gambar PNG Dot Matrix Bukopin (21,6 x 6,95 cm)"
+            id="btn-download-txt"
+            onClick={handleDownloadDotMatrixText}
+            className="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            title="Download struk format teks (.txt) menggunakan High-Speed Draft Font #9 untuk hasil cetak dot matrix maksimal & tajam"
           >
-            {isDownloadingImage ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ImageIcon className="w-4 h-4" />
-            )}
-            <span>{isDownloadingImage ? 'Memproses PNG...' : 'Download PNG Bukopin'}</span>
+            <FileText className="w-4 h-4" />
+            <span>Download Teks (.txt) • Font #9</span>
           </button>
           <button
             onClick={() => {

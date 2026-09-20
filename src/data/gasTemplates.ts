@@ -387,7 +387,7 @@ function doPost(e) {
       });
     }
 
-    if (action === "twoWaySync" || action === "sync") {
+    if (action === "twoWaySync" || action === "sync" || action === "syncTransactions") {
       var txList = payload.transactions || [];
       return jsonResponse(executeTwoWaySync(txList));
     }

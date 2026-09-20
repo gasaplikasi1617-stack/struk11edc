@@ -8,6 +8,35 @@ interface DotMatrixReceiptProps {
   showTractorHoles?: boolean;
 }
 
+export function generateDotMatrixText(receipt: ReceiptData): string {
+  const line = "====================================================================================================";
+  const dash = "----------------------------------------------------------------------------------------------------";
+  const formatRupiah = (val: any) => Number(val || 0).toLocaleString('id-ID');
+  const cleanRincian = (receipt.rincianTagihan || 'TAGIHAN PEMBAYARAN').toUpperCase();
+  const dateStr = receipt.tanggal || new Date().toLocaleDateString('id-ID');
+  const agentStr = (receipt.namaAgen || 'AGEN BATARA').toUpperCase();
+  const rawDate = (receipt.tanggal || '').replace(/[^0-9]/g, '');
+  const rawId = (receipt.idpel || '12345').replace(/[^0-9]/g, '');
+  const refCode = (rawDate + rawId).slice(-16).padEnd(16, '8').toUpperCase();
+
+  return [
+    line,
+    `[ PPOB RESMI ]                    STRUK PEMBAYARAN: ${cleanRincian}                    STATUS: LUNAS`,
+    dash,
+    `TGL/JAM: ${dateStr.padEnd(25, ' ')} LOKET: ${agentStr.padEnd(30, ' ')} NO REFF: ${refCode}`,
+    dash,
+    `IDPEL     : ${(receipt.idpel || '-').padEnd(20, ' ')} | STAND MTR : ${(receipt.standMeter || '-').padEnd(20, ' ')} | RP TAGIHAN: Rp ${formatRupiah(receipt.rpTagihan)}`,
+    `NAMA      : ${(receipt.namaPelanggan || '-').toUpperCase().padEnd(20, ' ')} | PEMAKAIAN : ${(receipt.pemakaian || '-').padEnd(20, ' ')} | BIAYA LAIN: Rp ${Number(receipt.lainLain || 0) > 0 ? formatRupiah(receipt.lainLain) : '0'}`,
+    `TRF/DY    : ${(receipt.tarifDaya || '-').padEnd(20, ' ')} | NO TELP/HP: ${(receipt.noHp || '-').padEnd(20, ' ')} | ADMIN BANK: Rp ${formatRupiah(receipt.adminBank)}`,
+    `BL/TH     : ${(receipt.bulanTagihan || '-').padEnd(20, ' ')} | STATUS    : LUNAS                | TOTAL BYR : Rp ${formatRupiah(receipt.totalBayar)}`,
+    dash,
+    `TERBILANG : # ${terbilang(receipt.totalBayar)} #`,
+    `* PLN/INSTANSI MENYATAKAN STRUK INI ADALAH BUKTI PEMBAYARAN YANG SAH & LUNAS *`,
+    `INFO HUBUNGI CALL CENTER ATAU KANTOR LAYANAN TERDEKAT. TERIMA KASIH. ALAMAT: ${receipt.alamat || '-'}`,
+    line
+  ].join('\n');
+}
+
 export function DotMatrixReceipt({
   receipt,
   id = 'printable-dotmatrix-receipt',
@@ -18,7 +47,6 @@ export function DotMatrixReceipt({
     return num.toLocaleString('id-ID');
   };
 
-  // Generate standard Bukopin / PLN reference code if not present
   const generateRef = () => {
     const rawDate = (receipt.tanggal || '').replace(/[^0-9]/g, '');
     const rawId = (receipt.idpel || '12345').replace(/[^0-9]/g, '');
@@ -35,7 +63,6 @@ export function DotMatrixReceipt({
     .trim()
     .toUpperCase();
 
-  // Dynamic header based on bill type
   const isPln = /pln|listrik|token/i.test(receipt.rincianTagihan || '');
   const isPdam = /pdam|air/i.test(receipt.rincianTagihan || '');
   const isTelkom = /telkom|indihome|speedy/i.test(receipt.rincianTagihan || '');
@@ -81,59 +108,46 @@ export function DotMatrixReceipt({
           </div>
         )}
 
-        {/* PRINTABLE BOX (Exact 216mm x 69.5mm layout container) */}
+        {/* PRINTABLE BOX (Exact Continuous Form layout container with High-Speed Draft Font #9) */}
         <div
           id={id}
-          className="dotmatrix-content-box w-full text-black text-[10px] sm:text-[11px] leading-[1.25] tracking-tight print:text-[9.5pt] print:leading-[1.18]"
+          className="dotmatrix-content-box w-full text-black text-[9pt] leading-[1.2] tracking-tight print:text-[9pt] print:leading-[1.18]"
           style={{
             color: '#000000',
+            fontSize: '9pt',
+            fontFamily: '"Courier New", Courier, monospace',
             WebkitPrintColorAdjust: 'exact',
             printColorAdjust: 'exact',
           }}
         >
           {/* Top Divider */}
-          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9px] sm:text-[10px] leading-none mb-1">
+          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9pt] leading-none mb-1">
             ====================================================================================================
           </div>
 
-          {/* Header 1: Bank Bukopin & Service Title */}
+          {/* Header 1: Service Title (No Bukopin) */}
           <div
-            className="flex justify-between items-center text-[11px] sm:text-[12px] font-bold uppercase tracking-wider mb-0.5"
+            className="flex justify-between items-center text-[9pt] font-bold uppercase tracking-wider mb-0.5"
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span
-                style={{
-                  backgroundColor: '#000000',
-                  color: '#ffffff',
-                  padding: '1px 4px',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  display: 'inline-block',
-                }}
-              >
-                BUKOPIN
-              </span>
-              <span style={{ fontWeight: 'bold' }}>BANK BUKOPIN</span>
-            </span>
-            <span style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '11px' }}>
+            <span style={{ fontWeight: 'bold' }}>[PPOB RESMI]</span>
+            <span style={{ textAlign: 'center', fontWeight: 'bold' }}>
               {serviceHeader}
             </span>
-            <span style={{ textAlign: 'right', fontSize: '10px', fontWeight: 'bold' }}>
-              PPOB BUKOPIN
+            <span style={{ textAlign: 'right', fontWeight: 'bold' }}>
+              STATUS: LUNAS
             </span>
           </div>
 
           {/* Header 2: Metadata Bar (Tanggal, Loket, No Reff) */}
           <div
-            className="flex justify-between text-[9.5px] sm:text-[10.5px] font-semibold border-b border-dashed border-black pb-1 mb-1 text-slate-900 print:text-black"
+            className="flex justify-between text-[9pt] font-semibold border-b border-dashed border-black pb-1 mb-1 text-slate-900 print:text-black"
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               borderBottom: '1px dashed #000000',
               paddingBottom: '3px',
               marginBottom: '3px',
-              fontSize: '10px',
             }}
           >
             <div>
@@ -152,16 +166,16 @@ export function DotMatrixReceipt({
 
           {/* 3-Column Content Grid */}
           <div
-            className="text-[9.5px] sm:text-[10.5px] leading-tight my-1"
+            className="text-[9pt] leading-tight my-1"
             style={{
               display: 'flex',
               width: '100%',
               margin: '3px 0',
-              fontSize: '10px',
+              fontSize: '9pt',
               lineHeight: 1.2,
             }}
           >
-            {/* Column 1: Customer Data (Width: 33.3%) */}
+            {/* Column 1: Customer Data */}
             <div
               style={{
                 flex: '1 1 33.3%',
@@ -189,7 +203,7 @@ export function DotMatrixReceipt({
               </div>
             </div>
 
-            {/* Column 2: Meter & Usage Details (Width: 33.3%) */}
+            {/* Column 2: Meter & Usage Details */}
             <div
               style={{
                 flex: '1 1 33.3%',
@@ -217,7 +231,7 @@ export function DotMatrixReceipt({
               </div>
             </div>
 
-            {/* Column 3: Payment Breakdown (Width: 33.3%) */}
+            {/* Column 3: Payment Breakdown */}
             <div
               style={{
                 flex: '1 1 33.3%',
@@ -244,7 +258,7 @@ export function DotMatrixReceipt({
                   paddingTop: '2px',
                   marginTop: '2px',
                   fontWeight: 'bold',
-                  fontSize: '10.5px',
+                  fontSize: '9pt',
                 }}
               >
                 <span>TOTAL BAYAR</span>
@@ -254,25 +268,25 @@ export function DotMatrixReceipt({
           </div>
 
           {/* Middle Divider */}
-          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9px] sm:text-[10px] leading-none my-0.5">
+          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9pt] leading-none my-0.5">
             ----------------------------------------------------------------------------------------------------
           </div>
 
           {/* Terbilang Row */}
-          <div className="text-[9px] sm:text-[10px] font-bold tracking-tight text-slate-900 print:text-black truncate">
+          <div className="text-[9pt] font-bold tracking-tight text-slate-900 print:text-black truncate">
             <span>TERBILANG : </span>
             <span className="uppercase italic"># {terbilangText} #</span>
           </div>
 
           {/* Footer Notice & Certification */}
-          <div className="text-[8.5px] sm:text-[9.5px] leading-tight text-slate-800 print:text-black mt-0.5 space-y-0.5">
+          <div className="text-[9pt] leading-tight text-slate-800 print:text-black mt-0.5 space-y-0.5">
             <div className="flex justify-between items-center">
               <span>* PLN/INSTANSI MENYATAKAN STRUK INI SEBAGAI BUKTI PEMBAYARAN YANG SAH & LUNAS *</span>
-              <span className="font-mono text-[8px] sm:text-[9px]">KODE: BUKOPIN-PPOB-OK</span>
+              <span className="font-mono text-[9pt]">KODE: PPOB-OK</span>
             </div>
-            <div className="flex justify-between text-[8px] sm:text-[9px] text-slate-600 print:text-black">
+            <div className="flex justify-between text-[9pt] text-slate-600 print:text-black">
               <span>
-                INFO HUBUNGI CALL CENTER 123 ATAU KANTOR CABANG TERDEKAT. TERIMA KASIH.
+                INFO HUBUNGI CALL CENTER ATAU KANTOR LAYANAN TERDEKAT. TERIMA KASIH.
               </span>
               <span className="truncate max-w-[200px]">
                 {receipt.alamat ? `ALAMAT: ${receipt.alamat}` : ''}
@@ -281,7 +295,7 @@ export function DotMatrixReceipt({
           </div>
 
           {/* Bottom Divider */}
-          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9px] sm:text-[10px] leading-none mt-1">
+          <div className="text-center font-bold tracking-tighter text-slate-800 print:text-black overflow-hidden whitespace-nowrap text-[9pt] leading-none mt-1">
             ====================================================================================================
           </div>
         </div>
@@ -289,3 +303,4 @@ export function DotMatrixReceipt({
     </div>
   );
 }
+

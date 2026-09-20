@@ -1,10 +1,13 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import dns from "node:dns";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars } from "./src/utils/billParser";
 import { DEFAULT_GAS_DATA } from "./src/data/gasTemplates";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const PORT = 3000;
@@ -984,7 +987,10 @@ app.post("/api/gas/sync", async (req, res) => {
       return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum dikonfigurasi." });
     }
 
-    const localTxs = getTransactions();
+    const diskTxs = getTransactions();
+    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
+    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
+
     let remoteTxs: any[] = [];
     let pushedCount = 0;
 
@@ -1067,7 +1073,9 @@ app.post("/api/gas/pull", async (req, res) => {
     }
     const getRes = await callGasGet(targetUrl, { action: "getTransactions" });
     const sheetTxs = Array.isArray(getRes?.data) ? getRes.data : (Array.isArray(getRes) ? getRes : []);
-    const localTxs = getTransactions();
+    const diskTxs = getTransactions();
+    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
+    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
     const { merged, newFromSheet } = mergeTransactions(localTxs, sheetTxs);
     saveTransactions(merged);
     const now = new Date().toISOString();
@@ -1096,7 +1104,9 @@ app.post("/api/gas/push", async (req, res) => {
     if (!targetUrl) {
       return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum dikonfigurasi." });
     }
-    const localTxs = getTransactions();
+    const diskTxs = getTransactions();
+    const incomingTxs = Array.isArray(req.body.transactions) ? req.body.transactions : [];
+    const localTxs = mergeTransactions(diskTxs, incomingTxs).merged;
     const pushRes = await callGasPost(targetUrl, {
       action: "syncTransactions",
       transactions: localTxs,
