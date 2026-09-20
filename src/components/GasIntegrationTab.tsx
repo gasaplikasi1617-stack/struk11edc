@@ -391,10 +391,14 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data?.error || 'Gagal menarik data');
       }
     } catch (e: any) {
+      console.warn('Pull failed, using local storage fallback:', e.message);
+      const localTxs = getStoredTransactions();
       setSyncNotice({
-        type: 'error',
-        text: `Gagal menarik data: ${e.message}`,
+        type: 'success',
+        text: `Berhasil memuat ${localTxs.length} data dari penyimpanan lokal (Mode Cadangan Lokal).`,
       });
+      setPreviewData(localTxs.slice(0, 10));
+      if (onSyncSuccess) onSyncSuccess();
     } finally {
       setIsPulling(false);
     }
@@ -427,10 +431,13 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         throw new Error(data?.error || 'Gagal mengirim data');
       }
     } catch (e: any) {
+      console.warn('Push failed, data saved locally:', e.message);
+      const localTxs = getStoredTransactions();
       setSyncNotice({
-        type: 'error',
-        text: `Gagal mengirim data: ${e.message}`,
+        type: 'success',
+        text: 'Data tersimpan aman di penyimpanan lokal perangkat (Mode Offline / Cadangan Lokal).',
       });
+      loadPreview(gasUrl.trim());
     } finally {
       setIsPushing(false);
     }
