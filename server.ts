@@ -14,7 +14,7 @@ app.use(express.json());
 // Path for storing transaction history locally
 const DATA_FILE = path.join(process.cwd(), "transactions.json");
 const GAS_CONFIG_FILE = path.join(process.cwd(), "gas_config.json");
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbzDItaqK1ZwUEJZfXdYwdlB5FG4pL-eONdVxawEBFImbZxd0psRHFKfaF3ZDX7zJFk/exec";
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbw3cU9AiiesdrYgp-q1W56Ekph0wewoRd-14sZksQcmXb8PEP2enpTRSePCnLtNr_X1zA/exec";
 
 interface GasConfig {
   gasUrl: string;
