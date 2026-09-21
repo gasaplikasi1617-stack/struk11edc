@@ -114,24 +114,26 @@ export function formatPeriod3Chars(input: string): string {
   if (!input) return '';
   const upper = input.toUpperCase();
   const monthMap: Record<string, string> = {
-    JAN: 'Jan', JANUARI: 'Jan',
-    FEB: 'Feb', FEBRUARI: 'Feb',
-    MAR: 'Mar', MARET: 'Mar',
-    APR: 'Apr', APRIL: 'Apr',
+    JANUARI: 'Jan', JAN: 'Jan',
+    FEBRUARI: 'Feb', FEB: 'Feb',
+    MARET: 'Mar', MAR: 'Mar',
+    APRIL: 'Apr', APR: 'Apr',
     MEI: 'Mei', MAY: 'Mei',
-    JUN: 'Jun', JUNI: 'Jun',
-    JUL: 'Jul', JULI: 'Jul',
-    AGUST: 'Agust', AGUS: 'Agust', AGT: 'Agust', AGS: 'Agust', AGUSTUS: 'Agust', AUG: 'Agust',
-    SEPT: 'Sept', SEP: 'Sept', SEPTEMBER: 'Sept',
-    OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
-    NOV: 'Nov', NOVEMBER: 'Nov',
-    DES: 'Des', DESEMBER: 'Des', DEC: 'Des'
+    JUNI: 'Jun', JUN: 'Jun',
+    JULI: 'Jul', JUL: 'Jul',
+    AGUSTUS: 'Agu', AGUST: 'Agu', AGUS: 'Agu', AGT: 'Agu', AGS: 'Agu', AUG: 'Agu', AGU: 'Agu',
+    SEPTEMBER: 'Sep', SEPT: 'Sep', SEP: 'Sep',
+    OKTOBER: 'Okt', OKT: 'Okt', OCT: 'Okt',
+    NOVEMBER: 'Nov', NOV: 'Nov',
+    DESEMBER: 'Des', DES: 'Des', DEC: 'Des'
   };
 
   let mCode = '';
-  for (const [key, val] of Object.entries(monthMap)) {
+  // Sort keys by length descending to match longer keywords first
+  const sortedKeys = Object.keys(monthMap).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
     if (upper.includes(key)) {
-      mCode = val;
+      mCode = monthMap[key];
       break;
     }
   }
@@ -150,7 +152,7 @@ export function formatPeriod3Chars(input: string): string {
   const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
   if (numMatch) {
     const mNum = parseInt(numMatch[1], 10);
-    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
+    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
     if (mNum >= 1 && mNum <= 12) {
       mCode = monthsArr[mNum];
       const y = numMatch[2];
@@ -168,14 +170,14 @@ export function formatPeriod3Chars(input: string): string {
 }
 
 export function getCurrentMonthPeriod(dateObj: Date = new Date()): string {
-  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   const m = dateObj.getMonth() + 1; // 1-12
   const yStr = String(dateObj.getFullYear()).slice(-2);
   return `${monthsArr[m]}${yStr}`;
 }
 
 export function getPreviousMonthPeriod(periodStr?: string): string {
-  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   
   let month = 0;
   let year = new Date().getFullYear();
@@ -191,7 +193,7 @@ export function getPreviousMonthPeriod(periodStr?: string): string {
 
       const monthMap: Record<string, number> = {
         Jan: 1, Feb: 2, Mar: 3, Apr: 4, Mei: 5, Jun: 6,
-        Jul: 7, Agust: 8, Agus: 8, Agt: 8, Sept: 9, Sep: 9, Okt: 10, Nov: 11, Des: 12
+        Jul: 7, Agu: 8, Agust: 8, Agus: 8, Agt: 8, Sep: 9, Sept: 9, Okt: 10, Nov: 11, Des: 12
       };
       month = monthMap[mStr] || 0;
     }
@@ -229,9 +231,9 @@ export function getDefaultBulanTagihan(isPdam: boolean, extractedPeriod?: string
   }
 
   if (isPdam) {
-    return getPreviousMonthPeriod(); // e.g. if current is Sept26 -> returns Agust26
+    return getPreviousMonthPeriod(); // e.g. if current is Sep26 -> returns Agu26
   }
-  return getCurrentMonthPeriod(); // e.g. if current is Sept26 -> returns Sept26
+  return getCurrentMonthPeriod(); // e.g. if current is Sep26 -> returns Sep26
 }
 
 export function isPdamBill(t: {
