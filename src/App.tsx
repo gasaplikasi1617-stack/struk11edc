@@ -6,7 +6,8 @@ import { ReceiptPreview } from './components/ReceiptPreview';
 import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
-import { formatReceiptDateTime } from './utils/dateFormatter';
+import { formatReceiptDateTime, generateRandomTransactionId } from './utils/dateFormatter';
+import { getCurrentMonthPeriod } from './utils/billParser';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
 import {
   getStoredTransactions,
@@ -24,13 +25,14 @@ export default function App() {
   });
 
   const [receipt, setReceipt] = useState<ReceiptData>({
+    id: generateRandomTransactionId(),
     tanggal: formatReceiptDateTime(),
     idpel: '541293847210',
     namaPelanggan: 'BUDI SANTOSO',
     pemakaian: '145 kWh',
     standMeter: '014230 - 014380',
     rincianTagihan: 'Tagihan Listrik PLN Pascabayar',
-    bulanTagihan: 'Agus26',
+    bulanTagihan: getCurrentMonthPeriod(),
     rpTagihan: 150000,
     lainLain: 0,
     adminBank: 2500,
@@ -117,9 +119,9 @@ export default function App() {
     setIsSaving(true);
 
     const payload: ReceiptData = {
-      id: "TX-" + Date.now(),
-      createdAt: new Date().toISOString(),
       ...receipt,
+      id: receipt.id || generateRandomTransactionId(),
+      createdAt: new Date().toISOString(),
       namaAgen: agentConfig.namaAgen,
       alamat: agentConfig.alamat,
       noHp: agentConfig.noHp,

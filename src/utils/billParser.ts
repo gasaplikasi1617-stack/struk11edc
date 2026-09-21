@@ -121,8 +121,8 @@ export function formatPeriod3Chars(input: string): string {
     MEI: 'Mei', MAY: 'Mei',
     JUN: 'Jun', JUNI: 'Jun',
     JUL: 'Jul', JULI: 'Jul',
-    AGUS: 'Agus', AGT: 'Agus', AGS: 'Agus', AGUSTUS: 'Agus', AUG: 'Agus',
-    SEP: 'Sep', SEPTEMBER: 'Sep', SEPT: 'Sep',
+    AGUST: 'Agust', AGUS: 'Agust', AGT: 'Agust', AGS: 'Agust', AGUSTUS: 'Agust', AUG: 'Agust',
+    SEPT: 'Sept', SEP: 'Sept', SEPTEMBER: 'Sept',
     OKT: 'Okt', OKTOBER: 'Okt', OCT: 'Okt',
     NOV: 'Nov', NOVEMBER: 'Nov',
     DES: 'Des', DESEMBER: 'Des', DEC: 'Des'
@@ -150,7 +150,7 @@ export function formatPeriod3Chars(input: string): string {
   const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
   if (numMatch) {
     const mNum = parseInt(numMatch[1], 10);
-    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
     if (mNum >= 1 && mNum <= 12) {
       mCode = monthsArr[mNum];
       const y = numMatch[2];
@@ -167,8 +167,15 @@ export function formatPeriod3Chars(input: string): string {
   return '';
 }
 
+export function getCurrentMonthPeriod(dateObj: Date = new Date()): string {
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
+  const m = dateObj.getMonth() + 1; // 1-12
+  const yStr = String(dateObj.getFullYear()).slice(-2);
+  return `${monthsArr[m]}${yStr}`;
+}
+
 export function getPreviousMonthPeriod(periodStr?: string): string {
-  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agus', 'Sep', 'Okt', 'Nov', 'Des'];
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sept', 'Okt', 'Nov', 'Des'];
   
   let month = 0;
   let year = new Date().getFullYear();
@@ -184,7 +191,7 @@ export function getPreviousMonthPeriod(periodStr?: string): string {
 
       const monthMap: Record<string, number> = {
         Jan: 1, Feb: 2, Mar: 3, Apr: 4, Mei: 5, Jun: 6,
-        Jul: 7, Agus: 8, Agt: 8, Sep: 9, Okt: 10, Nov: 11, Des: 12
+        Jul: 7, Agust: 8, Agus: 8, Agt: 8, Sept: 9, Sep: 9, Okt: 10, Nov: 11, Des: 12
       };
       month = monthMap[mStr] || 0;
     }
@@ -208,6 +215,23 @@ export function getPreviousMonthPeriod(periodStr?: string): string {
   const prevYStr = String(prevYear).slice(-2);
 
   return `${prevMStr}${prevYStr}`;
+}
+
+export function getDefaultBulanTagihan(isPdam: boolean, extractedPeriod?: string): string {
+  if (extractedPeriod && extractedPeriod.trim()) {
+    const formatted = formatPeriod3Chars(extractedPeriod);
+    if (formatted) {
+      if (isPdam) {
+        return getPreviousMonthPeriod(formatted);
+      }
+      return formatted;
+    }
+  }
+
+  if (isPdam) {
+    return getPreviousMonthPeriod(); // e.g. if current is Sept26 -> returns Agust26
+  }
+  return getCurrentMonthPeriod(); // e.g. if current is Sept26 -> returns Sept26
 }
 
 export function isPdamBill(t: {

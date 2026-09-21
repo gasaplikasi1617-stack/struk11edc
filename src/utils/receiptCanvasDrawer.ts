@@ -98,6 +98,7 @@ export function drawReceiptToCanvas(receipt: ReceiptData): HTMLCanvasElement {
   };
 
   // --- METADATA TRANSAKSI ---
+  drawRow('ID Transaksi:', receipt.id || 'TRX-83920184', true);
   drawRow('Tgl/Waktu:', formatReceiptDateTime(receipt.tanggal));
   drawRow('ID Pelanggan:', receipt.idpel || '-', true);
   

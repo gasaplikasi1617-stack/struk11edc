@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Check,
   Share2,
+  Calendar,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -59,11 +60,50 @@ function getTransactionTimestamp(tx: ReceiptData): number {
   }
   if (tx.id && String(tx.id).startsWith('TX-')) {
     const num = Number(String(tx.id).replace('TX-', ''));
-    if (!isNaN(num) && num > 1000000) return num;
+    if (!isNaN(num) && num > 1000000000) return num;
   }
   if (tx.tanggal) {
+    // Direct JS Date parse
+    const directDate = new Date(tx.tanggal);
+    if (!isNaN(directDate.getTime()) && directDate.getFullYear() > 2000) {
+      return directDate.getTime();
+    }
+    // Indonesian month name mapping
+    const monthMap: Record<string, number> = {
+      jan: 0, januari: 0,
+      feb: 1, februari: 1,
+      mar: 2, maret: 2,
+      apr: 3, april: 3,
+      mei: 4,
+      jun: 5, juni: 5,
+      jul: 6, juli: 6,
+      agu: 7, agustus: 7, ags: 7,
+      sep: 8, september: 8,
+      okt: 9, oktober: 9,
+      nov: 10, november: 10,
+      des: 11, desember: 11,
+    };
+    const tokens = tx.tanggal.toLowerCase().split(/[\s,.:/-]+/);
+    let day = 0, month = -1, year = 0;
+    for (const tok of tokens) {
+      if (monthMap[tok] !== undefined) {
+        month = monthMap[tok];
+      } else {
+        const val = parseInt(tok, 10);
+        if (!isNaN(val)) {
+          if (val > 1900 && val < 2100) year = val;
+          else if (val >= 1 && val <= 31 && day === 0) day = val;
+          else if (val >= 1 && val <= 12 && month === -1 && day > 0) month = val - 1;
+        }
+      }
+    }
+    if (year > 0 && month >= 0 && day > 0) {
+      return new Date(year, month, day).getTime();
+    }
+
+    // Slash or dash format DD/MM/YYYY
     const parts = tx.tanggal.split(/[/.-]/);
-    if (parts.length === 3) {
+    if (parts.length >= 3) {
       const d = parseInt(parts[0], 10);
       const m = parseInt(parts[1], 10) - 1;
       let y = parseInt(parts[2], 10);
@@ -87,6 +127,40 @@ export function HistoryTab({
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
+
+  // Date Range Filter States
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const setTodayFilter = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const setLast7DaysFilter = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    setStartDate(start.toISOString().slice(0, 10));
+    setEndDate(end.toISOString().slice(0, 10));
+  };
+
+  const setThisMonthFilter = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const firstDay = `${y}-${m}-01`;
+    const lastDayObj = new Date(y, now.getMonth() + 1, 0);
+    const lastDay = `${y}-${m}-${String(lastDayObj.getDate()).padStart(2, '0')}`;
+    setStartDate(firstDay);
+    setEndDate(lastDay);
+  };
+
+  const resetDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+  };
 
   const handleGasSyncClick = async () => {
     setIsSyncingGas(true);
@@ -219,9 +293,22 @@ export function HistoryTab({
     return counts;
   }, [transactions]);
 
-  // Filter transactions by search term and expanded service categories
+  // Filter transactions by search term, service category, and date range
   const filteredList = useMemo(() => {
+    let startMs: number | null = null;
+    let endMs: number | null = null;
+
+    if (startDate) {
+      const s = new Date(startDate + 'T00:00:00');
+      if (!isNaN(s.getTime())) startMs = s.getTime();
+    }
+    if (endDate) {
+      const e = new Date(endDate + 'T23:59:59.999');
+      if (!isNaN(e.getTime())) endMs = e.getTime();
+    }
+
     return transactions.filter((t) => {
+      // 1. Search query match
       const q = searchTerm.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -230,16 +317,29 @@ export function HistoryTab({
         (t.namaPelanggan != null && String(t.namaPelanggan).toLowerCase().includes(q)) ||
         (t.rincianTagihan != null && String(t.rincianTagihan).toLowerCase().includes(q)) ||
         (t.bulanTagihan != null && String(t.bulanTagihan).toLowerCase().includes(q)) ||
+        (t.tanggal != null && String(t.tanggal).toLowerCase().includes(q)) ||
         (t.totalBayar != null && String(t.totalBayar).includes(q));
 
       if (!matchSearch) return false;
 
-      if (serviceFilter === 'all') return true;
+      // 2. Category filter
+      if (serviceFilter !== 'all') {
+        const cat = getTransactionCategory(t);
+        if (cat !== serviceFilter) return false;
+      }
 
-      const cat = getTransactionCategory(t);
-      return cat === serviceFilter;
+      // 3. Date range filter
+      if (startMs !== null || endMs !== null) {
+        const txMs = getTransactionTimestamp(t);
+        if (txMs > 0) {
+          if (startMs !== null && txMs < startMs) return false;
+          if (endMs !== null && txMs > endMs) return false;
+        }
+      }
+
+      return true;
     });
-  }, [transactions, searchTerm, serviceFilter]);
+  }, [transactions, searchTerm, serviceFilter, startDate, endDate]);
 
   // Sort filtered transactions based on selected criterion
   const sortedAndFiltered = useMemo(() => {
@@ -307,14 +407,28 @@ export function HistoryTab({
   // Export to Excel with current sorting & filtering
   const handleExportToExcel = () => {
     if (sortedAndFiltered.length === 0) {
-      alert('Tidak ada data transaksi yang dapat diekspor.');
+      alert('Tidak ada data transaksi yang sesuai untuk diekspor.');
       return;
     }
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const filterTag = serviceFilter === 'all' ? 'Semua' : getCategoryLabel(serviceFilter).replace(/[\/\s]+/g, '_');
-    const fileName = `Riwayat_${filterTag}_${todayStr}.xlsx`;
-    const sheetName = serviceFilter === 'all' ? 'Riwayat Semua Transaksi' : `Riwayat ${getCategoryLabel(serviceFilter)}`;
+    
+    let dateRangeTag = todayStr;
+    let periodText = '';
+    if (startDate && endDate) {
+      dateRangeTag = `${startDate}_sd_${endDate}`;
+      periodText = ` (Periode ${startDate} s/d ${endDate})`;
+    } else if (startDate) {
+      dateRangeTag = `sejak_${startDate}`;
+      periodText = ` (Sejak ${startDate})`;
+    } else if (endDate) {
+      dateRangeTag = `hingga_${endDate}`;
+      periodText = ` (Hingga ${endDate})`;
+    }
+
+    const fileName = `Riwayat_${filterTag}_${dateRangeTag}.xlsx`;
+    const sheetName = serviceFilter === 'all' ? 'Riwayat Transaksi' : `Riwayat ${getCategoryLabel(serviceFilter)}`;
 
     exportTransactionsToExcel(sortedAndFiltered, {
       fileName,
@@ -322,11 +436,11 @@ export function HistoryTab({
     });
 
     setExportSuccessNotice(
-      `Berhasil mengekspor ${sortedAndFiltered.length} transaksi ke ${fileName} (sesuai urutan sortir & kriteria aktif).`
+      `Berhasil mengekspor ${sortedAndFiltered.length} transaksi${periodText} ke file Excel ${fileName}.`
     );
     setTimeout(() => {
       setExportSuccessNotice(null);
-    }, 4500);
+    }, 5000);
   };
 
   // Compute summary stats for the current list
@@ -363,7 +477,7 @@ export function HistoryTab({
               title="Periksa dan pastikan tidak ada data transaksi yang dobel di riwayat"
             >
               <ShieldCheck className={`w-4 h-4 ${isDeduplicating ? 'animate-pulse' : ''}`} />
-              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Duplikat'}</span>
+              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti'}</span>
             </button>
 
             <button
@@ -374,7 +488,7 @@ export function HistoryTab({
               title="Sinkronisasi 2 arah dengan Google Sheets"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
-              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron 2 Arah Sheets'}</span>
+              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron'}</span>
             </button>
 
             <button
@@ -385,7 +499,7 @@ export function HistoryTab({
               title="Export riwayat transaksi ke format Microsoft Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Export ke Excel (.xlsx)</span>
+              <span>Export</span>
               {sortedAndFiltered.length > 0 && (
                 <span className="bg-emerald-700/60 text-emerald-100 text-xs px-2 py-0.5 rounded-full font-mono">
                   {sortedAndFiltered.length}
@@ -442,8 +556,101 @@ export function HistoryTab({
           </div>
         </div>
 
-        {/* Filter and Sort Criteria Control Bar */}
+        {/* Filter, Rentang Waktu, and Sort Criteria Control Bar */}
         <div className="mt-6 pt-6 border-t border-slate-100 space-y-4">
+          {/* Rentang Waktu (Date Range) Filter Box */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/60">
+              <div className="flex items-center gap-2">
+                <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-2xs">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Filter Rentang Waktu (Sortir Tanggal)</span>
+                    {(startDate || endDate) && (
+                      <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <span>Aktif</span>
+                        <button
+                          onClick={resetDateFilter}
+                          className="hover:text-blue-900 transition-colors ml-0.5"
+                          title="Reset filter tanggal"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Pilih tanggal mulai dan selesai untuk memfilter riwayat transaksi yang ditampilkan &amp; diekspor.
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Date Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs shrink-0">
+                <span className="text-[11px] font-medium text-slate-400 mr-1">Preset:</span>
+                <button
+                  type="button"
+                  onClick={setTodayFilter}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                >
+                  Hari Ini
+                </button>
+                <button
+                  type="button"
+                  onClick={setLast7DaysFilter}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                >
+                  7 Hari Terakhir
+                </button>
+                <button
+                  type="button"
+                  onClick={setThisMonthFilter}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                >
+                  Bulan Ini
+                </button>
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={resetDateFilter}
+                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-lg border border-rose-200 text-xs transition-all shadow-2xs flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  📅 Tanggal Mulai (Start Date)
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full text-xs font-semibold bg-white border border-slate-300 text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  📅 Tanggal Selesai (End Date)
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-xs font-semibold bg-white border border-slate-300 text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">

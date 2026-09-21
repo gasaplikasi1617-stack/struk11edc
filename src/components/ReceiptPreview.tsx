@@ -317,6 +317,10 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         {/* Transaction Metadata */}
         <div className="space-y-1 border-b border-dashed border-black pb-2 mb-3 text-[11px] text-black">
           <div className="flex justify-between">
+            <span className="text-black">ID Transaksi:</span>
+            <span className="font-bold text-black font-mono">{receipt.id || 'TRX-83920184'}</span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-black">Tgl/Waktu:</span>
             <span className="font-semibold text-black">{formatReceiptDateTime(receipt.tanggal)}</span>
           </div>

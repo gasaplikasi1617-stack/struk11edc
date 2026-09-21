@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
 import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer, RotateCcw, Trash2 } from 'lucide-react';
-import { formatReceiptDateTime } from '../utils/dateFormatter';
-import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, isPdamBill } from '../utils/billParser';
+import { formatReceiptDateTime, generateRandomTransactionId } from '../utils/dateFormatter';
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, getCurrentMonthPeriod, getDefaultBulanTagihan, isPdamBill } from '../utils/billParser';
 
 interface ReceiptFormProps {
   receipt: ReceiptData;
@@ -32,6 +32,7 @@ export function ReceiptForm({
     setParseNote('');
     setReceipt((prev) => ({
       ...prev,
+      id: generateRandomTransactionId(),
       idpel: '',
       namaPelanggan: '',
       pemakaian: '',
@@ -45,10 +46,14 @@ export function ReceiptForm({
     }));
   };
 
-  // Clear rawText when resetTrigger changes
+  // Clear rawText and assign a fresh random ID when resetTrigger changes
   React.useEffect(() => {
     if (resetTrigger !== undefined && resetTrigger > 0) {
       setRawText('');
+      setReceipt((prev) => ({
+        ...prev,
+        id: generateRandomTransactionId(),
+      }));
     }
   }, [resetTrigger]);
 
@@ -208,9 +213,8 @@ export function ReceiptForm({
       else bulanTagihan = "";
     }
 
-    if (isPdam || isPdamBill({ rincianTagihan, rawText: text })) {
-      bulanTagihan = getPreviousMonthPeriod(bulanTagihan);
-    }
+    const isPdamCheck = isPdam || isPdamBill({ rincianTagihan, rawText: text });
+    bulanTagihan = getDefaultBulanTagihan(isPdamCheck, bulanTagihan);
 
     if (!idpel) {
       idpel = extractIdpelFromLines(lines, text);
@@ -282,10 +286,8 @@ export function ReceiptForm({
         finalIdpel = cleanExtractedId(finalIdpel);
 
         setReceipt((prev) => {
-          let finalBulanTagihan = d.bulanTagihan || prev.bulanTagihan;
-          if (isPdamBill({ ...d, rawText })) {
-            finalBulanTagihan = getPreviousMonthPeriod(finalBulanTagihan);
-          }
+          const isPdam = isPdamBill({ ...d, rawText });
+          let finalBulanTagihan = getDefaultBulanTagihan(isPdam, d.bulanTagihan || prev.bulanTagihan);
 
           return {
             ...prev,
@@ -325,6 +327,10 @@ export function ReceiptForm({
         const lain = field === 'lainLain' ? Number(value) || 0 : prev.lainLain;
         const admin = field === 'adminBank' ? Number(value) || 0 : prev.adminBank;
         updated.totalBayar = rp + lain + admin;
+      }
+      if (field === 'rincianTagihan') {
+        const isPdam = isPdamBill({ rincianTagihan: String(value) });
+        updated.bulanTagihan = getDefaultBulanTagihan(isPdam, prev.bulanTagihan);
       }
       return updated;
     });
@@ -458,6 +464,28 @@ export function ReceiptForm({
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
+              <span>ID Transaksi (Identitas Resi)</span>
+              <button
+                type="button"
+                onClick={() => handleInputChange('id', generateRandomTransactionId())}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200"
+                title="Acak nomor ID Transaksi baru"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                <span>Acak ID</span>
+              </button>
+            </label>
+            <input
+              type="text"
+              value={receipt.id || ''}
+              onChange={(e) => handleInputChange('id', e.target.value)}
+              placeholder="TRX-83920184"
+              className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-mono font-semibold text-blue-900 bg-slate-50"
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Tanggal Transaksi</label>
             <input

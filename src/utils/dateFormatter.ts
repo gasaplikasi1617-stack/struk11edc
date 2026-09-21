@@ -14,3 +14,12 @@ export function formatReceiptDateTime(dateInput?: string | Date): string {
   const minutes = String(d.getMinutes()).padStart(2, '0');
   return `${day} ${month} ${year} ${hours}.${minutes}`;
 }
+
+/**
+ * Generates a clean random transaction ID (e.g. TRX-84920184)
+ */
+export function generateRandomTransactionId(): string {
+  const randomNum = Math.floor(10000000 + Math.random() * 90000000);
+  return `TRX-${randomNum}`;
+}
+

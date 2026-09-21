@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, isPdamBill } from "./src/utils/billParser";
+import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, getCurrentMonthPeriod, getDefaultBulanTagihan, isPdamBill } from "./src/utils/billParser";
 import { DEFAULT_GAS_DATA } from "./src/data/gasTemplates";
 
 const app = express();
@@ -536,12 +536,9 @@ ${rawText}
       }
       parsedData.idpel = cleanExtractedId(rawIdpel);
 
-      // If PDAM, format period as previous month (e.g., September -> Agus26)
-      if (isPdamBill({ ...parsedData, rawText })) {
-        parsedData.bulanTagihan = getPreviousMonthPeriod(parsedData.bulanTagihan);
-      } else if (parsedData.bulanTagihan) {
-        parsedData.bulanTagihan = formatPeriod3Chars(parsedData.bulanTagihan);
-      }
+      // Determine period based on rule: current month for normal bills, previous month for PDAM
+      const isPdam = isPdamBill({ ...parsedData, rawText });
+      parsedData.bulanTagihan = getDefaultBulanTagihan(isPdam, parsedData.bulanTagihan);
 
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
@@ -716,9 +713,8 @@ ${rawText}
       else bulanTagihan = "";
     }
 
-    if (isPdam || isPdamBill({ rincianTagihan, rawText })) {
-      bulanTagihan = getPreviousMonthPeriod(bulanTagihan);
-    }
+    const isPdamCheck = isPdam || isPdamBill({ rincianTagihan, rawText });
+    bulanTagihan = getDefaultBulanTagihan(isPdamCheck, bulanTagihan);
 
     if (!idpel) {
       idpel = extractIdpelFromLines(lines, rawText);
