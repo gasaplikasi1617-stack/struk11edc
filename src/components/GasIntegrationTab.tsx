@@ -94,6 +94,8 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   // Preview of live data from GAS/Sheet
   const [previewData, setPreviewData] = useState<ReceiptData[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewSource, setPreviewSource] = useState<'sheet' | 'local' | 'empty'>('empty');
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Subscribe to live sync events
   useEffect(() => {
@@ -143,25 +145,55 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   const loadPreview = async (targetUrl?: string) => {
     const urlToUse = targetUrl || gasUrl;
-    if (!urlToUse) return;
-
     setIsLoadingPreview(true);
-    try {
-      const json = await safeFetchJson('/api/gas/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: urlToUse }),
-      });
-      if (json.success && Array.isArray(json.data)) {
-        setPreviewData(json.data.slice(0, 10));
-        if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
-        if (onSyncSuccess) onSyncSuccess();
+    setPreviewError(null);
+
+    let sheetData: ReceiptData[] = [];
+    let fetchErrorMsg: string | null = null;
+
+    if (urlToUse && urlToUse.trim()) {
+      try {
+        let json: any;
+        try {
+          json = await safeFetchJson('/api/gas/pull', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gasUrl: urlToUse.trim() }),
+          });
+        } catch (beErr: any) {
+          // Fallback direct GAS call
+          json = await directGasCall(urlToUse.trim(), 'getTransactions');
+        }
+
+        const rawList = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+        if (json && (json.success || Array.isArray(rawList))) {
+          sheetData = rawList;
+          if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
+          if (onSyncSuccess) onSyncSuccess();
+        } else if (json?.error) {
+          fetchErrorMsg = json.error;
+        }
+      } catch (err: any) {
+        fetchErrorMsg = err.message || 'Gagal terhubung ke Google Apps Script';
       }
-    } catch {
-      // preview error silent
-    } finally {
-      setIsLoadingPreview(false);
     }
+
+    const localTxs = getStoredTransactions();
+
+    if (sheetData.length > 0) {
+      setPreviewData(sheetData.slice(0, 25));
+      setPreviewSource('sheet');
+    } else if (localTxs.length > 0) {
+      setPreviewData(localTxs.slice(0, 25));
+      setPreviewSource('local');
+      if (fetchErrorMsg) setPreviewError(fetchErrorMsg);
+    } else {
+      setPreviewData([]);
+      setPreviewSource('empty');
+      if (fetchErrorMsg) setPreviewError(fetchErrorMsg);
+    }
+
+    setIsLoadingPreview(false);
   };
 
   const handleSaveConfig = async () => {
@@ -733,25 +765,56 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
         {/* 2. Live Sheet Preview Section */}
         <div className="mt-8 border-t border-slate-100 pt-6">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <Database className="w-4 h-4 text-emerald-600" />
-                <span>Data Terkini di Google Sheets ({previewData.length} baris preview)</span>
+                <span>
+                  Data Terkini {previewSource === 'sheet' ? 'di Google Sheets' : 'Riwayat Transaksi'} ({previewData.length} baris preview)
+                </span>
+                {previewSource === 'sheet' && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Live Google Sheets
+                  </span>
+                )}
+                {previewSource === 'local' && (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    Data Lokal
+                  </span>
+                )}
               </h3>
-              <p className="text-[11px] text-slate-500">
-                Menampilkan data langsung dari tab <code>RiwayatTransaksi</code> di spreadsheet Anda.
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {previewSource === 'sheet'
+                  ? 'Menampilkan data langsung dari tab RiwayatTransaksi di spreadsheet Anda.'
+                  : previewSource === 'local'
+                  ? 'Menampilkan data riwayat lokal tersimpan di aplikasi. Klik tombol "Kirim (Push)" atau "Sinkron" untuk menyamakan dengan Google Sheets.'
+                  : 'Memantau data transaksi di Google Sheets.'}
               </p>
             </div>
-            <button
-              onClick={() => loadPreview()}
-              disabled={isLoadingPreview || !gasUrl.trim()}
-              className="text-xs text-blue-600 hover:text-blue-800 disabled:text-slate-400 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <RefreshCw className={`w-3 h-3 ${isLoadingPreview ? 'animate-spin' : ''}`} />
-              <span>Segarkan Preview</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadPreview()}
+                disabled={isLoadingPreview}
+                className="text-xs bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg disabled:text-slate-400 font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isLoadingPreview ? 'animate-spin' : ''}`} />
+                <span>Segarkan Preview</span>
+              </button>
+            </div>
           </div>
+
+          {previewError && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-xs flex items-start gap-2.5">
+              <RefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900 mb-0.5">Perhatian Koneksi Google Sheets:</p>
+                <p className="text-amber-800">{previewError}</p>
+                <p className="mt-1 text-[11px] text-amber-700">
+                  Tips: Jika belum pernah menyambungkan spreadsheet, klik tombol <strong>"Setup Database"</strong> atau <strong>"Uji Koneksi"</strong> di atas.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/50">
             <table className="w-full text-left border-collapse text-xs">
@@ -778,7 +841,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                       ) : (
                         <span>
                           {gasUrl.trim()
-                            ? 'Belum ada transaksi di sheet atau klik "Segarkan Preview" untuk memuat.'
+                            ? 'Belum ada transaksi tersimpan. Klik "Segarkan Preview" atau lakukan transaksi baru.'
                             : 'Masukkan Web App URL di atas untuk memantau data di Google Sheets secara langsung.'}
                         </span>
                       )}
