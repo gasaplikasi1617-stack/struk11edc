@@ -185,84 +185,87 @@ export function printDotMatrixReceipt(
         <!-- LEFT COLUMN: AGEN & CUSTOMER METADATA -->
         <div class="col-left">
           <div>
-            <div class="header-box">
-              <div class="header-title">${receipt.namaAgen || 'AGEN BATARA'}</div>
-              <div class="header-sub">${receipt.alamat || 'Bekasi'} Telp/WA: ${receipt.noHp || '-'}</div>
-              <div class="struk-badge">${strTitle}</div>
+            <div class="header-box" style="padding-bottom: 3px; margin-bottom: 4px;">
+              <div class="header-title">${strTitle}</div>
+              <div class="header-sub">LOKET: ${receipt.namaAgen || 'AGEN BATARA'} (${receipt.alamat || 'Bekasi'}) WA:${receipt.noHp || '-'}</div>
             </div>
 
             <table class="meta-table">
               <tr>
-                <td class="meta-label">ID Transaksi</td>
+                <td class="meta-label">ID TRANSAKSI</td>
                 <td class="meta-val">: ${receipt.id || 'TRX-83920184'}</td>
               </tr>
               <tr>
-                <td class="meta-label">Tgl/Waktu</td>
+                <td class="meta-label">TGL / WAKTU</td>
                 <td class="meta-val">: ${formatReceiptDateTime(receipt.tanggal)}</td>
               </tr>
               <tr>
-                <td class="meta-label">ID Pelanggan</td>
+                <td class="meta-label">ID PELANGGAN</td>
                 <td class="meta-val">: ${receipt.idpel || '-'}</td>
               </tr>
               <tr>
-                <td class="meta-label">Nama Pelanggan</td>
+                <td class="meta-label">NAMA PELANGGAN</td>
                 <td class="meta-val">: ${(receipt.namaPelanggan || '-').toUpperCase()}</td>
               </tr>
               <tr>
-                <td class="meta-label">Bulan/Periode</td>
+                <td class="meta-label">PERIODE / BLN</td>
                 <td class="meta-val">: ${receipt.bulanTagihan || '-'}</td>
               </tr>
               <tr>
-                <td class="meta-label">Pemakaian</td>
+                <td class="meta-label">PEMAKAIAN</td>
                 <td class="meta-val">: ${receipt.pemakaian || '-'}</td>
               </tr>
               ${receipt.standMeter ? `
               <tr>
-                <td class="meta-label">Stand Meter</td>
+                <td class="meta-label">STAND METER</td>
                 <td class="meta-val">: ${receipt.standMeter}</td>
               </tr>
               ` : ''}
             </table>
           </div>
 
-          <div style="font-size: 8pt; font-weight: 400; color: #000000;">
-            Halaman 1/1 - Resi Dot Matrix LX-310 (21.6 x 6.95 cm)
+          <div style="font-size: 7.5pt; font-weight: 400; color: #000000; pt: 2px;">
+            STRUK BUKTI PEMBAYARAN RESMI PPOB
           </div>
         </div>
 
         <!-- RIGHT COLUMN: BILL DETAILS & TOTAL -->
         <div class="col-right">
           <div>
-            <div class="section-title">
+            <div class="section-title" style="padding-bottom: 3px; margin-bottom: 4px;">
               RINCIAN PEMBAYARAN TAGIHAN
             </div>
 
             <table class="bill-table">
               <tr>
-                <td class="bill-left">${receipt.rincianTagihan || 'Tagihan Pembayaran'}</td>
+                <td class="bill-left">RP TAGIHAN</td>
                 <td class="bill-right">Rp ${Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}</td>
+              </tr>
+              <tr>
+                <td class="bill-left">ADMIN LOKET</td>
+                <td class="bill-right">Rp ${Number(receipt.adminBank || 0).toLocaleString('id-ID')}</td>
               </tr>
               ${Number(receipt.lainLain) > 0 ? `
               <tr>
-                <td class="bill-left">Biaya Lain-Lain</td>
-                <td class="bill-right">Rp ${Number(receipt.lainLain || 0).toLocaleString('id-ID')}</td>
+                <td class="bill-left">BIAYA LAIN</td>
+                <td class="bill-right">Rp ${Number(receipt.lainLain).toLocaleString('id-ID')}</td>
               </tr>
               ` : ''}
               <tr>
-                <td class="bill-left">Admin Bank / Loket</td>
-                <td class="bill-right">Rp ${Number(receipt.adminBank || 0).toLocaleString('id-ID')}</td>
+                <td class="bill-left">INFORMASI</td>
+                <td class="bill-right">${receipt.rincianTagihan || 'PPOB LUNAS'}</td>
               </tr>
             </table>
 
-            <div class="total-box">
-              <span>TOTAL BAYAR</span>
-              <span>Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}</span>
+            <div class="total-box" style="margin-top: 6px; padding: 3px 0;">
+              <span style="font-weight: bold;">TOTAL BAYAR</span>
+              <span style="font-weight: bold;">Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}</span>
             </div>
           </div>
 
-          <div class="footer-text">
+          <div class="footer-text" style="margin-top: 4px;">
+            <div style="font-weight: bold;">STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH</div>
             <div>TERIMA KASIH ATAS PEMBAYARAN ANDA</div>
-            <div>Simpan struk ini sebagai bukti pembayaran yang sah.</div>
           </div>
         </div>
       </div>
@@ -362,47 +365,46 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
 }
 
 /**
- * Generates pure 80-column plain ASCII text for direct raw printing on Continuous Form 21.6 x 6.95 cm
+ * Generates pure 80-column plain ASCII text formatted in standard PPOB Bank Bukopin receipt style
+ * (without Bukopin logo/name, keeping all original fields intact)
  */
 export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const rawTitle = receipt.rincianTagihan || '';
   const cleanTitle = rawTitle.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-  const titleText = (cleanTitle || rawTitle || 'PEMBAYARAN RESMI').toUpperCase();
+  const titleText = (cleanTitle || rawTitle || 'PEMBAYARAN TAGIHAN').toUpperCase();
   const strTitle = titleText.includes('STRUK') ? titleText : `STRUK PEMBAYARAN ${titleText}`;
 
   const agen = (receipt.namaAgen || 'AGEN BATARA').toUpperCase();
-  const alamat = receipt.alamat ? `${receipt.alamat} WA:${receipt.noHp || '-'}` : `Bekasi WA:${receipt.noHp || '-'}`;
+  const alamat = receipt.alamat || 'BEKASI';
+  const noHp = receipt.noHp || '-';
   const idTrx = receipt.id || 'TRX-83920184';
   const tgl = formatReceiptDateTime(receipt.tanggal);
   const idpel = receipt.idpel || '-';
   const nama = (receipt.namaPelanggan || '-').toUpperCase();
   const periode = receipt.bulanTagihan || '-';
   const pemakaian = receipt.pemakaian || '-';
-  const standStr = receipt.standMeter ? `Stand Meter    : ${receipt.standMeter}` : '';
+  const standStr = receipt.standMeter ? receipt.standMeter : '';
 
   const rincian = receipt.rincianTagihan || 'Tagihan Pembayaran';
   const rpTagihan = `Rp ${Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}`;
   const rpAdmin = `Rp ${Number(receipt.adminBank || 0).toLocaleString('id-ID')}`;
   const rpTotal = `Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}`;
+  const rpLain = Number(receipt.lainLain) > 0 ? `Rp ${Number(receipt.lainLain).toLocaleString('id-ID')}` : '';
 
-  let lainLainStr = '';
-  if (Number(receipt.lainLain) > 0) {
-    lainLainStr = `Biaya Lain-Lain: Rp ${Number(receipt.lainLain || 0).toLocaleString('id-ID')}`;
-  }
+  const blankLine = ' '.repeat(80);
 
-  // Exact 80 Columns Width (Left 38 chars + ' | ' + Right 39 chars)
-  const l1  = `${agen.slice(0, 38).padEnd(38)} | ${'RINCIAN PEMBAYARAN TAGIHAN'.padEnd(39)}`;
-  const l2  = `${alamat.slice(0, 38).padEnd(38)} | ${(rincian.slice(0, 18) + ': ' + rpTagihan).padEnd(39)}`;
-  const l3  = `${strTitle.slice(0, 38).padEnd(38)} | ${('Admin Bank / Loket: ' + rpAdmin).padEnd(39)}`;
-  const l4  = `${'-'.repeat(38)} + ${'-'.repeat(39)}`;
-  const l5  = `${('ID Transaksi   : ' + idTrx).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR       : ' + rpTotal).padEnd(39)}`;
-  const l6  = `${('Tanggal/Waktu  : ' + tgl).slice(0, 38).padEnd(38)} | ${'TERIMA KASIH ATAS PEMBAYARAN ANDA'.padEnd(39)}`;
-  const l7  = `${('ID Pelanggan   : ' + idpel).slice(0, 38).padEnd(38)} | ${'Simpan struk ini sebagai bukti sah.'.padEnd(39)}`;
-  const l8  = `${('Nama Pelanggan : ' + nama).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
-  const l9  = `${('Bulan/Periode  : ' + periode).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
-  const l10 = `${('Pemakaian      : ' + pemakaian).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
-  const l11 = `${standStr.slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
-  const l12 = `${lainLainStr.slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+  // PPOB Style 80 Columns Grid Layout (38 chars | ' | ' | 39 chars) - Clean format without = or - lines
+  const l1  = `${strTitle.slice(0, 38).padEnd(38)} | ${('LOKET : ' + agen).slice(0, 39).padEnd(39)}`;
+  const l2  = `${('ALAMAT: ' + alamat + ' WA:' + noHp).slice(0, 38).padEnd(38)} | ${('TGL   : ' + tgl).slice(0, 39).padEnd(39)}`;
+  const l3  = blankLine;
+  const l4  = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
+  const l5  = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${('ADMIN LOKET  : ' + rpAdmin).slice(0, 39).padEnd(39)}`;
+  const l6  = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'INFORMASI    : ' + rincian).slice(0, 39).padEnd(39)}`;
+  const l7  = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
+  const l8  = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
+  const l9  = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${'STATUS       : LUNAS / SUKSES'.padEnd(39)}`;
+  const l10 = blankLine;
+  const l11 = `         STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH - TERIMA KASIH         `;
 
-  return [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12].join('\n');
+  return [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11].join('\n');
 }

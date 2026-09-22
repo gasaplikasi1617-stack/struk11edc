@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ReceiptData } from '../types';
 import { printDotMatrixReceipt } from '../utils/dotMatrixPrinter';
+import { printDirectQZTray } from '../utils/qzTrayPrinter';
 import {
   History,
   Search,
@@ -26,6 +27,7 @@ import {
   Check,
   Share2,
   Calendar,
+  Zap,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -129,7 +131,16 @@ export function HistoryTab({
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
 
-  // Date Range Filter States
+  const handlePrintQZTrayFromHistory = async (tx: ReceiptData) => {
+    try {
+      const printedTo = await printDirectQZTray(tx);
+      setExportSuccessNotice(`SUKSES! Struk ${tx.namaPelanggan || tx.idpel} langsung dicetak ke ${printedTo} via QZ Tray.`);
+      setTimeout(() => setExportSuccessNotice(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      printDotMatrixReceipt(tx);
+    }
+  };
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -973,13 +984,13 @@ export function HistoryTab({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              printDotMatrixReceipt(tx);
+                              handlePrintQZTrayFromHistory(tx);
                             }}
-                            className="bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 transition-all"
-                            title="Cetak langsung ke Printer Dot Matrix (21.6 x 6.95 cm)"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 transition-all border border-emerald-500"
+                            title="Cetak langsung ke Epson LX-310 via QZ Tray (RAW Direct 100% Tajam)"
                           >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Dot Matrix</span>
+                            <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                            <span className="hidden sm:inline">QZ Tray</span>
                           </button>
                           <button
                             onClick={() => handleQuickDownloadPng(tx)}

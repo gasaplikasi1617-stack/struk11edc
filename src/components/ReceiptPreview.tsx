@@ -710,7 +710,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           ) : (
             <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
           )}
-          <span>Cetak QZ Tray (LX-310 Direct)</span>
+          <span>Cetak QZ Tray</span>
         </button>
 
         <button
@@ -724,7 +724,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           ) : (
             <Printer className="w-4 h-4 text-indigo-200" />
           )}
-          <span>Cetak JSPrintManager (JSPM)</span>
+          <span>Cetak JSPrintManager</span>
         </button>
 
         <button
