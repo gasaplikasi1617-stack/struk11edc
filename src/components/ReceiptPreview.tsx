@@ -90,6 +90,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handleOpenJspmModal = async () => {
+    onSave();
     setIsJspmPrinting(true);
     try {
       showActionNotice('Menghubungkan ke JSPrintManager Client...');
@@ -128,6 +129,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handleOpenQzModal = async () => {
+    onSave();
     setIsQzPrinting(true);
     try {
       showActionNotice('Menghubungkan ke QZ Tray...');
