@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ReceiptData } from '../types';
+import { printDotMatrixReceipt } from '../utils/dotMatrixPrinter';
 import {
   History,
   Search,
@@ -964,10 +965,21 @@ export function HistoryTab({
                           <button
                             onClick={() => onSelectTransaction(tx)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 font-medium transition-all"
-                            title="Buka & Cetak Ulang Resi"
+                            title="Buka & Cetak Ulang Resi (A6)"
                           >
                             <Printer className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Cetak</span>
+                            <span className="hidden sm:inline">A6</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              printDotMatrixReceipt(tx);
+                            }}
+                            className="bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1 transition-all"
+                            title="Cetak langsung ke Printer Dot Matrix (21.6 x 6.95 cm)"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Dot Matrix</span>
                           </button>
                           <button
                             onClick={() => handleQuickDownloadPng(tx)}

@@ -11,10 +11,29 @@ import {
   Check,
   X,
   Share2,
+  HelpCircle,
+  Zap,
+  FileText,
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
+import {
+  printDotMatrixReceipt,
+  printRawTextLX310,
+  generatePlainTextReceipt,
+  DotMatrixFontSize,
+} from '../utils/dotMatrixPrinter';
+import {
+  printDirectQZTray,
+  getQZTrayPrinters,
+  connectQZTray,
+} from '../utils/qzTrayPrinter';
+import {
+  printDirectJSPM,
+  getJSPMPrinters,
+  connectJSPM,
+} from '../utils/jsPrintManagerPrinter';
 
 interface ReceiptPreviewProps {
   receipt: ReceiptData;
@@ -30,10 +49,138 @@ interface DownloadedModalState {
 }
 
 export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: ReceiptPreviewProps) {
+  const [previewMode, setPreviewMode] = useState<'a6' | 'dotmatrix'>('a6');
+  const [dotMatrixFontSize, setDotMatrixFontSize] = useState<DotMatrixFontSize>('normal');
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [downloadedModal, setDownloadedModal] = useState<DownloadedModalState | null>(null);
   const [copiedClipboard, setCopiedClipboard] = useState(false);
+  const [copiedRawText, setCopiedRawText] = useState(false);
+  const [showLx310GuideModal, setShowLx310GuideModal] = useState(false);
+
+  // QZ Tray State & Handlers
+  const [isQzPrinting, setIsQzPrinting] = useState(false);
+  const [qzPrinterList, setQzPrinterList] = useState<string[]>([]);
+  const [selectedQzPrinter, setSelectedQzPrinter] = useState<string>('');
+  const [showQzModal, setShowQzModal] = useState(false);
+
+  // JSPrintManager (JSPM) State & Handlers
+  const [isJspmPrinting, setIsJspmPrinting] = useState(false);
+  const [jspmPrinterList, setJspmPrinterList] = useState<string[]>([]);
+  const [selectedJspmPrinter, setSelectedJspmPrinter] = useState<string>('');
+  const [showJspmModal, setShowJspmModal] = useState(false);
+
+  const handlePrintJSPM = async (overridePrinterName?: string) => {
+    onSave();
+    setIsJspmPrinting(true);
+    showActionNotice('Menghubungkan ke JSPrintManager & Mengirim Perintah Cetak ke LX-310...');
+    try {
+      const printerName = overridePrinterName || selectedJspmPrinter;
+      const printedTo = await printDirectJSPM(receipt, printerName || undefined);
+      showActionNotice(`SUKSES! Struk dikirim ke ${printedTo} via JSPrintManager (RAW Mode).`);
+      setShowJspmModal(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Gagal Mencetak via JSPrintManager: ${err.message || err}`);
+    } finally {
+      setIsJspmPrinting(false);
+    }
+  };
+
+  const handleOpenJspmModal = async () => {
+    setIsJspmPrinting(true);
+    try {
+      showActionNotice('Menghubungkan ke JSPrintManager Client...');
+      await connectJSPM();
+      const printers = await getJSPMPrinters();
+      setJspmPrinterList(printers);
+      if (printers.length > 0) {
+        const lxPrinter = printers.find((p) => p.toUpperCase().includes('LX') || p.toUpperCase().includes('EPSON')) || printers[0];
+        setSelectedJspmPrinter(lxPrinter);
+      }
+      setShowJspmModal(true);
+    } catch (err: any) {
+      alert(`JSPrintManager Client belum aktif: ${err.message || err}\n\nPastikan program JSPrintManager App (JSPM) sudah berjalan di Windows tray Anda.`);
+    } finally {
+      setIsJspmPrinting(false);
+    }
+  };
+
+  const handlePrintQZTray = async (overridePrinterName?: string) => {
+    onSave();
+    setIsQzPrinting(true);
+    showActionNotice('Menghubungkan ke QZ Tray & Mengirim Perintah Cetak ke LX-310...');
+    try {
+      const printerName = overridePrinterName || selectedQzPrinter;
+      const printedTo = await printDirectQZTray(receipt, printerName || undefined);
+      showActionNotice(`SUKSES! Struk berhasil dicetak ke ${printedTo} via QZ Tray (Direct Hardware RAW).`);
+      setShowQzModal(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Gagal Mencetak via QZ Tray: ${err.message || err}`);
+      setShowLx310GuideModal(true);
+    } finally {
+      setIsQzPrinting(false);
+    }
+  };
+
+  const handleOpenQzModal = async () => {
+    setIsQzPrinting(true);
+    try {
+      showActionNotice('Menghubungkan ke QZ Tray...');
+      await connectQZTray();
+      const printers = await getQZTrayPrinters();
+      setQzPrinterList(printers);
+      if (printers.length > 0) {
+        const lxPrinter = printers.find((p) => p.toUpperCase().includes('LX') || p.toUpperCase().includes('EPSON')) || printers[0];
+        setSelectedQzPrinter(lxPrinter);
+      }
+      setShowQzModal(true);
+    } catch (err: any) {
+      alert(`QZ Tray belum terhubung: ${err.message || err}\n\nPastikan program QZ Tray sudah terbuka dan aktif (ikon hijau di dekat jam Windows).`);
+    } finally {
+      setIsQzPrinting(false);
+    }
+  };
+
+  const handleDotMatrixPrintClick = () => {
+    onSave();
+    showActionNotice(`Data tersimpan! Menyiapkan cetak Dot Matrix Layout...`);
+    printDotMatrixReceipt(receipt, undefined, dotMatrixFontSize);
+  };
+
+  const handleRawTextLX310PrintClick = () => {
+    onSave();
+    showActionNotice('Data tersimpan! Menyiapkan Cetak Direct Text LX-310 (Pasti Tajam 100%)...');
+    printRawTextLX310(receipt, undefined);
+  };
+
+  const handleDownloadTxtFile = () => {
+    onSave();
+    const rawText = generatePlainTextReceipt(receipt);
+    const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Struk_LX310_${receipt.idpel || receipt.id || 'transaksi'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showActionNotice('File Struk .TXT diunduh! Buka file di Notepad & tekan Ctrl+P untuk cetak 100% tajam.');
+  };
+
+  const handleCopyRawText = async () => {
+    try {
+      const rawText = generatePlainTextReceipt(receipt);
+      await navigator.clipboard.writeText(rawText);
+      setCopiedRawText(true);
+      showActionNotice('Teks murni struk berhasil disalin ke clipboard! Siap dipaste ke printer raw / Notepad.');
+      setTimeout(() => setCopiedRawText(false), 3000);
+    } catch {
+      showActionNotice('Gagal menyalin teks.');
+    }
+  };
 
   const showActionNotice = (msg: string) => {
     setActionNotice(msg);
@@ -292,129 +439,367 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         </div>
       )}
 
-      {/* A6 Receipt Container - styled specifically for A6 portrait look and print */}
-      <div
-        id="printable-receipt"
-        className="w-full max-w-[380px] bg-white p-5 text-black font-mono text-xs border-0 outline-none shadow-none relative my-2"
-        style={{ minHeight: '520px' }}
-      >
-        {/* Header Agen */}
-        <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
-          <h2 className="text-base font-extrabold tracking-wide uppercase text-black">{receipt.namaAgen || 'AGEN BATARA'}</h2>
-          <p className="text-[11px] text-black mt-0.5">{receipt.alamat || 'Bekasi'}</p>
-          <p className="text-[11px] text-black">Telp/WA: {receipt.noHp || '-'}</p>
-          <div className="mt-2 text-[10.5px] py-1 px-1 inline-block font-bold uppercase tracking-wider text-black bg-transparent">
-            {(() => {
-              const raw = receipt.rincianTagihan || '';
-              const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-              const title = clean || raw || 'PEMBAYARAN RESMI';
-              if (title.toUpperCase().includes('STRUK')) return title.toUpperCase();
-              return `STRUK PEMBAYARAN ${title.toUpperCase()}`;
-            })()}
-          </div>
-        </div>
-
-        {/* Transaction Metadata */}
-        <div className="space-y-1 border-b border-dashed border-black pb-2 mb-3 text-[11px] text-black">
-          <div className="flex justify-between">
-            <span className="text-black">ID Transaksi:</span>
-            <span className="font-bold text-black font-mono">{receipt.id || 'TRX-83920184'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-black">Tgl/Waktu:</span>
-            <span className="font-semibold text-black">{formatReceiptDateTime(receipt.tanggal)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-black">ID Pelanggan:</span>
-            <span className="font-bold text-black">{receipt.idpel || '-'}</span>
-          </div>
-          <div className="flex justify-between items-baseline gap-2">
-            <span className="text-black shrink-0">Nama:</span>
-            <span className="font-bold uppercase text-black text-right whitespace-nowrap overflow-hidden text-ellipsis max-w-[210px]" title={receipt.namaPelanggan}>
-              {receipt.namaPelanggan || '-'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-black">Bulan/Periode:</span>
-            <span className="text-black">{receipt.bulanTagihan || '-'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-black">Pemakaian:</span>
-            <span className="text-black">{receipt.pemakaian || '-'}</span>
-          </div>
-          {receipt.standMeter && (
-            <div className="flex justify-between">
-              <span className="text-black">Stand Meter:</span>
-              <span className="text-black">{receipt.standMeter}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Bill Details */}
-        <div className="space-y-1.5 border-b-2 border-dashed border-black pb-3 mb-3 text-black">
-          <div className="text-[11px] font-bold text-black mb-1">Rincian Transaksi:</div>
-          <div className="flex justify-between text-[11px]">
-            <span className="text-black">{receipt.rincianTagihan || 'Tagihan Pembayaran'}</span>
-            <span className="text-black">Rp {Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}</span>
-          </div>
-          {Number(receipt.lainLain) > 0 && (
-            <div className="flex justify-between text-[11px]">
-              <span className="text-black">Biaya Lain-Lain</span>
-              <span className="text-black">Rp {Number(receipt.lainLain || 0).toLocaleString('id-ID')}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-[11px]">
-            <span className="text-black">Admin Bank / Loket</span>
-            <span className="text-black">Rp {Number(receipt.adminBank || 0).toLocaleString('id-ID')}</span>
-          </div>
-        </div>
-
-        {/* Total Bayar */}
-        <div className="py-2.5 mb-4 text-center text-black border-y-2 border-black bg-transparent">
-          <div className="text-[10px] text-black uppercase font-bold tracking-wider">Total Pembayaran</div>
-          <div className="text-base font-extrabold text-black mt-0.5">
-            Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
-          </div>
-        </div>
-
-        {/* Footer Thanks */}
-        <div className="text-center pt-2 text-black">
-          <p className="text-[10px] text-black mt-1 font-semibold">Terima Kasih Atas Pembayaran Anda</p>
-          <p className="text-[9px] text-black">Simpan struk ini sebagai bukti pembayaran yang sah.</p>
-        </div>
+      {/* Mode Selector Tabs (Struk A6 vs Dot Matrix 21.6x6.95 cm) */}
+      <div className="w-full flex items-center justify-center gap-2 mb-3 bg-slate-100 p-1 rounded-xl">
+        <button
+          onClick={() => setPreviewMode('a6')}
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+            previewMode === 'a6'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Pratinjau A6 (Portrait)
+        </button>
+        <button
+          onClick={() => setPreviewMode('dotmatrix')}
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+            previewMode === 'dotmatrix'
+              ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>Dot Matrix (21.6 x 6.95 cm)</span>
+          <span className="text-[9px] bg-slate-900 text-amber-300 px-1 py-0.2 rounded uppercase">Text/Draft</span>
+        </button>
       </div>
 
-      {/* Action Buttons: Cetak, Download PDF, Download Gambar - Semua otomatis save data */}
-      <div className="w-full mt-4 flex flex-col sm:flex-row gap-2.5">
+      {previewMode === 'a6' ? (
+        /* A6 Receipt Container - styled specifically for A6 portrait look and print */
+        <div
+          id="printable-receipt"
+          className="w-full max-w-[380px] bg-white p-5 text-black font-mono text-xs border-0 outline-none shadow-none relative my-2"
+          style={{ minHeight: '520px' }}
+        >
+          {/* Header Agen */}
+          <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
+            <h2 className="text-base font-extrabold tracking-wide uppercase text-black">{receipt.namaAgen || 'AGEN BATARA'}</h2>
+            <p className="text-[11px] text-black mt-0.5">{receipt.alamat || 'Bekasi'}</p>
+            <p className="text-[11px] text-black">Telp/WA: {receipt.noHp || '-'}</p>
+            <div className="mt-2 text-[10.5px] py-1 px-1 inline-block font-bold uppercase tracking-wider text-black bg-transparent">
+              {(() => {
+                const raw = receipt.rincianTagihan || '';
+                const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
+                const title = clean || raw || 'PEMBAYARAN RESMI';
+                if (title.toUpperCase().includes('STRUK')) return title.toUpperCase();
+                return `STRUK PEMBAYARAN ${title.toUpperCase()}`;
+              })()}
+            </div>
+          </div>
+
+          {/* Transaction Metadata */}
+          <div className="space-y-1 border-b border-dashed border-black pb-2 mb-3 text-[11px] text-black">
+            <div className="flex justify-between">
+              <span className="text-black">ID Transaksi:</span>
+              <span className="font-bold text-black font-mono">{receipt.id || 'TRX-83920184'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black">Tgl/Waktu:</span>
+              <span className="font-semibold text-black">{formatReceiptDateTime(receipt.tanggal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black">ID Pelanggan:</span>
+              <span className="font-bold text-black">{receipt.idpel || '-'}</span>
+            </div>
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-black shrink-0">Nama:</span>
+              <span className="font-bold uppercase text-black text-right whitespace-nowrap overflow-hidden text-ellipsis max-w-[210px]" title={receipt.namaPelanggan}>
+                {receipt.namaPelanggan || '-'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black">Bulan/Periode:</span>
+              <span className="text-black">{receipt.bulanTagihan || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black">Pemakaian:</span>
+              <span className="text-black">{receipt.pemakaian || '-'}</span>
+            </div>
+            {receipt.standMeter && (
+              <div className="flex justify-between">
+                <span className="text-black">Stand Meter:</span>
+                <span className="text-black">{receipt.standMeter}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Bill Details */}
+          <div className="space-y-1.5 border-b-2 border-dashed border-black pb-3 mb-3 text-black">
+            <div className="text-[11px] font-bold text-black mb-1">Rincian Transaksi:</div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-black">{receipt.rincianTagihan || 'Tagihan Pembayaran'}</span>
+              <span className="text-black">Rp {Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}</span>
+            </div>
+            {Number(receipt.lainLain) > 0 && (
+              <div className="flex justify-between text-[11px]">
+                <span className="text-black">Biaya Lain-Lain</span>
+                <span className="text-black">Rp {Number(receipt.lainLain || 0).toLocaleString('id-ID')}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-[11px]">
+              <span className="text-black">Admin Bank / Loket</span>
+              <span className="text-black">Rp {Number(receipt.adminBank || 0).toLocaleString('id-ID')}</span>
+            </div>
+          </div>
+
+          {/* Total Bayar */}
+          <div className="py-2.5 mb-4 text-center text-black border-y-2 border-black bg-transparent">
+            <div className="text-[10px] text-black uppercase font-bold tracking-wider">Total Pembayaran</div>
+            <div className="text-base font-extrabold text-black mt-0.5">
+              Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
+            </div>
+          </div>
+
+          {/* Footer Thanks */}
+          <div className="text-center pt-2 text-black">
+            <p className="text-[10px] text-black mt-1 font-semibold">Terima Kasih Atas Pembayaran Anda</p>
+            <p className="text-[9px] text-black">Simpan struk ini sebagai bukti pembayaran yang sah.</p>
+          </div>
+        </div>
+      ) : (
+        /* Dot Matrix 21.6 x 6.95 cm Continuous Text Preview */
+        <div className="w-full bg-amber-50/70 border border-amber-300 rounded-2xl p-4 my-2 font-serif text-slate-950 shadow-xs overflow-x-auto">
+          {/* Dot Matrix Settings Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-amber-200/80">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
+              <span className="bg-amber-600 text-slate-950 px-2 py-0.5 rounded text-[11px] uppercase font-bold">21.6 x 6.95 cm</span>
+              <span>Font Roman Dot Matrix (Tanpa Bold):</span>
+            </div>
+            <div className="flex items-center gap-1 bg-amber-100/80 p-1 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setDotMatrixFontSize('kecil')}
+                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
+                  dotMatrixFontSize === 'kecil'
+                    ? 'bg-amber-600 text-slate-950 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+              >
+                Kecil (11px)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDotMatrixFontSize('normal')}
+                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
+                  dotMatrixFontSize === 'normal'
+                    ? 'bg-amber-600 text-slate-950 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+              >
+                Normal (12.5px)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDotMatrixFontSize('sedang')}
+                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
+                  dotMatrixFontSize === 'sedang'
+                    ? 'bg-amber-600 text-slate-950 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+              >
+                Sedang (14px)
+              </button>
+            </div>
+          </div>
+
+          <div className="min-w-[620px] grid grid-cols-2 gap-6">
+            {/* Left Col */}
+            <div className="pr-2 space-y-2 flex flex-col justify-between">
+              <div>
+                <div className="mb-3">
+                  <div className="font-normal text-base uppercase tracking-wide text-slate-950">{receipt.namaAgen || 'AGEN BATARA'}</div>
+                  <div className="text-xs text-slate-800 font-normal">{receipt.alamat || 'Bekasi'} Telp/WA: {receipt.noHp || '-'}</div>
+                  <div className="font-normal uppercase text-xs text-blue-950 mt-1">
+                    {(() => {
+                      const raw = receipt.rincianTagihan || '';
+                      const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
+                      const title = clean || raw || 'PEMBAYARAN RESMI';
+                      return title.toUpperCase().includes('STRUK') ? title.toUpperCase() : `STRUK PEMBAYARAN ${title.toUpperCase()}`;
+                    })()}
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs font-normal">
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">ID Transaksi</span>
+                    <span className="col-span-2 font-mono text-slate-950">: {receipt.id || 'TRX-83920184'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">Tgl/Waktu</span>
+                    <span className="col-span-2 text-slate-950">: {formatReceiptDateTime(receipt.tanggal)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">ID Pelanggan</span>
+                    <span className="col-span-2 text-slate-950">: {receipt.idpel || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">Nama</span>
+                    <span className="col-span-2 text-slate-950 uppercase truncate">: {receipt.namaPelanggan || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">Periode</span>
+                    <span className="col-span-2 text-slate-950">: {receipt.bulanTagihan || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="text-slate-700">Pemakaian</span>
+                    <span className="col-span-2 text-slate-950">: {receipt.pemakaian || '-'}</span>
+                  </div>
+                  {receipt.standMeter && (
+                    <div className="grid grid-cols-3 gap-1">
+                      <span className="text-slate-700">Stand Meter</span>
+                      <span className="col-span-2 text-slate-950">: {receipt.standMeter}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-600 font-normal pt-2">
+                *Tanpa Garis / Polos | Font Roman Dot Matrix (Single-Pass Normal Weight)
+              </div>
+            </div>
+
+            {/* Right Col */}
+            <div className="pl-2 flex flex-col justify-between">
+              <div>
+                <div className="font-normal text-xs text-slate-950 uppercase mb-2">RINCIAN PEMBAYARAN TAGIHAN</div>
+                <div className="space-y-1.5 text-xs font-normal">
+                  <div className="flex justify-between">
+                    <span className="text-slate-800">{receipt.rincianTagihan || 'Tagihan Pembayaran'}</span>
+                    <span className="text-slate-950">Rp {Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  {Number(receipt.lainLain) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-800">Biaya Lain-Lain</span>
+                      <span className="text-slate-950">Rp {Number(receipt.lainLain || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-800">Admin Bank / Loket</span>
+                    <span className="text-slate-950">Rp {Number(receipt.adminBank || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+
+                <div className="my-3 py-2 px-2 flex justify-between font-normal text-base text-slate-950 bg-amber-200/90 rounded-lg">
+                  <span>TOTAL BAYAR</span>
+                  <span>Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              <div className="text-center text-xs text-slate-900 pt-2 font-normal space-y-0.5">
+                <div>TERIMA KASIH ATAS PEMBAYARAN ANDA</div>
+                <div className="text-[10px] text-slate-700 font-normal">Simpan struk ini sebagai bukti pembayaran yang sah.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="w-full mt-4 flex flex-col sm:flex-row flex-wrap gap-2">
+        <button
+          onClick={handleOpenQzModal}
+          disabled={isQzPrinting}
+          className="flex-1 min-w-[200px] bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold py-2.5 px-3.5 rounded-xl text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer border border-emerald-400"
+          title="Cetak langsung ke Epson LX-310 via QZ Tray (Paling Tajam 100%, Kecepatan Maksimal, Tanpa Dialog Chrome)"
+        >
+          {isQzPrinting ? (
+            <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+          ) : (
+            <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+          )}
+          <span>Cetak QZ Tray (LX-310 Direct)</span>
+        </button>
+
+        <button
+          onClick={handleOpenJspmModal}
+          disabled={isJspmPrinting}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-400"
+          title="Cetak langsung ke Epson LX-310 via JSPrintManager (JSPM RAW Mode)"
+        >
+          {isJspmPrinting ? (
+            <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+          ) : (
+            <Printer className="w-4 h-4 text-indigo-200" />
+          )}
+          <span>Cetak JSPrintManager (JSPM)</span>
+        </button>
+
+        <button
+          onClick={handleRawTextLX310PrintClick}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-emerald-500"
+          title="Cetak Teks Direct Mode ESC/P khusus Epson LX-310 via Browser"
+        >
+          <Printer className="w-4 h-4 text-emerald-200" />
+          <span>Cetak Direct Browser</span>
+        </button>
+
+        <button
+          onClick={handleDownloadTxtFile}
+          className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-teal-500"
+          title="Unduh file .TXT untuk dicetak lewat Notepad (Metode Loket PPOB 100% Tajam)"
+        >
+          <FileText className="w-4 h-4 text-teal-100" />
+          <span>Download .TXT</span>
+        </button>
+
+        <button
+          onClick={handleDotMatrixPrintClick}
+          className="bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-500"
+          title="Cetak dengan Layout HTML Dot Matrix 21.6 x 6.95 cm"
+        >
+          <Printer className="w-4 h-4 text-slate-950" />
+          <span>Cetak Layout HTML</span>
+        </button>
+
+        <button
+          onClick={() => setShowLx310GuideModal(true)}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-300"
+          title="Petunjuk Setting Printer LX-310 Agar Hasil Cetakan Tidak Pecah/Buram"
+        >
+          <HelpCircle className="w-4 h-4 text-blue-600" />
+          <span>Tips LX-310</span>
+        </button>
+
+        <button
+          onClick={handleCopyRawText}
+          className="bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-300"
+          title="Salin Teks Polos ASCII untuk dipaste langsung ke Notepad"
+        >
+          {copiedRawText ? <Check className="w-4 h-4 text-emerald-700" /> : <Copy className="w-4 h-4 text-amber-800" />}
+          <span>{copiedRawText ? 'Tersalin!' : 'Salin RAW'}</span>
+        </button>
+
         <button
           onClick={() => handleDirectPrint(false)}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          title="Cetak langsung struk ukuran A6 (Otomatis simpan ke riwayat transaksi)"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          title="Cetak langsung struk ukuran A6 portrait"
         >
           <Printer className="w-4 h-4" />
-          <span>Cetak Langsung (A6)</span>
+          <span>Cetak A6</span>
         </button>
+
         <button
           onClick={() => handleDirectPrint(true)}
-          className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          title="Download struk format PDF A6 (Otomatis simpan ke riwayat transaksi)"
+          className="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          title="Download struk format PDF A6"
         >
           <Download className="w-4 h-4" />
-          <span>Download PDF</span>
+          <span>PDF A6</span>
         </button>
+
         <button
           id="btn-download-png"
           onClick={handleDownloadImage}
           disabled={isDownloadingImage}
-          className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          title="Download struk format gambar PNG resolusi tajam (Otomatis simpan ke riwayat transaksi)"
+          className="bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-semibold py-2.5 px-3 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          title="Download struk format gambar PNG"
         >
           {isDownloadingImage ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <ImageIcon className="w-4 h-4" />
           )}
-          <span>{isDownloadingImage ? 'Memproses PNG...' : 'Download Gambar (PNG)'}</span>
+          <span>{isDownloadingImage ? 'Memproses PNG...' : 'PNG'}</span>
         </button>
       </div>
 
@@ -499,6 +884,256 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             <p className="text-[11px] text-slate-400 text-center mt-3">
               *Jika unduhan browser tidak langsung muncul otomatis, klik tombol <strong>Unduh File PNG</strong> di atas.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* LX-310 Dot Matrix Setup Guide Modal */}
+      {showLx310GuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowLx310GuideModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3 border-b border-slate-100 pb-3">
+              <div className="bg-amber-100 text-amber-800 p-2.5 rounded-xl font-extrabold text-sm">
+                EPSON LX-310
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-base">Panduan Cetak Tajam LX-310</h4>
+                <p className="text-xs text-slate-500">Solusi agar cetakan jarum paku 100% jelas & tidak pecah/buram</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                <div className="font-bold text-emerald-950 flex items-center gap-1.5 mb-1 text-sm">
+                  <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600" />
+                  Solusi 1: Gunakan Tombol "Cetak Direct LX-310" (Rekomendasi Utama)
+                </div>
+                <p className="text-emerald-900">
+                  Klik tombol hijau <b>"Cetak Direct LX-310"</b>. Mode ini mengirim teks ASCII murni langsung ke pita printer tanpa diubah menjadi gambar oleh browser, sehingga paku jarum LX-310 langsung mengetuk karakter asli. <b>Pasti 100% tajam dan sangat cepat!</b>
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <div className="font-bold text-amber-950 mb-1 text-sm">
+                  Mengapa Cetakan Browser Sering Pecah/Buram?
+                </div>
+                <p className="text-amber-900">
+                  Secara default, Google Chrome merender halaman web sebagai <b>Gambar Graphic 180 DPI</b> sebelum dikirim ke driver printer. Jarum Epson LX-310 mencoba mengetuk piksel titik-titik gambar halus (dithering) sehingga huruf terasa samar/pecah.
+                </p>
+              </div>
+
+              <div className="border border-teal-200 bg-teal-50/80 p-3 rounded-xl space-y-1.5">
+                <div className="font-bold text-teal-950 flex items-center gap-1 text-xs">
+                  <FileText className="w-4 h-4 text-teal-700" />
+                  Solusi 2: Metode File .TXT + Notepad (Metode Resmi Loket PLN/PPOB)
+                </div>
+                <p className="text-teal-900 text-[11px]">
+                  1. Klik tombol <b>"Download .TXT"</b> di aplikasi.<br/>
+                  2. Buka file <code>.txt</code> tersebut di program <b>Notepad</b> Windows.<br/>
+                  3. Tekan <b>Ctrl + P</b> lalu cetak ke LX-310. Karena Notepad adalah aplikasi teks murni Win32, paku jarum LX-310 mencetak <b>100% cepat, tajam, dan tidak akan pernah pecah!</b>
+                </p>
+              </div>
+
+              <div className="border border-blue-200 bg-blue-50/80 p-3 rounded-xl space-y-1.5">
+                <div className="font-bold text-blue-950 text-xs">
+                  Solusi 3: Software Add-on / Extension RAW Print Browser
+                </div>
+                <p className="text-blue-900 text-[11px]">
+                  Jika ingin cetak langsung dari browser secara otomatis tanpa dialog Chrome:<br/>
+                  • <b>QZ Tray (qz.io)</b>: Software print bridge resmi untuk menghubungkan web browser ke printer dot matrix USB.<br/>
+                  • <b>Web2Print / RawBT Extension</b>: Ekstensi Chrome untuk meneruskan perintah ESC/P ke printer LPT/USB.<br/>
+                  • <b>JSPrintManager</b>: Driver add-on lokal untuk bypass rendering raster Chrome.
+                </p>
+              </div>
+
+              <div className="border border-slate-200 p-3 rounded-xl space-y-2 bg-slate-50">
+                <div className="font-bold text-slate-900">Solusi 4: Setting di Jendela Print Browser (Chrome / Edge)</div>
+                <ol className="list-decimal list-inside space-y-1 text-slate-700 pl-1 text-[11px]">
+                  <li>Saat menekan tombol Cetak, di jendela Print Chrome klik <b>Setelan Lainnya (More Settings)</b>.</li>
+                  <li>Pada pilihan <b>Kualitas (Quality / Resolution)</b>, ubah dari 240/360 dpi menjadi <b>120 x 144 dpi</b> atau <b>120 x 72 dpi</b>. Opsi dpi rendah ini adalah mode teks pita khas dot matrix!</li>
+                  <li>Pastikan centang <b>Background Graphics / Grafik Latar Belakang</b> dalam keadaan <u>dimatikan (OFF)</u>.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setShowLx310GuideModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Saya Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QZ Tray Printer Selection Modal */}
+      {showQzModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col">
+            <button
+              onClick={() => setShowQzModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3 border-b border-slate-100 pb-3">
+              <div className="bg-emerald-100 text-emerald-900 p-2.5 rounded-xl font-extrabold text-sm flex items-center justify-center">
+                <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-base">Cetak Direct QZ Tray</h4>
+                <p className="text-xs text-slate-500">Koneksi Hardware RAW Direct ke Epson LX-310</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 my-2 text-xs text-slate-700">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl space-y-1">
+                <div className="font-bold text-emerald-950">QZ Tray Terhubung!</div>
+                <p className="text-emerald-900">
+                  Sistem berhasil mendeteksi aplikasi QZ Tray di komputer Anda. Silakan pilih printer Dot Matrix Anda di bawah ini:
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Pilih Printer Dot Matrix (EPSON LX-310):
+                </label>
+                <select
+                  value={selectedQzPrinter}
+                  onChange={(e) => setSelectedQzPrinter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                >
+                  {qzPrinterList.map((printer, idx) => (
+                    <option key={idx} value={printer}>
+                      {printer} {printer.toUpperCase().includes('LX') || printer.toUpperCase().includes('EPSON') ? '★ (Rekomendasi LX-310)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                *Catatan: Saat pertama kali menekan Cetak, QZ Tray di Windows akan menampilkan pop-up konfirmasi dialog keselamatan. Klik tombol <b>"Allow"</b> / <b>"Remember"</b>.
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setShowQzModal(false)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handlePrintQZTray()}
+                disabled={isQzPrinting || !selectedQzPrinter}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                {isQzPrinting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    <span>Cetak Sekarang (100% Tajam)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSPrintManager (JSPM) Selection Modal */}
+      {showJspmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col">
+            <button
+              onClick={() => setShowJspmModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3 border-b border-slate-100 pb-3">
+              <div className="bg-indigo-100 text-indigo-900 p-2.5 rounded-xl font-extrabold text-sm flex items-center justify-center">
+                <Printer className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-base">Cetak JSPrintManager (JSPM)</h4>
+                <p className="text-xs text-slate-500">Koneksi Hardware RAW via JSPrintManager Client</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 my-2 text-xs text-slate-700">
+              <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
+                <div className="font-bold text-indigo-950">JSPrintManager Client Terhubung!</div>
+                <p className="text-indigo-900">
+                  Aplikasi JSPrintManager di Windows berhasil terdeteksi. Silakan pilih printer EPSON LX-310 Anda di bawah ini:
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Pilih Printer Dot Matrix (EPSON LX-310):
+                </label>
+                <select
+                  value={selectedJspmPrinter}
+                  onChange={(e) => setSelectedJspmPrinter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  {jspmPrinterList.map((printer, idx) => (
+                    <option key={idx} value={printer}>
+                      {printer} {printer.toUpperCase().includes('LX') || printer.toUpperCase().includes('EPSON') ? '★ (Rekomendasi LX-310)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                *Mengirim perintah karakter ESC/P langsung ke port USB printer. Hasil cetakan dipastikan <b>100% tajam & tanpa raster gambar</b>.
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setShowJspmModal(false)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handlePrintJSPM()}
+                disabled={isJspmPrinting}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                {isJspmPrinting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    <span>Cetak Sekarang (JSPM Tajam)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
