@@ -69,6 +69,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   const [jspmPrinterList, setJspmPrinterList] = useState<string[]>([]);
   const [selectedJspmPrinter, setSelectedJspmPrinter] = useState<string>('');
   const [showJspmModal, setShowJspmModal] = useState(false);
+  const [showJspmHelpModal, setShowJspmHelpModal] = useState(false);
 
   const handlePrintJSPM = async (overridePrinterName?: string) => {
     onSave();
@@ -82,6 +83,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     } catch (err: any) {
       console.error(err);
       alert(`Gagal Mencetak via JSPrintManager: ${err.message || err}`);
+      setShowJspmHelpModal(true);
     } finally {
       setIsJspmPrinting(false);
     }
@@ -100,7 +102,8 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
       }
       setShowJspmModal(true);
     } catch (err: any) {
-      alert(`JSPrintManager Client belum aktif: ${err.message || err}\n\nPastikan program JSPrintManager App (JSPM) sudah berjalan di Windows tray Anda.`);
+      console.error(err);
+      setShowJspmHelpModal(true);
     } finally {
       setIsJspmPrinting(false);
     }
@@ -1105,6 +1108,85 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
                     <span>Cetak Sekarang (JSPM Tajam)</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSPrintManager Activation Guide Modal */}
+      {showJspmHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowJspmHelpModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3 border-b border-slate-100 pb-3">
+              <div className="bg-indigo-100 text-indigo-900 p-2.5 rounded-xl font-extrabold text-sm flex items-center justify-center">
+                <Printer className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-base">Panduan Mengaktifkan JSPrintManager</h4>
+                <p className="text-xs text-slate-500">3 Langkah Cepat Mengaktifkan Koneksi JSPrintManager di Windows</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl space-y-1">
+                <div className="font-bold text-amber-950">Status: Belum Terhubung</div>
+                <p className="text-amber-900 text-[11px]">
+                  Browser belum dapat berkomunikasi dengan aplikasi JSPrintManager di Komputer Anda. Ikuti 3 langkah mudah berikut:
+                </p>
+              </div>
+
+              <div className="border border-slate-200 p-3 rounded-xl space-y-1.5 bg-slate-50">
+                <div className="font-bold text-slate-900">1. Jalankan Aplikasi JSPrintManager di Windows</div>
+                <p className="text-slate-600 text-[11px]">
+                  Buka Start Menu Windows &gt; ketik <b>JSPrintManager</b> &gt; klik jalankan. Pastikan ikon JSPrintManager sudah muncul di pojok kanan bawah Windows (dekat jam).
+                </p>
+              </div>
+
+              <div className="border border-indigo-200 p-3 rounded-xl space-y-1.5 bg-indigo-50/70">
+                <div className="font-bold text-indigo-950">2. Izinkan Sertifikat HTTPS Localhost (PENTING)</div>
+                <p className="text-indigo-900 text-[11px]">
+                  Karena web ini menggunakan HTTPS, browser Chrome memblokir koneksi ke JSPrintManager sebelum Anda mengizinkannya 1x.<br/>
+                  <b>Klik tombol biru di bawah ini untuk membuka dan mengizinkan localhost:</b>
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <a
+                    href="https://localhost:20001"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-3 rounded-lg text-[11px] inline-flex items-center gap-1 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Buka https://localhost:20001</span>
+                  </a>
+                </div>
+                <p className="text-[10px] text-slate-500 pt-1">
+                  *Di tab baru yang terbuka: Klik <b>"Advanced" (Lanjutan)</b> &gt; lalu klik <b>"Proceed to localhost (unsafe)" / "Lanjutkan"</b>. Setelah itu tutup tab tersebut.
+                </p>
+              </div>
+
+              <div className="border border-slate-200 p-3 rounded-xl space-y-1.5 bg-slate-50">
+                <div className="font-bold text-slate-900">3. Klik "Cetak JSPrintManager" Kembali</div>
+                <p className="text-slate-600 text-[11px]">
+                  Setelah menjalankan JSPrintManager dan mengizinkan tautan di atas, klik tombol <b>Cetak JSPrintManager (JSPM)</b> di aplikasi ini. Struk akan langsung tercetak 100% tajam!
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setShowJspmHelpModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Saya Mengerti
               </button>
             </div>
           </div>

@@ -362,7 +362,7 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
 }
 
 /**
- * Generates pure 80-column plain ASCII text for direct raw printing or copy
+ * Generates pure 80-column plain ASCII text for direct raw printing on Continuous Form 21.6 x 6.95 cm
  */
 export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const rawTitle = receipt.rincianTagihan || '';
@@ -371,15 +371,14 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const strTitle = titleText.includes('STRUK') ? titleText : `STRUK PEMBAYARAN ${titleText}`;
 
   const agen = (receipt.namaAgen || 'AGEN BATARA').toUpperCase();
-  const alamat = receipt.alamat || 'Bekasi';
-  const noHp = receipt.noHp || '-';
+  const alamat = receipt.alamat ? `${receipt.alamat} WA:${receipt.noHp || '-'}` : `Bekasi WA:${receipt.noHp || '-'}`;
   const idTrx = receipt.id || 'TRX-83920184';
   const tgl = formatReceiptDateTime(receipt.tanggal);
   const idpel = receipt.idpel || '-';
   const nama = (receipt.namaPelanggan || '-').toUpperCase();
   const periode = receipt.bulanTagihan || '-';
   const pemakaian = receipt.pemakaian || '-';
-  const stand = receipt.standMeter ? `Stand Meter   : ${receipt.standMeter}\n` : '';
+  const standStr = receipt.standMeter ? `Stand Meter    : ${receipt.standMeter}` : '';
 
   const rincian = receipt.rincianTagihan || 'Tagihan Pembayaran';
   const rpTagihan = `Rp ${Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}`;
@@ -388,19 +387,22 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
 
   let lainLainStr = '';
   if (Number(receipt.lainLain) > 0) {
-    const rpLain = `Rp ${Number(receipt.lainLain || 0).toLocaleString('id-ID')}`;
-    lainLainStr = `Biaya Lain-Lain      : ${rpLain}\n`;
+    lainLainStr = `Biaya Lain-Lain: Rp ${Number(receipt.lainLain || 0).toLocaleString('id-ID')}`;
   }
 
-  return `${agen.padEnd(40)} | RINCIAN PEMBAYARAN TAGIHAN
-${alamat.padEnd(30)} WA: ${noHp.padEnd(14)} | ${rincian.padEnd(20)} : ${rpTagihan}
-${strTitle.padEnd(40)} | ${lainLainStr ? lainLainStr.trim() : 'Admin Bank / Loket    : ' + rpAdmin}
---------------------------------------------------------------------------------
-ID Transaksi   : ${idTrx.padEnd(23)} | TOTAL BAYAR           : ${rpTotal}
-Tanggal/Waktu  : ${tgl.padEnd(23)} | 
-ID Pelanggan   : ${idpel.padEnd(23)} | TERIMA KASIH ATAS PEMBAYARAN ANDA
-Nama Pelanggan : ${nama.padEnd(23)} | Simpan struk ini sebagai bukti sah.
-Bulan/Periode  : ${periode.padEnd(23)} |
-Pemakaian      : ${pemakaian.padEnd(23)} |
-${stand}`;
+  // Exact 80 Columns Width (Left 38 chars + ' | ' + Right 39 chars)
+  const l1  = `${agen.slice(0, 38).padEnd(38)} | ${'RINCIAN PEMBAYARAN TAGIHAN'.padEnd(39)}`;
+  const l2  = `${alamat.slice(0, 38).padEnd(38)} | ${(rincian.slice(0, 18) + ': ' + rpTagihan).padEnd(39)}`;
+  const l3  = `${strTitle.slice(0, 38).padEnd(38)} | ${('Admin Bank / Loket: ' + rpAdmin).padEnd(39)}`;
+  const l4  = `${'-'.repeat(38)} + ${'-'.repeat(39)}`;
+  const l5  = `${('ID Transaksi   : ' + idTrx).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR       : ' + rpTotal).padEnd(39)}`;
+  const l6  = `${('Tanggal/Waktu  : ' + tgl).slice(0, 38).padEnd(38)} | ${'TERIMA KASIH ATAS PEMBAYARAN ANDA'.padEnd(39)}`;
+  const l7  = `${('ID Pelanggan   : ' + idpel).slice(0, 38).padEnd(38)} | ${'Simpan struk ini sebagai bukti sah.'.padEnd(39)}`;
+  const l8  = `${('Nama Pelanggan : ' + nama).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+  const l9  = `${('Bulan/Periode  : ' + periode).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+  const l10 = `${('Pemakaian      : ' + pemakaian).slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+  const l11 = `${standStr.slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+  const l12 = `${lainLainStr.slice(0, 38).padEnd(38)} | ${''.padEnd(39)}`;
+
+  return [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12].join('\n');
 }

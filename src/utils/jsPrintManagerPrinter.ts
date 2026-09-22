@@ -128,7 +128,8 @@ export async function printDirectJSPM(
     targetPrinter = 'Default Printer';
   }
 
-  const escInit = '\x1B\x40\x1B\x6B\x00\x1B\x78\x00';
+  // ESC/P Commands: Init (\x1B\x40), Pitch 10cpi (\x1B\x50), Line Spacing 1/6" (\x1B\x32), Page Length 16 lines=6.95cm (\x1B\x43\x10), Draft Roman (\x1B\x6B\x00\x1B\x78\x00)
+  const escInit = '\x1B\x40\x1B\x50\x1B\x32\x1B\x43\x10\x1B\x6B\x00\x1B\x78\x00';
   const escFormFeed = '\x0C';
   const fullTextToPrint = escInit + rawText + escFormFeed;
 
