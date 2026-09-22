@@ -734,33 +734,6 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         </button>
 
         <button
-          onClick={handleDownloadTxtFile}
-          className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-teal-500"
-          title="Unduh file .TXT untuk dicetak lewat Notepad (Metode Loket PPOB 100% Tajam)"
-        >
-          <FileText className="w-4 h-4 text-teal-100" />
-          <span>Download .TXT</span>
-        </button>
-
-        <button
-          onClick={handleDotMatrixPrintClick}
-          className="bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-500"
-          title="Cetak dengan Layout HTML Dot Matrix 21.6 x 6.95 cm"
-        >
-          <Printer className="w-4 h-4 text-slate-950" />
-          <span>Cetak Layout HTML</span>
-        </button>
-
-        <button
-          onClick={() => setShowLx310GuideModal(true)}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-300"
-          title="Petunjuk Setting Printer LX-310 Agar Hasil Cetakan Tidak Pecah/Buram"
-        >
-          <HelpCircle className="w-4 h-4 text-blue-600" />
-          <span>Tips LX-310</span>
-        </button>
-
-        <button
           onClick={handleCopyRawText}
           className="bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-300"
           title="Salin Teks Polos ASCII untuk dipaste langsung ke Notepad"
