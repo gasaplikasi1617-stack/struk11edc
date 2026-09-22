@@ -429,7 +429,6 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Cetak / PDF</span>
-            <span className="text-[10px] bg-blue-800/70 px-1.5 py-0.2 rounded font-mono">Auto Save</span>
           </button>
         </div>
       </div>
@@ -464,8 +463,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <span>Dot Matrix (21.6 x 6.95 cm)</span>
-          <span className="text-[9px] bg-slate-900 text-amber-300 px-1 py-0.2 rounded uppercase">Text/Draft</span>
+          <span>Dot Matrix</span>
         </button>
       </div>
 
@@ -564,49 +562,6 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
       ) : (
         /* Dot Matrix 21.6 x 6.95 cm Continuous Text Preview */
         <div className="w-full bg-amber-50/70 border border-amber-300 rounded-2xl p-4 my-2 font-serif text-slate-950 shadow-xs overflow-x-auto">
-          {/* Dot Matrix Settings Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-amber-200/80">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
-              <span className="bg-amber-600 text-slate-950 px-2 py-0.5 rounded text-[11px] uppercase font-bold">21.6 x 6.95 cm</span>
-              <span>Font Roman Dot Matrix (Tanpa Bold):</span>
-            </div>
-            <div className="flex items-center gap-1 bg-amber-100/80 p-1 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setDotMatrixFontSize('kecil')}
-                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
-                  dotMatrixFontSize === 'kecil'
-                    ? 'bg-amber-600 text-slate-950 shadow-xs'
-                    : 'text-slate-700 hover:text-slate-950'
-                }`}
-              >
-                Kecil (11px)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDotMatrixFontSize('normal')}
-                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
-                  dotMatrixFontSize === 'normal'
-                    ? 'bg-amber-600 text-slate-950 shadow-xs'
-                    : 'text-slate-700 hover:text-slate-950'
-                }`}
-              >
-                Normal (12.5px)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDotMatrixFontSize('sedang')}
-                className={`px-2.5 py-1 text-xs rounded-md font-semibold transition-all ${
-                  dotMatrixFontSize === 'sedang'
-                    ? 'bg-amber-600 text-slate-950 shadow-xs'
-                    : 'text-slate-700 hover:text-slate-950'
-                }`}
-              >
-                Sedang (14px)
-              </button>
-            </div>
-          </div>
-
           <div className="min-w-[620px] grid grid-cols-2 gap-6">
             {/* Left Col */}
             <div className="pr-2 space-y-2 flex flex-col justify-between">
@@ -727,24 +682,6 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             <Printer className="w-4 h-4 text-indigo-200" />
           )}
           <span>Cetak JSPrintManager</span>
-        </button>
-
-        <button
-          onClick={handleRawTextLX310PrintClick}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-emerald-500"
-          title="Cetak Teks Direct Mode ESC/P khusus Epson LX-310 via Browser"
-        >
-          <Printer className="w-4 h-4 text-emerald-200" />
-          <span>Cetak Direct Browser</span>
-        </button>
-
-        <button
-          onClick={handleCopyRawText}
-          className="bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-300"
-          title="Salin Teks Polos ASCII untuk dipaste langsung ke Notepad"
-        >
-          {copiedRawText ? <Check className="w-4 h-4 text-emerald-700" /> : <Copy className="w-4 h-4 text-amber-800" />}
-          <span>{copiedRawText ? 'Tersalin!' : 'Salin RAW'}</span>
         </button>
 
         <button

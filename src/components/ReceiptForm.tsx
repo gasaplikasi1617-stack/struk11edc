@@ -618,7 +618,6 @@ export function ReceiptForm({
           >
             <Printer className="w-4 h-4" />
             <span>Cetak Resi</span>
-            <span className="text-[11px] bg-blue-800/60 px-2 py-0.5 rounded-full font-normal">Auto Save</span>
           </button>
         </div>
       </div>
