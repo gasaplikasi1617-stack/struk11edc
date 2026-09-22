@@ -38,11 +38,13 @@ interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
   onDeleteTransaction: (id: string) => void;
+  onToggleStatus?: (tx: ReceiptData) => void;
   onRefreshTransactions?: () => Promise<void> | void;
   onNavigateToGasTab?: () => void;
 }
 
 type ServiceFilterType = 'all' | BillCategory;
+type StatusFilterType = 'all' | 'aktif' | 'tidak_aktif';
 
 type SortCriterion =
   | 'date-desc'
@@ -54,7 +56,9 @@ type SortCriterion =
   | 'idpel-asc'
   | 'idpel-desc'
   | 'service-asc'
-  | 'service-desc';
+  | 'service-desc'
+  | 'status-aktif'
+  | 'status-inaktif';
 
 function getTransactionTimestamp(tx: ReceiptData): number {
   if (tx.createdAt) {
@@ -122,11 +126,13 @@ export function HistoryTab({
   transactions,
   onSelectTransaction,
   onDeleteTransaction,
+  onToggleStatus,
   onRefreshTransactions,
   onNavigateToGasTab,
 }: HistoryTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
@@ -305,7 +311,21 @@ export function HistoryTab({
     return counts;
   }, [transactions]);
 
-  // Filter transactions by search term, service category, and date range
+  // Status counts across all transactions
+  const statusCounts = useMemo(() => {
+    let aktif = 0;
+    let tidakAktif = 0;
+    for (const t of transactions) {
+      if (t.status === 'tidak_aktif') {
+        tidakAktif++;
+      } else {
+        aktif++;
+      }
+    }
+    return { all: transactions.length, aktif, tidakAktif };
+  }, [transactions]);
+
+  // Filter transactions by search term, service category, status, and date range
   const filteredList = useMemo(() => {
     let startMs: number | null = null;
     let endMs: number | null = null;
@@ -340,7 +360,11 @@ export function HistoryTab({
         if (cat !== serviceFilter) return false;
       }
 
-      // 3. Date range filter
+      // 3. Status filter
+      if (statusFilter === 'aktif' && t.status === 'tidak_aktif') return false;
+      if (statusFilter === 'tidak_aktif' && t.status !== 'tidak_aktif') return false;
+
+      // 4. Date range filter
       if (startMs !== null || endMs !== null) {
         const txMs = getTransactionTimestamp(t);
         if (txMs > 0) {
@@ -351,7 +375,7 @@ export function HistoryTab({
 
       return true;
     });
-  }, [transactions, searchTerm, serviceFilter, startDate, endDate]);
+  }, [transactions, searchTerm, serviceFilter, statusFilter, startDate, endDate]);
 
   // Sort filtered transactions based on selected criterion
   const sortedAndFiltered = useMemo(() => {
@@ -379,6 +403,16 @@ export function HistoryTab({
           return String(a.rincianTagihan || '').localeCompare(String(b.rincianTagihan || ''), 'id');
         case 'service-desc':
           return String(b.rincianTagihan || '').localeCompare(String(a.rincianTagihan || ''), 'id');
+        case 'status-aktif': {
+          const aIn = a.status === 'tidak_aktif' ? 1 : 0;
+          const bIn = b.status === 'tidak_aktif' ? 1 : 0;
+          return aIn - bIn;
+        }
+        case 'status-inaktif': {
+          const aIn = a.status === 'tidak_aktif' ? 1 : 0;
+          const bIn = b.status === 'tidak_aktif' ? 1 : 0;
+          return bIn - aIn;
+        }
         default:
           return 0;
       }
@@ -388,7 +422,7 @@ export function HistoryTab({
   }, [filteredList, sortCriterion]);
 
   // Quick toggle column sort when clicking on table header
-  const handleColumnSortClick = (field: 'date' | 'name' | 'idpel' | 'service' | 'total') => {
+  const handleColumnSortClick = (field: 'date' | 'name' | 'idpel' | 'service' | 'total' | 'status') => {
     if (field === 'date') {
       setSortCriterion((prev) => (prev === 'date-desc' ? 'date-asc' : 'date-desc'));
     } else if (field === 'name') {
@@ -399,16 +433,24 @@ export function HistoryTab({
       setSortCriterion((prev) => (prev === 'service-asc' ? 'service-desc' : 'service-asc'));
     } else if (field === 'total') {
       setSortCriterion((prev) => (prev === 'total-desc' ? 'total-asc' : 'total-desc'));
+    } else if (field === 'status') {
+      setSortCriterion((prev) => (prev === 'status-aktif' ? 'status-inaktif' : 'status-aktif'));
     }
   };
 
   // Helper to render sort icon on table headers
-  const renderSortIndicator = (field: 'date' | 'name' | 'idpel' | 'service' | 'total') => {
+  const renderSortIndicator = (field: 'date' | 'name' | 'idpel' | 'service' | 'total' | 'status') => {
     const isCurrent = sortCriterion.startsWith(field);
     if (!isCurrent) {
       return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100" />;
     }
-    const isAsc = sortCriterion.endsWith('-asc');
+    const isAsc =
+      sortCriterion === 'date-asc' ||
+      sortCriterion === 'name-asc' ||
+      sortCriterion === 'idpel-asc' ||
+      sortCriterion === 'service-asc' ||
+      sortCriterion === 'total-asc' ||
+      sortCriterion === 'status-aktif';
     return isAsc ? (
       <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold" />
     ) : (
@@ -708,15 +750,65 @@ export function HistoryTab({
                   <option value="idpel-desc">🔢 ID Pelanggan (9 → 0)</option>
                   <option value="service-asc">⚡ Jenis Layanan (A → Z)</option>
                   <option value="service-desc">⚡ Jenis Layanan (Z → A)</option>
+                  <option value="status-aktif">🟢 Status (Aktif Pertama)</option>
+                  <option value="status-inaktif">⚪ Status (Tidak Aktif Pertama)</option>
                 </select>
               </div>
             </div>
           </div>
 
+          {/* Status Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 pb-1 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 mr-1">
+              <Filter className="w-3.5 h-3.5 text-slate-400" /> Status:
+            </span>
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                statusFilter === 'all'
+                  ? 'bg-slate-800 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span>Semua Status</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {statusCounts.all}
+              </span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('aktif')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                statusFilter === 'aktif'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span>Aktif</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'aktif' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {statusCounts.aktif}
+              </span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('tidak_aktif')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
+                statusFilter === 'tidak_aktif'
+                  ? 'bg-slate-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+              <span>Tidak Aktif</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'tidak_aktif' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {statusCounts.tidakAktif}
+              </span>
+            </button>
+          </div>
+
           {/* Category Service Filter Buttons */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 mr-1">
-              <Filter className="w-3.5 h-3.5 text-slate-400" /> Filter:
+              <Filter className="w-3.5 h-3.5 text-slate-400" /> Kategori:
             </span>
             <button
               onClick={() => setServiceFilter('all')}
@@ -878,13 +970,23 @@ export function HistoryTab({
                       {renderSortIndicator('total')}
                     </div>
                   </th>
+                  <th
+                    onClick={() => handleColumnSortClick('status')}
+                    className="p-3 cursor-pointer hover:bg-slate-200/70 transition-colors group text-center"
+                    title="Klik untuk sortir Status"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Status</span>
+                      {renderSortIndicator('status')}
+                    </div>
+                  </th>
                   <th className="p-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {sortedAndFiltered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-slate-400">
+                    <td colSpan={8} className="text-center py-12 text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <AlertCircle className="w-8 h-8 text-slate-300" />
                         <p className="text-sm font-medium">Tidak ada data transaksi yang sesuai.</p>
@@ -970,6 +1072,32 @@ export function HistoryTab({
                         <p className="text-[10px] text-slate-400">
                           Tagihan: Rp {Number(tx.rpTagihan || 0).toLocaleString('id-ID')}
                         </p>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onToggleStatus) onToggleStatus(tx);
+                          }}
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer ${
+                            tx.status === 'tidak_aktif'
+                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-500 border-slate-300'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
+                          }`}
+                          title={
+                            tx.status === 'tidak_aktif'
+                              ? 'Status saat ini: Tidak Aktif. Klik untuk mengubah ke Aktif'
+                              : 'Status saat ini: Aktif. Klik untuk mengubah ke Tidak Aktif'
+                          }
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              tx.status === 'tidak_aktif' ? 'bg-slate-400' : 'bg-emerald-500'
+                            }`}
+                          />
+                          <span>{tx.status === 'tidak_aktif' ? 'Tidak Aktif' : 'Aktif'}</span>
+                        </button>
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">

@@ -41,6 +41,7 @@ export function exportTransactionsToExcel(
 
     return {
       'No': index + 1,
+      'Status': t.status === 'tidak_aktif' ? 'Tidak Aktif' : 'Aktif',
       'Kategori': categoryName,
       'ID Transaksi': t.id || '-',
       'Tanggal': formattedDate,
@@ -70,6 +71,7 @@ export function exportTransactionsToExcel(
   // Append Total Row
   rows.push({
     'No': '' as any,
+    'Status': '',
     'Kategori': 'TOTAL' as any,
     'ID Transaksi': 'TOTAL KESELURUHAN',
     'Tanggal': '',

@@ -20,6 +20,7 @@ export interface ReceiptData {
   namaAgen: string;
   alamat: string;
   noHp: string;
+  status?: 'aktif' | 'tidak_aktif';
   createdAt?: string;
 }
 

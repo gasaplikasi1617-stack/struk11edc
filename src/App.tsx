@@ -242,6 +242,41 @@ export default function App() {
     }
   };
 
+  const handleToggleStatus = async (tx: ReceiptData) => {
+    const targetKey = tx.id || tx.idpel;
+    if (!targetKey) return;
+
+    const currentStatus: 'aktif' | 'tidak_aktif' = tx.status === 'tidak_aktif' ? 'tidak_aktif' : 'aktif';
+    const newStatus: 'aktif' | 'tidak_aktif' = currentStatus === 'aktif' ? 'tidak_aktif' : 'aktif';
+
+    const updated: ReceiptData[] = transactions.map((t) => {
+      const isMatch =
+        (t.id && t.id === tx.id) ||
+        (t.idpel && t.idpel === tx.idpel && t.tanggal === tx.tanggal);
+      if (isMatch) {
+        return { ...t, status: newStatus };
+      }
+      return t;
+    });
+
+    setTransactions(updated);
+    saveStoredTransactions(updated);
+    try {
+      localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
+    } catch (err) {}
+
+    try {
+      const key = tx.id || tx.idpel || '';
+      await fetch(`/api/transactions/${encodeURIComponent(key)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (e) {
+      console.warn('Server update status error:', e);
+    }
+  };
+
   const handleSelectTransaction = (tx: ReceiptData) => {
     setReceipt(tx);
     if (tx.namaAgen && tx.alamat) {
@@ -293,6 +328,7 @@ export default function App() {
             transactions={transactions}
             onSelectTransaction={handleSelectTransaction}
             onDeleteTransaction={handleDeleteTransaction}
+            onToggleStatus={handleToggleStatus}
             onRefreshTransactions={fetchTransactions}
             onNavigateToGasTab={() => setActiveTab('gas')}
           />

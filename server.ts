@@ -446,6 +446,29 @@ app.post("/api/transactions/deduplicate", (req, res) => {
   });
 });
 
+// Update transaction status or attributes
+app.patch("/api/transactions/:id", (req, res) => {
+  const txs = getTransactions();
+  const targetKey = decodeURIComponent(req.params.id || "");
+  const updates = req.body || {};
+  let updatedItem = null;
+
+  const updatedTxs = txs.map((t: any) => {
+    if (t.id === targetKey || t.idpel === targetKey) {
+      updatedItem = { ...t, ...updates };
+      return updatedItem;
+    }
+    return t;
+  });
+
+  if (updatedItem) {
+    saveTransactions(updatedTxs);
+    return res.json({ success: true, transaction: updatedItem });
+  }
+
+  res.status(404).json({ success: false, message: "Transaksi tidak ditemukan" });
+});
+
 // Delete a transaction
 app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
