@@ -187,7 +187,7 @@ export function printDotMatrixReceipt(
           <div>
             <div class="header-box" style="padding-bottom: 3px; margin-bottom: 4px;">
               <div class="header-title">${strTitle}</div>
-              <div class="header-sub">LOKET: ${receipt.namaAgen || 'AGEN BATARA'} (${receipt.alamat || 'Bekasi'}) WA:${receipt.noHp || '-'}</div>
+              <div class="header-sub">LOKET: ${receipt.namaAgen || 'AGEN BATARA'} (${receipt.alamat || 'BEKASI'})</div>
             </div>
 
             <table class="meta-table">
@@ -395,14 +395,14 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
 
   // PPOB Style 80 Columns Grid Layout (38 chars | ' | ' | 39 chars) - Clean format without = or - lines
   const l1  = `${strTitle.slice(0, 38).padEnd(38)} | ${('LOKET : ' + agen).slice(0, 39).padEnd(39)}`;
-  const l2  = `${('ALAMAT: ' + alamat + ' WA:' + noHp).slice(0, 38).padEnd(38)} | ${('TGL   : ' + tgl).slice(0, 39).padEnd(39)}`;
+  const l2  = `${('ALAMAT: ' + alamat).slice(0, 38).padEnd(38)} | ${('TGL   : ' + tgl).slice(0, 39).padEnd(39)}`;
   const l3  = blankLine;
   const l4  = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
   const l5  = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${('ADMIN LOKET  : ' + rpAdmin).slice(0, 39).padEnd(39)}`;
   const l6  = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'INFORMASI    : ' + rincian).slice(0, 39).padEnd(39)}`;
   const l7  = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l8  = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
-  const l9  = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${'STATUS       : LUNAS / SUKSES'.padEnd(39)}`;
+  const l9  = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l10 = blankLine;
   const l11 = `         STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH - TERIMA KASIH         `;
 
