@@ -18,6 +18,7 @@ import {
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
+import { getReceiptHeaderTitle } from '../utils/billParser';
 import {
   printDotMatrixReceipt,
   printRawTextLX310,
@@ -474,20 +475,20 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           className="w-full max-w-[380px] bg-white p-5 text-black font-mono text-xs border-0 outline-none shadow-none relative my-2"
           style={{ minHeight: '520px' }}
         >
-          {/* Header Agen */}
+          {/* Header Agen (Bukopin PPOB Style: Centered, Bold, Larger Header Title at Very Top) */}
           <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
-            <h2 className="text-base font-extrabold tracking-wide uppercase text-black">{receipt.namaAgen || 'AGEN BATARA'}</h2>
-            <p className="text-[11px] text-black mt-0.5">{receipt.alamat || 'Bekasi'}</p>
-            <p className="text-[11px] text-black">Telp/WA: {receipt.noHp || '-'}</p>
-            <div className="mt-2 text-[10.5px] py-1 px-1 inline-block font-bold uppercase tracking-wider text-black bg-transparent">
-              {(() => {
-                const raw = receipt.rincianTagihan || '';
-                const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-                const title = clean || raw || 'PEMBAYARAN RESMI';
-                if (title.toUpperCase().includes('STRUK')) return title.toUpperCase();
-                return `STRUK PEMBAYARAN ${title.toUpperCase()}`;
-              })()}
-            </div>
+            <h2 className="text-base sm:text-lg font-extrabold tracking-wide uppercase text-black leading-tight">
+              {getReceiptHeaderTitle(receipt)}
+            </h2>
+            <p className="text-xs font-bold uppercase text-black mt-1">
+              LOKET: {receipt.namaAgen || 'AGEN BATARA'}
+            </p>
+            {receipt.alamat && (
+              <p className="text-[11px] text-black mt-0.5">{receipt.alamat}</p>
+            )}
+            {receipt.noHp && (
+              <p className="text-[11px] text-black">Telp/WA: {receipt.noHp}</p>
+            )}
           </div>
 
           {/* Transaction Metadata */}
@@ -562,23 +563,20 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
       ) : (
         /* Dot Matrix 21.6 x 6.95 cm Continuous Text Preview */
         <div className="w-full bg-amber-50/70 border border-amber-300 rounded-2xl p-4 my-2 font-serif text-slate-950 shadow-xs overflow-x-auto">
+          {/* Top Header Centered, Bold, Larger Font (Bukopin PPOB Style) */}
+          <div className="text-center pb-2 mb-3 border-b border-dashed border-amber-300/80">
+            <h2 className="text-base font-extrabold uppercase tracking-wide text-slate-950">
+              {getReceiptHeaderTitle(receipt)}
+            </h2>
+            <div className="text-xs font-bold text-slate-800 uppercase mt-0.5">
+              LOKET: {receipt.namaAgen || 'AGEN BATARA'} {receipt.alamat ? ` - ${receipt.alamat}` : ''}
+            </div>
+          </div>
+
           <div className="min-w-[620px] grid grid-cols-2 gap-6">
             {/* Left Col */}
             <div className="pr-2 space-y-2 flex flex-col justify-between">
               <div>
-                <div className="mb-3">
-                  <div className="font-normal text-base uppercase tracking-wide text-slate-950">{receipt.namaAgen || 'AGEN BATARA'}</div>
-                  <div className="text-xs text-slate-800 font-normal">{receipt.alamat || 'Bekasi'} Telp/WA: {receipt.noHp || '-'}</div>
-                  <div className="font-normal uppercase text-xs text-blue-950 mt-1">
-                    {(() => {
-                      const raw = receipt.rincianTagihan || '';
-                      const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-                      const title = clean || raw || 'PEMBAYARAN RESMI';
-                      return title.toUpperCase().includes('STRUK') ? title.toUpperCase() : `STRUK PEMBAYARAN ${title.toUpperCase()}`;
-                    })()}
-                  </div>
-                </div>
-
                 <div className="space-y-1 text-xs font-normal">
                   <div className="grid grid-cols-3 gap-1">
                     <span className="text-slate-700">ID Transaksi</span>

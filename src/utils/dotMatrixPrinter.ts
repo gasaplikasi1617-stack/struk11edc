@@ -1,5 +1,6 @@
 import { ReceiptData } from '../types';
 import { formatReceiptDateTime } from './dateFormatter';
+import { getReceiptHeaderTitle } from './billParser';
 
 export type DotMatrixFontSize = 'kecil' | 'normal' | 'sedang';
 
@@ -21,10 +22,7 @@ export function printDotMatrixReceipt(
     return;
   }
 
-  const rawTitle = receipt.rincianTagihan || '';
-  const cleanTitle = rawTitle.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-  const titleText = (cleanTitle || rawTitle || 'PEMBAYARAN RESMI').toUpperCase();
-  const strTitle = titleText.includes('STRUK') ? titleText : `STRUK PEMBAYARAN ${titleText}`;
+  const strTitle = getReceiptHeaderTitle(receipt);
 
   // Font size in points (pt) for LX-310 hardware character grid alignment
   const sizeMap = {
@@ -185,9 +183,9 @@ export function printDotMatrixReceipt(
         <!-- LEFT COLUMN: AGEN & CUSTOMER METADATA -->
         <div class="col-left">
           <div>
-            <div class="header-box" style="padding-bottom: 3px; margin-bottom: 4px;">
-              <div class="header-title">${strTitle}</div>
-              <div class="header-sub">LOKET: ${receipt.namaAgen || 'AGEN BATARA'}</div>
+            <div class="header-box" style="text-align: center; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px dashed #000;">
+              <div class="header-title" style="font-weight: bold; font-size: ${currentSize.header}; text-transform: uppercase;">${strTitle}</div>
+              <div class="header-sub" style="font-weight: bold; margin-top: 2px;">LOKET: ${(receipt.namaAgen || 'AGEN BATARA').toUpperCase()}</div>
             </div>
 
             <table class="meta-table">
@@ -369,14 +367,8 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
  * (without Bukopin logo/name, keeping all original fields intact)
  */
 export function generatePlainTextReceipt(receipt: ReceiptData): string {
-  const rawTitle = receipt.rincianTagihan || '';
-  const cleanTitle = rawTitle.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
-  const titleText = (cleanTitle || rawTitle || 'PEMBAYARAN TAGIHAN').toUpperCase();
-  const strTitle = titleText.includes('STRUK') ? titleText : `STRUK PEMBAYARAN ${titleText}`;
-
+  const strTitle = getReceiptHeaderTitle(receipt);
   const agen = (receipt.namaAgen || 'AGEN BATARA').toUpperCase();
-  const alamat = receipt.alamat || 'BEKASI';
-  const noHp = receipt.noHp || '-';
   const idTrx = receipt.id || 'TRX-83920184';
   const tgl = formatReceiptDateTime(receipt.tanggal);
   const idpel = receipt.idpel || '-';
@@ -391,18 +383,25 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const rpTotal = `Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}`;
   const rpLain = Number(receipt.lainLain) > 0 ? `Rp ${Number(receipt.lainLain).toLocaleString('id-ID')}` : '';
 
-  const blankLine = ' '.repeat(80);
+  const center80 = (s: string) => {
+    const str = s.trim().slice(0, 78);
+    const pad = Math.max(0, Math.floor((80 - str.length) / 2));
+    return ' '.repeat(pad) + str;
+  };
 
-  // PPOB Style 80 Columns Grid Layout (38 chars | ' | ' | 39 chars) - Clean format without ALAMAT or = or - lines
-  const l1 = `${strTitle.slice(0, 38).padEnd(38)} | ${('LOKET : ' + agen).slice(0, 39).padEnd(39)}`;
-  const l2 = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('TGL   : ' + tgl).slice(0, 39).padEnd(39)}`;
-  const l3 = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
-  const l4 = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${('ADMIN LOKET  : ' + rpAdmin).slice(0, 39).padEnd(39)}`;
-  const l5 = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'INFORMASI    : ' + rincian).slice(0, 39).padEnd(39)}`;
-  const l6 = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
+  const lTitle = center80(strTitle);
+  const lLoket = center80(`LOKET : ${agen}`);
+
+  // PPOB Bukopin Style 80 Columns Grid Layout
+  const l1 = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
+  const l2 = `${('TGL/WAKTU    : ' + tgl).slice(0, 38).padEnd(38)} | ${('ADMIN LOKET  : ' + rpAdmin).slice(0, 39).padEnd(39)}`;
+  const l3 = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'INFORMASI    : ' + rincian).slice(0, 39).padEnd(39)}`;
+  const l4 = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
+  const l5 = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
+  const l6 = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l7 = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
-  const l8 = blankLine;
-  const l9 = `         STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH - TERIMA KASIH         `;
+  const l8 = center80('STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH');
+  const l9 = center80('TERIMA KASIH ATAS PEMBAYARAN ANDA');
 
-  return [l1, l2, l3, l4, l5, l6, l7, l8, l9].join('\n');
+  return [lTitle, lLoket, l1, l2, l3, l4, l5, l6, l7, l8, l9].join('\n');
 }

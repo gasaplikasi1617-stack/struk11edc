@@ -350,3 +350,38 @@ export function getCategoryLabel(cat: BillCategory): string {
   }
 }
 
+/**
+ * Generates the standard PPOB receipt header title in Bukopin format
+ * (e.g., "STRUK PEMBAYARAN TAGIHAN LISTRIK" or "STRUK PEMBAYARAN TAGIHAN PDAM")
+ * without any bank branding.
+ */
+export function getReceiptHeaderTitle(receipt: { rincianTagihan?: string; pemakaian?: string; idpel?: string; standMeter?: string }): string {
+  const raw = (receipt.rincianTagihan || '').trim();
+
+  // If title already explicitly starts with "STRUK", clean and return
+  if (/^STRUK\s+/i.test(raw)) {
+    return raw.toUpperCase();
+  }
+
+  const cat = getTransactionCategory(receipt);
+
+  switch (cat) {
+    case 'pln':
+      return 'STRUK PEMBAYARAN TAGIHAN LISTRIK';
+    case 'pdam':
+      return 'STRUK PEMBAYARAN TAGIHAN PDAM';
+    case 'bpjs':
+      return 'STRUK PEMBAYARAN TAGIHAN BPJS';
+    case 'telkom':
+      return 'STRUK PEMBAYARAN TAGIHAN TELKOM / SPEEDY';
+    case 'pascabayar':
+      return 'STRUK PEMBAYARAN PASCABAYAR';
+    case 'other':
+    default: {
+      const clean = raw.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim();
+      const title = clean || 'PEMBAYARAN RESMI';
+      return `STRUK PEMBAYARAN ${title.toUpperCase()}`;
+    }
+  }
+}
+

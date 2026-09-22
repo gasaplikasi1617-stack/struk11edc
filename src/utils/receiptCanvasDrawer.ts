@@ -1,5 +1,6 @@
 import { ReceiptData } from '../types';
 import { formatReceiptDateTime } from './dateFormatter';
+import { getReceiptHeaderTitle } from './billParser';
 
 /**
  * Pure HTML5 Canvas 2D renderer for A6 Receipt.
@@ -56,32 +57,29 @@ export function drawReceiptToCanvas(receipt: ReceiptData): HTMLCanvasElement {
     ctx.restore();
   };
 
-  // --- HEADER AGEN ---
-  ctx.font = `bold 28px ${fontMono}`;
-  ctx.fillText((receipt.namaAgen || 'AGEN BATARA').toUpperCase(), width / 2, curY);
-  curY += 36;
-
-  ctx.font = `19px ${fontMono}`;
-  ctx.fillText(receipt.alamat || 'Bekasi', width / 2, curY);
-  curY += 26;
-
-  ctx.fillText(`Telp/WA: ${receipt.noHp || '-'}`, width / 2, curY);
-  curY += 34;
-
-  // Title Banner
-  drawDashedLine(curY);
-  curY += 16;
-
-  const rawTitle = receipt.rincianTagihan || '';
-  const cleanTitle = rawTitle.replace(/^info\s*tagihan/i, '').replace(/^tagihan/i, '').trim() || 'PEMBAYARAN RESMI';
-  const displayTitle = cleanTitle.toUpperCase().includes('STRUK')
-    ? cleanTitle.toUpperCase()
-    : `STRUK PEMBAYARAN ${cleanTitle.toUpperCase()}`;
-
-  ctx.font = `bold 20px ${fontMono}`;
+  // --- HEADER (Bukopin PPOB Style: Centered, Bold, Large Header Title at Very Top) ---
+  const displayTitle = getReceiptHeaderTitle(receipt);
+  
+  ctx.font = `bold 30px ${fontMono}`;
   ctx.fillText(displayTitle, width / 2, curY);
+  curY += 40;
+
+  ctx.font = `bold 22px ${fontMono}`;
+  ctx.fillText(`LOKET: ${(receipt.namaAgen || 'AGEN BATARA').toUpperCase()}`, width / 2, curY);
   curY += 30;
 
+  if (receipt.alamat) {
+    ctx.font = `18px ${fontMono}`;
+    ctx.fillText(receipt.alamat, width / 2, curY);
+    curY += 24;
+  }
+  if (receipt.noHp) {
+    ctx.font = `18px ${fontMono}`;
+    ctx.fillText(`Telp/WA: ${receipt.noHp}`, width / 2, curY);
+    curY += 24;
+  }
+
+  curY += 10;
   drawDashedLine(curY);
   curY += 25;
 
