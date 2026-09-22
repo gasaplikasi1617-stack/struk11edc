@@ -249,10 +249,6 @@ export function printDotMatrixReceipt(
                 <td class="bill-right">Rp ${Number(receipt.lainLain).toLocaleString('id-ID')}</td>
               </tr>
               ` : ''}
-              <tr>
-                <td class="bill-left">INFORMASI</td>
-                <td class="bill-right">${receipt.rincianTagihan || 'PPOB LUNAS'}</td>
-              </tr>
             </table>
 
             <div class="total-box" style="margin-top: 6px; padding: 3px 0;">
@@ -395,8 +391,8 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
   // PPOB Bukopin Style 80 Columns Grid Layout
   const l1 = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
   const l2 = `${('TGL/WAKTU    : ' + tgl).slice(0, 38).padEnd(38)} | ${('ADMIN LOKET  : ' + rpAdmin).slice(0, 39).padEnd(39)}`;
-  const l3 = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'INFORMASI    : ' + rincian).slice(0, 39).padEnd(39)}`;
-  const l4 = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${('TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
+  const l3 = `${('ID PELANGGAN : ' + idpel).slice(0, 38).padEnd(38)} | ${(rpLain ? 'BIAYA LAIN   : ' + rpLain : 'TOTAL BAYAR  : ' + rpTotal).slice(0, 39).padEnd(39)}`;
+  const l4 = `${('NAMA PEL     : ' + nama).slice(0, 38).padEnd(38)} | ${(rpLain ? 'TOTAL BAYAR  : ' + rpTotal : ' ').slice(0, 39).padEnd(39)}`;
   const l5 = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l6 = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l7 = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
