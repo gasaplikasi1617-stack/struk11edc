@@ -88,8 +88,11 @@ export function setStoredGasUrl(url: string): void {
   localStorage.setItem(STORAGE_KEY_URL, url.trim());
 }
 
+export const DEFAULT_SHEET_ID = '1BsGCKV1wvFlmaVuJDZee8bSJsklwatMzVznkOzBFzys';
+export const DEFAULT_SHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SHEET_ID}/edit`;
+
 export function getStoredSheetUrl(): string {
-  return localStorage.getItem(STORAGE_KEY_SHEET_URL) || '';
+  return localStorage.getItem(STORAGE_KEY_SHEET_URL) || DEFAULT_SHEET_URL;
 }
 
 export function setStoredSheetUrl(url: string): void {

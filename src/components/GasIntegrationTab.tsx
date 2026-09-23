@@ -26,6 +26,8 @@ import {
   getStoredTransactions,
   saveStoredTransactions,
   setStoredGasUrl,
+  getStoredSheetUrl,
+  setStoredSheetUrl,
   isAutoSyncEnabled,
   setAutoSyncEnabled,
   getAutoSyncInterval,
@@ -426,36 +428,25 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* 1. Integration Header & Link Database Card */}
+      {/* 1. Integration Header & Sync Controls Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="bg-emerald-600 text-white p-2 rounded-xl shadow-xs">
-                <Database className="w-5 h-5" />
+              <div className="bg-blue-600 text-white p-2 rounded-xl shadow-xs">
+                <RefreshCw className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-bold text-slate-800">
-                Database Google Sheets &amp; Pengaturan Sync
+                Sinkronisasi 2 Arah dengan Google Apps Script &amp; Google Sheets
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-              Semua data transaksi tersimpan dan tersinkronisasi 2 arah secara otomatis ke <strong>Google Sheets</strong>. 
-              Gunakan tombol <strong>Link Database</strong> di bawah untuk membuka spreadsheet Anda secara langsung.
+              Hubungkan sistem cetak resi langsung ke Google Sheets. Sistem mendukung <strong>Sinkronisasi 2 Arah Penuh</strong>:
+              data yang diinput di aplikasi terkirim ke Sheet, dan data di Sheet otomatis tersinkronkan.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* LINK DATABASE BUTTON */}
-            <a
-              href={directSheetUrl || sheetInfo?.url || 'https://docs.google.com/spreadsheets'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm border border-emerald-500"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Link Database Google Sheet</span>
-            </a>
-
             <span
               className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border ${
                 gasUrl.trim()
@@ -513,22 +504,32 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
           {/* Configuration Form */}
           <div className="space-y-4">
-            {/* Active Sheet Banner */}
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-emerald-600 shrink-0" />
+            {/* Active Sheet Banner with Sheet ID */}
+            <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-600 text-white p-2 rounded-lg shrink-0">
+                  <Database className="w-4 h-4" />
+                </div>
                 <div>
-                  <span className="text-slate-600">Nama Spreadsheet Database: </span>
-                  <strong className="text-emerald-950">{sheetInfo?.name || 'Database Resi Agen Batara'}</strong>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-600">Database Spreadsheet:</span>
+                    <strong className="text-emerald-950 font-bold">{sheetInfo?.name || 'Database Resi Agen Batara'}</strong>
+                  </div>
+                  <div className="text-[11px] font-mono text-emerald-800 mt-0.5 flex items-center gap-1.5">
+                    <span className="text-slate-500 font-sans">Sheet ID:</span>
+                    <code className="bg-emerald-100/80 px-1.5 py-0.5 rounded text-emerald-900 font-bold border border-emerald-200/80">
+                      1BsGCKV1wvFlmaVuJDZee8bSJsklwatMzVznkOzBFzys
+                    </code>
+                  </div>
                 </div>
               </div>
               <a
-                href={directSheetUrl || sheetInfo?.url || 'https://docs.google.com/spreadsheets'}
+                href={directSheetUrl || `https://docs.google.com/spreadsheets/d/1BsGCKV1wvFlmaVuJDZee8bSJsklwatMzVznkOzBFzys/edit`}
                 target="_blank"
                 rel="noreferrer"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-xs border border-emerald-500"
               >
-                <span>Buka Link Database</span>
+                <span>Buka Google Sheets</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>

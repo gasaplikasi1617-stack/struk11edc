@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, History, Receipt, RefreshCw, Database, ExternalLink } from 'lucide-react';
-import { subscribeSyncState, SyncState, executeTwoWaySync, getStoredSheetUrl } from '../services/gasClientSync';
+import { Printer, History, Receipt, RefreshCw } from 'lucide-react';
+import { subscribeSyncState, SyncState, executeTwoWaySync } from '../services/gasClientSync';
 
 interface NavbarProps {
   activeTab: 'create' | 'history' | 'gas';
@@ -17,14 +17,9 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
     totalInSheet: 0,
   });
 
-  const [sheetUrl, setSheetUrl] = useState<string>(getStoredSheetUrl());
-
   useEffect(() => {
     const unsubscribe = subscribeSyncState((state) => {
       setSyncState(state);
-      if (state.sheetUrl) {
-        setSheetUrl(state.sheetUrl);
-      }
     });
     return unsubscribe;
   }, []);
@@ -34,15 +29,6 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
       await executeTwoWaySync();
       if (onSyncTrigger) onSyncTrigger();
     } catch {}
-  };
-
-  const handleOpenDatabaseLink = () => {
-    const url = sheetUrl || getStoredSheetUrl();
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } else {
-      setActiveTab('gas');
-    }
   };
 
   const formatLastSync = (iso: string | null) => {
@@ -129,24 +115,14 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
 
             <button
               onClick={() => setActiveTab('gas')}
-              className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'gas'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <Database className="w-4 h-4 text-emerald-400" />
-              <span>Database</span>
-            </button>
-
-            {/* Direct Button: Link Database Google Sheet */}
-            <button
-              onClick={handleOpenDatabaseLink}
-              title={sheetUrl ? 'Buka Google Sheet Database di Tab Baru' : 'Atur / Buka Link Database Google Sheet'}
-              className="hidden sm:flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs border border-emerald-400/30"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Link Database</span>
+              <RefreshCw className="w-4 h-4" />
+              <span>Integrasi</span>
             </button>
           </nav>
         </div>
