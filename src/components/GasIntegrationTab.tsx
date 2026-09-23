@@ -147,22 +147,33 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   const loadPreview = async (targetUrl?: string) => {
     const urlToUse = targetUrl || gasUrl;
-    if (!urlToUse) return;
+    if (!urlToUse || !urlToUse.trim()) {
+      setSyncNotice({
+        type: 'error',
+        text: 'Silakan isi Web App URL Google Apps Script terlebih dahulu di kolom atas untuk memuat data.',
+      });
+      return;
+    }
 
     setIsLoadingPreview(true);
     try {
       const json = await safeFetchJson('/api/gas/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasUrl: urlToUse }),
+        body: JSON.stringify({ gasUrl: urlToUse.trim() }),
       });
       if (json.success && Array.isArray(json.data)) {
-        setPreviewData(json.data.slice(0, 10));
+        setPreviewData(json.data);
         if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
         if (onSyncSuccess) onSyncSuccess();
+      } else if (json.error) {
+        setSyncNotice({
+          type: 'error',
+          text: `Gagal memuat data sheet: ${json.error}`,
+        });
       }
-    } catch {
-      // preview error silent
+    } catch (err: any) {
+      console.error('Preview error:', err);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -778,11 +789,12 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
               />
               <button
                 onClick={() => loadPreview()}
-                disabled={isLoadingPreview || !gasUrl.trim()}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 shrink-0"
+                disabled={isLoadingPreview}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                title="Segarkan data terkini langsung dari Google Sheets"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPreview ? 'animate-spin' : ''}`} />
-                <span>Segarkan Data</span>
+                <RefreshCw className={`w-4 h-4 ${isLoadingPreview ? 'animate-spin' : ''}`} />
+                <span>{isLoadingPreview ? 'Memuat...' : 'Segarkan Data'}</span>
               </button>
             </div>
           </div>
