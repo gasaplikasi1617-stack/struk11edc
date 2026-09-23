@@ -75,7 +75,9 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   const [copiedGs, setCopiedGs] = useState(false);
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [showScriptCode, setShowScriptCode] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
+  const [showConfig, setShowConfig] = useState(true);
+  const [directSheetUrl, setDirectSheetUrl] = useState<string>(getStoredSheetUrl());
+  const [previewSearch, setPreviewSearch] = useState('');
 
   // Operation states
   const [isTesting, setIsTesting] = useState(false);
@@ -223,10 +225,12 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       }
 
       if (data && (data.success || data.status === 'online')) {
-        if (data.detail && data.detail.spreadsheet) {
-          setSheetInfo(data.detail.spreadsheet);
-        } else if (data.spreadsheet) {
-          setSheetInfo(data.spreadsheet);
+        const sUrl = data.detail?.spreadsheet?.url || data.spreadsheet?.url || data.detail?.spreadsheetUrl || data.spreadsheetUrl;
+        const sName = data.detail?.spreadsheet?.name || data.spreadsheet?.name || data.detail?.spreadsheetName || data.spreadsheetName;
+        if (sUrl) {
+          setSheetInfo({ name: sName, url: sUrl });
+          setDirectSheetUrl(sUrl);
+          setStoredSheetUrl(sUrl);
         }
         setSyncNotice({
           type: 'success',
@@ -275,16 +279,12 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       }
 
       if (data && data.success) {
-        if (data.detail) {
-          setSheetInfo({
-            name: data.detail.spreadsheetName,
-            url: data.detail.spreadsheetUrl,
-          });
-        } else if (data.spreadsheetUrl) {
-          setSheetInfo({
-            name: data.spreadsheetName,
-            url: data.spreadsheetUrl,
-          });
+        const sUrl = data.detail?.spreadsheetUrl || data.spreadsheetUrl || data.detail?.spreadsheet?.url;
+        const sName = data.detail?.spreadsheetName || data.spreadsheetName || data.detail?.spreadsheet?.name;
+        if (sUrl) {
+          setSheetInfo({ name: sName, url: sUrl });
+          setDirectSheetUrl(sUrl);
+          setStoredSheetUrl(sUrl);
         }
         setSyncNotice({
           type: 'success',
@@ -426,333 +426,365 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* 1. Integration Header & Sync Controls Card (Collapsible - Hidden by default) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      {/* 1. Integration Header & Link Database Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="bg-blue-600 text-white p-2 rounded-xl">
+              <div className="bg-emerald-600 text-white p-2 rounded-xl shadow-xs">
                 <Database className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-bold text-slate-800">
-                Sinkronisasi 2 Arah dengan Google Apps Script & Google Sheets
+                Database Google Sheets &amp; Pengaturan Sync
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-              Hubungkan sistem cetak resi langsung ke Google Sheets. Sistem mendukung <strong>Sinkronisasi 2 Arah Penuh</strong>:
-              data yang diinput di aplikasi terkirim ke Sheet, dan data yang diinput langsung di Sheet otomatis dapat ditarik kembali ke aplikasi.
+              Semua data transaksi tersimpan dan tersinkronisasi 2 arah secara otomatis ke <strong>Google Sheets</strong>. 
+              Gunakan tombol <strong>Link Database</strong> di bawah untuk membuka spreadsheet Anda secara langsung.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* LINK DATABASE BUTTON */}
+            <a
+              href={directSheetUrl || sheetInfo?.url || 'https://docs.google.com/spreadsheets'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm border border-emerald-500"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Link Database Google Sheet</span>
+            </a>
+
             <span
-              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border ${
                 gasUrl.trim()
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${gasUrl.trim() ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              <span>{gasUrl.trim() ? 'URL Terkonfigurasi' : 'Belum Ada URL'}</span>
+              <span>{gasUrl.trim() ? 'Google Sheet Terhubung' : 'Belum Ada URL'}</span>
             </span>
-
-            <button
-              type="button"
-              onClick={() => setShowConfig(!showConfig)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all border border-slate-300"
-            >
-              {showConfig ? (
-                <>
-                  <ChevronDown className="w-4 h-4 text-slate-500" />
-                  <span>Sembunyikan Pengaturan</span>
-                </>
-              ) : (
-                <>
-                  <ChevronRight className="w-4 h-4 text-slate-500" />
-                  <span>Tampilkan Pengaturan &amp; Sync</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
 
-        {showConfig && (
-          <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
-            {/* Sync Status / Notice Banner */}
-            {syncNotice && (
-              <div
-                className={`p-4 rounded-xl text-xs flex flex-col gap-2 transition-all shadow-xs ${
-                  syncNotice.type === 'success'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : syncNotice.type === 'error'
-                    ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                    : 'bg-blue-50 text-blue-800 border border-blue-200'
-                }`}
-              >
-                <div className="flex items-start gap-2.5">
-                  {syncNotice.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  ) : syncNotice.type === 'error' ? (
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 animate-spin" />
-                  )}
-                  <div className="flex-1 font-medium">{syncNotice.text}</div>
-                </div>
-
-                {syncNotice.type === 'error' && (syncNotice.text.includes('Anyone') || syncNotice.text.includes('Ditolak') || syncNotice.text.includes('JSON')) && (
-                  <div className="mt-2 pt-2 border-t border-rose-200 bg-white/70 p-3 rounded-lg text-[11px] text-rose-900 space-y-1.5">
-                    <p className="font-bold text-rose-950 flex items-center gap-1">
-                      💡 Cara Memperbaiki Pengaturan Hak Akses di Google Apps Script:
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-700">
-                      <li>Buka project Google Apps Script Anda.</li>
-                      <li>Klik tombol biru <strong>Deploy &gt; Manage deployments</strong> (Kelola penerapan).</li>
-                      <li>Klik ikon <strong>Pensil (Edit)</strong> pada deployment Web App aktif Anda.</li>
-                      <li>Ubah kolom <strong>Version</strong> menjadi <em>New version</em> (Versi baru).</li>
-                      <li>Ubah kolom <strong>Who has access</strong> menjadi <strong className="text-emerald-700">"Anyone" (Siapa saja)</strong>.</li>
-                      <li>Klik <strong>Deploy</strong>, izinkan akses jika diminta, lalu coba uji kembali di sini.</li>
-                    </ol>
-                  </div>
+        {/* Persistent Pengaturan & Sync Container */}
+        <div className="pt-6 border-t border-slate-100 space-y-6">
+          {/* Sync Status / Notice Banner */}
+          {syncNotice && (
+            <div
+              className={`p-4 rounded-xl text-xs flex flex-col gap-2 transition-all shadow-xs ${
+                syncNotice.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : syncNotice.type === 'error'
+                  ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                  : 'bg-blue-50 text-blue-800 border border-blue-200'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                {syncNotice.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : syncNotice.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 animate-spin" />
                 )}
+                <div className="flex-1 font-medium">{syncNotice.text}</div>
               </div>
-            )}
 
-            {/* Configuration Form */}
-            <div className="space-y-4">
-              {/* Active Sheet Card if detected */}
-              {sheetInfo && (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-emerald-600" />
-                    <div>
-                      <span className="text-slate-600">Spreadsheet Terhubung: </span>
-                      <strong className="text-emerald-900">{sheetInfo.name || 'Database Resi Agen Batara'}</strong>
-                    </div>
-                  </div>
-                  {sheetInfo.url && (
-                    <a
-                      href={sheetInfo.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-                    >
-                      <span>Buka Google Sheets</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+              {syncNotice.type === 'error' && (syncNotice.text.includes('Anyone') || syncNotice.text.includes('Ditolak') || syncNotice.text.includes('JSON')) && (
+                <div className="mt-2 pt-2 border-t border-rose-200 bg-white/70 p-3 rounded-lg text-[11px] text-rose-900 space-y-1.5">
+                  <p className="font-bold text-rose-950 flex items-center gap-1">
+                    💡 Cara Memperbaiki Pengaturan Hak Akses di Google Apps Script:
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-700">
+                    <li>Buka project Google Apps Script Anda.</li>
+                    <li>Klik tombol biru <strong>Deploy &gt; Manage deployments</strong> (Kelola penerapan).</li>
+                    <li>Klik ikon <strong>Pensil (Edit)</strong> pada deployment Web App aktif Anda.</li>
+                    <li>Ubah kolom <strong>Version</strong> menjadi <em>New version</em> (Versi baru).</li>
+                    <li>Ubah kolom <strong>Who has access</strong> menjadi <strong className="text-emerald-700">"Anyone" (Siapa saja)</strong>.</li>
+                    <li>Klik <strong>Deploy</strong>, izinkan akses jika diminta, lalu coba uji kembali di sini.</li>
+                  </ol>
                 </div>
               )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Link className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Google Apps Script Web App URL (/exec)</span>
-                  </span>
-                  {lastSyncedAt && (
-                    <span className="text-[11px] font-normal text-slate-400">
-                      Terakhir sinkron: {new Date(lastSyncedAt).toLocaleString('id-ID')}
-                    </span>
-                  )}
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="url"
-                    value={gasUrl}
-                    onChange={(e) => setGasUrl(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
-                    className="flex-1 px-3.5 py-2.5 text-xs font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs text-slate-800"
-                  />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleSaveConfig}
-                      disabled={isSavingConfig}
-                      className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
-                    >
-                      {isSavingConfig ? 'Menyimpan...' : 'Simpan URL'}
-                    </button>
-                    <button
-                      onClick={handleSetupDatabase}
-                      disabled={isSettingUp || !gasUrl.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap flex items-center gap-1.5"
-                      title="Inisialisasi header dan tabel RiwayatTransaksi di Google Sheet"
-                    >
-                      {isSettingUp ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>⚙️</span>}
-                      <span>{isSettingUp ? 'Menyiapkan...' : 'Setup Database'}</span>
-                    </button>
-                    <button
-                      onClick={handleTestConnection}
-                      disabled={isTesting || !gasUrl.trim()}
-                      className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all border border-slate-200 whitespace-nowrap flex items-center gap-1.5"
-                    >
-                      {isTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Zap className="w-3.5 h-3.5 text-amber-600" />}
-                      <span>Uji Koneksi</span>
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  *Salin URL Web App dari menu <strong>Deploy &gt; Manage deployments</strong> di Google Apps Script (berakhiran <code>/exec</code>).
-                </p>
-              </div>
-
-              {/* Auto Sync Toggle & Configuration */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="pr-4">
-                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <span>Sinkronisasi Otomatis 2 Arah (Auto 2-Way Sync)</span>
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Secara periodik menyamakan data antara aplikasi &amp; Google Sheets secara otomatis di latar belakang tanpa menekan tombol.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoSync}
-                      onChange={(e) => {
-                        const val = e.target.checked;
-                        setAutoSync(val);
-                        setAutoSyncEnabled(val);
-                        fetch('/api/gas/config', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ autoSync: val }),
-                        }).catch(() => {});
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                {autoSync && (
-                  <div className="pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <span className="text-[11px] font-medium">Interval Sinkronisasi Otomatis:</span>
-                      <select
-                        value={syncInterval}
-                        onChange={(e) => {
-                          const num = parseInt(e.target.value, 10);
-                          setSyncInterval(num);
-                          setAutoSyncInterval(num);
-                        }}
-                        className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-blue-500 font-semibold"
-                      >
-                        <option value={15}>Setiap 15 Detik (Sangat Cepat)</option>
-                        <option value={30}>Setiap 30 Detik (Direkomendasikan)</option>
-                        <option value={60}>Setiap 1 Menit</option>
-                        <option value={120}>Setiap 2 Menit</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">Status Terakhir:</span>
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                          liveSyncState.status === 'syncing'
-                            ? 'bg-blue-100 text-blue-700'
-                            : liveSyncState.status === 'error'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {liveSyncState.status === 'syncing' ? (
-                          <>
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                            <span>Sinkron Berjalan</span>
-                          </>
-                        ) : liveSyncState.status === 'error' ? (
-                          <>
-                            <AlertCircle className="w-3 h-3" />
-                            <span>Koneksi Gagal</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Tersinkronisasi Otomatis</span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Two-Way Sync Actions */}
-              <div className="p-4 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-200 rounded-xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-950 flex items-center gap-1.5">
-                      <RefreshCw className="w-4 h-4 text-blue-600" />
-                      <span>Aksi Sinkronisasi 2 Arah (Two-Way Sync)</span>
-                    </h4>
-                    <p className="text-xs text-blue-800/80 mt-0.5">
-                      Menyamakan seluruh riwayat transaksi antara aplikasi lokal dan Google Sheets tanpa menghapus atau menduplikasi data.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      id="btn-two-way-sync"
-                      onClick={handleTwoWaySync}
-                      disabled={isSyncing || !gasUrl.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkron 2 Arah Sekarang'}</span>
-                    </button>
-
-                    <button
-                      onClick={handlePullOnly}
-                      disabled={isPulling || !gasUrl.trim()}
-                      className="bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 transition-all shadow-2xs flex items-center gap-1.5"
-                      title="Tarik data terbaru dari Google Sheets"
-                    >
-                      <Download className={`w-3.5 h-3.5 text-blue-600 ${isPulling ? 'animate-bounce' : ''}`} />
-                      <span>Tarik (Pull)</span>
-                    </button>
-
-                    <button
-                      onClick={handlePushOnly}
-                      disabled={isPushing || !gasUrl.trim()}
-                      className="bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 transition-all shadow-2xs flex items-center gap-1.5"
-                      title="Kirim semua data lokal ke Google Sheets"
-                    >
-                      <Upload className={`w-3.5 h-3.5 text-emerald-600 ${isPushing ? 'animate-bounce' : ''}`} />
-                      <span>Kirim (Push)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 2. Live Sheet Preview Section */}
-        <div className="mt-8 border-t border-slate-100 pt-6">
-          <div className="flex items-center justify-between mb-3">
+          {/* Configuration Form */}
+          <div className="space-y-4">
+            {/* Active Sheet Banner */}
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-slate-600">Nama Spreadsheet Database: </span>
+                  <strong className="text-emerald-950">{sheetInfo?.name || 'Database Resi Agen Batara'}</strong>
+                </div>
+              </div>
+              <a
+                href={directSheetUrl || sheetInfo?.url || 'https://docs.google.com/spreadsheets'}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                <span>Buka Link Database</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
             <div>
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <Database className="w-4 h-4 text-emerald-600" />
-                <span>Data Terkini di Google Sheets ({previewData.length} baris preview)</span>
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Menampilkan data langsung dari tab <code>RiwayatTransaksi</code> di spreadsheet Anda.
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Link className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Google Apps Script Web App URL (/exec)</span>
+                </span>
+                {lastSyncedAt && (
+                  <span className="text-[11px] font-normal text-slate-500">
+                    Terakhir sinkron: {new Date(lastSyncedAt).toLocaleString('id-ID')}
+                  </span>
+                )}
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={gasUrl}
+                  onChange={(e) => setGasUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                  className="flex-1 px-3.5 py-2.5 text-xs font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs text-slate-800"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={isSavingConfig}
+                    className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap"
+                  >
+                    {isSavingConfig ? 'Menyimpan...' : 'Simpan URL'}
+                  </button>
+                  <button
+                    onClick={handleSetupDatabase}
+                    disabled={isSettingUp || !gasUrl.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all shadow-xs whitespace-nowrap flex items-center gap-1.5"
+                    title="Inisialisasi header dan tabel RiwayatTransaksi di Google Sheet"
+                  >
+                    {isSettingUp ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>⚙️</span>}
+                    <span>{isSettingUp ? 'Menyiapkan...' : 'Setup Database'}</span>
+                  </button>
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={isTesting || !gasUrl.trim()}
+                    className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition-all border border-slate-200 whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    {isTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Zap className="w-3.5 h-3.5 text-amber-600" />}
+                    <span>Uji Koneksi</span>
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                *Salin Web App URL dari menu <strong>Deploy &gt; Manage deployments</strong> di Google Apps Script (berakhiran <code>/exec</code>).
               </p>
             </div>
-            <button
-              onClick={() => loadPreview()}
-              disabled={isLoadingPreview || !gasUrl.trim()}
-              className="text-xs text-blue-600 hover:text-blue-800 disabled:text-slate-400 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <RefreshCw className={`w-3 h-3 ${isLoadingPreview ? 'animate-spin' : ''}`} />
-              <span>Segarkan Preview</span>
-            </button>
-          </div>
 
+            {/* Direct Google Sheet Link Input */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Link Direct Spreadsheet Google Sheets (Opsional)</span>
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={directSheetUrl}
+                  onChange={(e) => {
+                    const u = e.target.value;
+                    setDirectSheetUrl(u);
+                    setStoredSheetUrl(u);
+                  }}
+                  placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+                  className="flex-1 px-3.5 py-2 text-xs font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs text-slate-800"
+                />
+                {directSheetUrl && (
+                  <a
+                    href={directSheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <span>Buka Database Sheet</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Auto Sync Toggle & Configuration */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Sinkronisasi Otomatis 2 Arah (Auto 2-Way Sync)</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Secara periodik menyamakan data antara aplikasi &amp; Google Sheets secara otomatis di latar belakang tanpa menekan tombol.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoSync}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setAutoSync(val);
+                      setAutoSyncEnabled(val);
+                      fetch('/api/gas/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ autoSync: val }),
+                      }).catch(() => {});
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {autoSync && (
+                <div className="pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <span className="text-[11px] font-medium">Interval Sinkronisasi Otomatis:</span>
+                    <select
+                      value={syncInterval}
+                      onChange={(e) => {
+                        const num = parseInt(e.target.value, 10);
+                        setSyncInterval(num);
+                        setAutoSyncInterval(num);
+                      }}
+                      className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-blue-500 font-semibold"
+                    >
+                      <option value={15}>Setiap 15 Detik (Sangat Cepat)</option>
+                      <option value={30}>Setiap 30 Detik (Direkomendasikan)</option>
+                      <option value={60}>Setiap 1 Menit</option>
+                      <option value={120}>Setiap 2 Menit</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500">Status Terakhir:</span>
+                    <span
+                      className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                        liveSyncState.status === 'syncing'
+                          ? 'bg-blue-100 text-blue-700'
+                          : liveSyncState.status === 'error'
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {liveSyncState.status === 'syncing' ? (
+                        <>
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                          <span>Sinkron Berjalan</span>
+                        </>
+                      ) : liveSyncState.status === 'error' ? (
+                        <>
+                          <AlertCircle className="w-3 h-3" />
+                          <span>Koneksi Gagal</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Tersinkronisasi Otomatis</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Two-Way Sync Actions */}
+            <div className="p-4 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-200 rounded-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-blue-950 flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-blue-600" />
+                    <span>Aksi Sinkronisasi 2 Arah (Two-Way Sync)</span>
+                  </h4>
+                  <p className="text-xs text-blue-800/80 mt-0.5">
+                    Menyamakan seluruh riwayat transaksi antara aplikasi lokal dan Google Sheets tanpa menghapus atau menduplikasi data.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    id="btn-two-way-sync"
+                    onClick={handleTwoWaySync}
+                    disabled={isSyncing || !gasUrl.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkron 2 Arah Sekarang'}</span>
+                  </button>
+
+                  <button
+                    onClick={handlePullOnly}
+                    disabled={isPulling || !gasUrl.trim()}
+                    className="bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 transition-all shadow-2xs flex items-center gap-1.5"
+                    title="Tarik data terbaru dari Google Sheets"
+                  >
+                    <Download className={`w-3.5 h-3.5 text-blue-600 ${isPulling ? 'animate-bounce' : ''}`} />
+                    <span>Tarik (Pull)</span>
+                  </button>
+
+                  <button
+                    onClick={handlePushOnly}
+                    disabled={isPushing || !gasUrl.trim()}
+                    className="bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 transition-all shadow-2xs flex items-center gap-1.5"
+                    title="Kirim semua data lokal ke Google Sheets"
+                  >
+                    <Upload className={`w-3.5 h-3.5 text-emerald-600 ${isPushing ? 'animate-bounce' : ''}`} />
+                    <span>Kirim (Push)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Live Sheet Data Table (Always Rendered) */}
+        <div className="mt-8 border-t border-slate-100 pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-600" />
+                <span>Tabel Data Terkini di Google Sheets</span>
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {previewData.length} Baris
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Menampilkan data transaksi secara langsung dari Google Sheets.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={previewSearch}
+                onChange={(e) => setPreviewSearch(e.target.value)}
+                placeholder="Cari ID / Nama / IDPEL..."
+                className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 w-48 sm:w-60"
+              />
+              <button
+                onClick={() => loadPreview()}
+                disabled={isLoadingPreview || !gasUrl.trim()}
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPreview ? 'animate-spin' : ''}`} />
+                <span>Segarkan Data</span>
+              </button>
+            </div>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/50">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -767,25 +799,42 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/80 bg-white">
-                {previewData.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-6 text-slate-400">
-                      {isLoadingPreview ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-                          <span>Mengambil data dari Google Sheets...</span>
-                        </div>
-                      ) : (
-                        <span>
-                          {gasUrl.trim()
-                            ? 'Belum ada transaksi di sheet atau klik "Segarkan Preview" untuk memuat.'
-                            : 'Masukkan Web App URL di atas untuk memantau data di Google Sheets secara langsung.'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  previewData.map((row, idx) => (
+                {(() => {
+                  const filtered = previewData.filter((row) => {
+                    if (!previewSearch.trim()) return true;
+                    const q = previewSearch.toLowerCase();
+                    return (
+                      (row.id && row.id.toLowerCase().includes(q)) ||
+                      (row.idpel && row.idpel.toLowerCase().includes(q)) ||
+                      (row.namaPelanggan && row.namaPelanggan.toLowerCase().includes(q)) ||
+                      (row.rincianTagihan && row.rincianTagihan.toLowerCase().includes(q))
+                    );
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="text-center py-6 text-slate-400">
+                          {isLoadingPreview ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                              <span>Mengambil data dari Google Sheets...</span>
+                            </div>
+                          ) : (
+                            <span>
+                              {previewSearch.trim()
+                                ? `Tidak ditemukan data untuk kata kunci "${previewSearch}".`
+                                : gasUrl.trim()
+                                ? 'Belum ada transaksi di sheet atau klik "Segarkan Data" untuk memuat.'
+                                : 'Masukkan Web App URL di atas untuk memantau data di Google Sheets secara langsung.'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((row, idx) => (
                     <tr key={row.id || idx} className="hover:bg-blue-50/40 transition-colors">
                       <td className="p-2.5 text-center text-slate-400 font-mono">{idx + 1}</td>
                       <td className="p-2.5 font-mono text-[11px] text-slate-600">{row.id || '-'}</td>
@@ -797,8 +846,8 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                         Rp {Number(row.totalBayar || 0).toLocaleString('id-ID')}
                       </td>
                     </tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

@@ -10,6 +10,7 @@ import { ReceiptData } from '../types';
  */
 
 const STORAGE_KEY_URL = 'gas_web_app_url';
+const STORAGE_KEY_SHEET_URL = 'gas_google_sheet_url';
 const STORAGE_KEY_TXS = 'batara_transactions_backup';
 const STORAGE_KEY_LAST_SYNC = 'batara_last_synced_at';
 const STORAGE_KEY_AUTO_SYNC = 'batara_auto_sync_enabled';
@@ -22,6 +23,7 @@ export interface SyncState {
   lastSyncedAt: string | null;
   lastError: string | null;
   totalInSheet: number;
+  sheetUrl?: string;
 }
 
 type SyncListener = (state: SyncState, transactions?: ReceiptData[]) => void;
@@ -84,6 +86,18 @@ export function getStoredGasUrl(): string {
 
 export function setStoredGasUrl(url: string): void {
   localStorage.setItem(STORAGE_KEY_URL, url.trim());
+}
+
+export function getStoredSheetUrl(): string {
+  return localStorage.getItem(STORAGE_KEY_SHEET_URL) || '';
+}
+
+export function setStoredSheetUrl(url: string): void {
+  if (url) {
+    localStorage.setItem(STORAGE_KEY_SHEET_URL, url.trim());
+  } else {
+    localStorage.removeItem(STORAGE_KEY_SHEET_URL);
+  }
 }
 
 export function getLastSyncedTime(): string | null {
