@@ -163,7 +163,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
         body: JSON.stringify({ gasUrl: urlToUse.trim() }),
       });
       if (json.success && Array.isArray(json.data)) {
-        setPreviewData(json.data);
+        setPreviewData(json.data.slice(0, 10));
         if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
         if (onSyncSuccess) onSyncSuccess();
       } else if (json.error) {
@@ -771,7 +771,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                 <Database className="w-4 h-4 text-emerald-600" />
                 <span>Tabel Data Terkini di Google Sheets</span>
                 <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                  {previewData.length} Baris
+                  {previewData.length} (Maks. 10 Terakhir)
                 </span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
