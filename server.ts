@@ -500,6 +500,32 @@ app.patch("/api/transactions/:id", (req, res) => {
   res.status(404).json({ success: false, message: "Transaksi tidak ditemukan" });
 });
 
+// Reset all transactions (Tutup Buku Bulanan) with automatic backup file
+app.post("/api/transactions/reset", (req, res) => {
+  try {
+    const txs = getTransactions();
+    const count = txs.length;
+    const { backupPeriod } = req.body || {};
+    if (count > 0) {
+      const periodTag = (backupPeriod || Date.now()).toString().replace(/[^a-zA-Z0-9_-]/g, "_");
+      const backupPath = path.join(process.cwd(), `transactions_backup_${periodTag}.json`);
+      try {
+        fs.writeFileSync(backupPath, JSON.stringify(txs, null, 2), "utf-8");
+      } catch (bErr) {
+        console.warn("Gagal menulis file backup disk:", bErr);
+      }
+    }
+    saveTransactions([]);
+    res.json({
+      success: true,
+      clearedCount: count,
+      message: `Tutup buku lokal berhasil! ${count} transaksi telah diarsipkan dan riwayat aplikasi kini fresh dengan 0 transaksi.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Delete a transaction
 app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
@@ -1032,6 +1058,26 @@ app.post("/api/gas/push", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Gagal mengirim data ke Google Sheets: " + (err.message || String(err)),
+    });
+  }
+});
+
+// Endpoint to archive and reset Google Sheets for monthly rollover
+app.post("/api/gas/archive", async (req, res) => {
+  try {
+    const { gasUrl, periodName } = req.body || {};
+    const cfg = getGasConfig();
+    const targetUrl = (gasUrl || cfg.gasUrl || DEFAULT_GAS_URL).trim();
+    const gasRes = await callGasPost(targetUrl, {
+      action: "archiveAndResetMonth",
+      monthName: periodName,
+      periodName: periodName,
+    });
+    return res.json(gasRes);
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: "Gagal mengarsipkan Google Sheets: " + (err.message || String(err)),
     });
   }
 });

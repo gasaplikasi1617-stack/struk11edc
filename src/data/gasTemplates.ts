@@ -82,6 +82,8 @@ function onOpen() {
       .createMenu("Agen Batara")
       .addItem("⚙️ Setup / Inisialisasi Database", "setupDatabase")
       .addItem("🧪 Tes Koneksi Database", "testInitAndPing")
+      .addSeparator()
+      .addItem("📦 Tutup Buku & Arsipkan Data Bulan Ini", "menuArchiveAndResetMonth")
       .addToUi();
   } catch (e) {}
 }
@@ -278,6 +280,71 @@ function deleteTransactionRow(id) {
   return { success: false, error: "Transaksi ID tidak ditemukan di Google Sheets" };
 }
 
+// 9b. TUTUP BUKU & ARSIPKAN DATA BULANAN KE TAB BARU
+function archiveAndResetSheet(customMonthName) {
+  var ss = getSpreadsheet();
+  var sheet = getOrCreateSheet();
+  var lastRow = sheet.getLastRow();
+  var rowCount = Math.max(0, lastRow - 1);
+
+  // Buat nama tab arsip, contoh: "Arsip_Sep_2026"
+  var now = new Date();
+  var defaultMonthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  var monthTag = (customMonthName && String(customMonthName).trim()) 
+    ? String(customMonthName).trim().replace(/[^a-zA-Z0-9_-]/g, "_")
+    : ("Arsip_" + defaultMonthNames[now.getMonth()] + "_" + now.getFullYear());
+
+  if (!monthTag.toLowerCase().startsWith("arsip")) {
+    monthTag = "Arsip_" + monthTag;
+  }
+
+  // Jika tab arsip dengan nama tersebut sudah ada, beri sufiks unik
+  var finalTabName = monthTag;
+  var counter = 1;
+  while (ss.getSheetByName(finalTabName)) {
+    finalTabName = monthTag + "_" + counter;
+    counter++;
+  }
+
+  // 1. Salin seluruh isi sheet aktif ke tab arsip jika ada data
+  if (lastRow > 1) {
+    var archiveSheet = sheet.copyTo(ss);
+    archiveSheet.setName(finalTabName);
+  }
+
+  // 2. Kosongkan baris data pada sheet aktif (baris 2 ke bawah), biarkan header di baris 1 tetap utuh
+  if (lastRow > 1) {
+    sheet.deleteRows(2, lastRow - 1);
+  }
+
+  // Pastikan format kolom tetap rapi untuk bulan berikutnya
+  sheet.getRange("A2:A").setNumberFormat("@");
+  sheet.getRange("C2:C").setNumberFormat("@");
+  sheet.getRange("I2:L").setNumberFormat("#,##0");
+  sheet.getRange("O2:O").setNumberFormat("@");
+
+  return {
+    success: true,
+    message: "Tutup buku berhasil! Data (" + rowCount + " transaksi) telah diarsipkan ke tab '" + finalTabName + "' dan sheet aktif telah dikosongkan untuk bulan baru.",
+    archiveTabName: finalTabName,
+    archivedCount: rowCount,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function menuArchiveAndResetMonth() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert(
+    "Konfirmasi Tutup Buku & Arsip Bulanan",
+    "Apakah Anda yakin ingin mengarsipkan seluruh data transaksi saat ini ke tab baru dan mengosongkan sheet aktif untuk bulan baru?",
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm === ui.Button.YES) {
+    var res = archiveAndResetSheet();
+    ui.alert("Berhasil!", res.message, ui.ButtonSet.OK);
+  }
+}
+
 // 10. ENTRY POINT GET (Browser / API Read / Ping)
 function doGet(e) {
   try {
@@ -307,6 +374,11 @@ function doGet(e) {
         data: txs,
         timestamp: new Date().toISOString()
       });
+    }
+
+    if (action === "archiveAndResetMonth" || action === "resetMonth" || action === "archive") {
+      var mName = p.monthName || p.periodName || "";
+      return jsonResponse(archiveAndResetSheet(mName));
     }
 
     // Tampilkan Web App Index HTML
@@ -374,6 +446,11 @@ function doPost(e) {
 
     if (action === "deleteTransaction" || action === "delete") {
       return jsonResponse(deleteTransactionRow(payload.id));
+    }
+
+    if (action === "archiveAndResetMonth" || action === "resetMonth" || action === "archive") {
+      var mName = payload.monthName || payload.periodName || (e && e.parameter ? (e.parameter.monthName || e.parameter.periodName) : "");
+      return jsonResponse(archiveAndResetSheet(mName));
     }
 
     return jsonResponse({ success: false, error: "Action tidak dikenal: " + action });

@@ -28,11 +28,14 @@ import {
   Share2,
   Calendar,
   Zap,
+  Archive,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { executeTwoWaySync } from '../services/gasClientSync';
+import { MonthlyResetModal } from './MonthlyResetModal';
+import { RolloverResult } from '../utils/monthlyArchive';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
@@ -136,6 +139,7 @@ export function HistoryTab({
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
+  const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
 
   const handlePrintQZTrayFromHistory = async (tx: ReceiptData) => {
     try {
@@ -549,7 +553,7 @@ export function HistoryTab({
               id="btn-export-excel"
               onClick={handleExportToExcel}
               disabled={sortedAndFiltered.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
               title="Export riwayat transaksi ke format Microsoft Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -559,6 +563,16 @@ export function HistoryTab({
                   {sortedAndFiltered.length}
                 </span>
               )}
+            </button>
+
+            <button
+              id="btn-monthly-reset"
+              onClick={() => setIsMonthlyResetModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & kosongkan riwayat untuk bulan baru (0 data)"
+            >
+              <Archive className="w-4 h-4" />
+              <span>Tutup Buku & Reset Bulan</span>
             </button>
           </div>
         </div>
@@ -1258,6 +1272,19 @@ export function HistoryTab({
           </div>
         </div>
       )}
+
+      {/* Modal Tutup Buku & Reset Periode Bulan Baru */}
+      <MonthlyResetModal
+        isOpen={isMonthlyResetModalOpen}
+        onClose={() => setIsMonthlyResetModalOpen(false)}
+        transactions={transactions}
+        onResetComplete={(result) => {
+          setExportSuccessNotice(result.message);
+          if (onRefreshTransactions) {
+            onRefreshTransactions();
+          }
+        }}
+      />
     </div>
   );
 }

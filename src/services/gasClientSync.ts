@@ -486,3 +486,37 @@ export function startAutoSync(
     document.removeEventListener('visibilitychange', handleVisibility);
   };
 }
+
+/**
+ * Tutup Buku & Arsipkan Google Sheets:
+ * Menduplikasi sheet aktif menjadi tab arsip (contoh Arsip_Sep_2026) dan mengosongkan baris data sheet aktif
+ */
+export async function archiveAndResetGoogleSheet(
+  gasUrl?: string,
+  monthName?: string
+): Promise<{ success: boolean; message: string; archiveTabName?: string; archivedCount?: number }> {
+  const url = gasUrl || getStoredGasUrl();
+  if (!url) {
+    throw new Error('URL Google Apps Script belum diisi');
+  }
+
+  // 1. Coba lewat proxy internal backend
+  try {
+    const pRes = await fetch('/api/gas/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gasUrl: url.trim(), periodName: monthName }),
+    });
+    if (pRes.ok) {
+      const data = await pRes.json();
+      if (data && data.success) return data;
+    }
+  } catch {}
+
+  // 2. Fallback Direct GAS Call
+  return await directGasCall(url.trim(), 'archiveAndResetMonth', {
+    monthName,
+    periodName: monthName,
+  });
+}
+

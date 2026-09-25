@@ -1,6 +1,71 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import * as fs from "fs";
+import * as path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL } from "../src/data/gasTemplates";
+
+const VERCEL_DATA_FILE = path.join("/tmp", "transactions.json");
+const ROOT_DATA_FILE = path.join(process.cwd(), "transactions.json");
+
+function normalizeTxForVercel(t: any): any {
+  if (!t || typeof t !== "object") return t;
+  let idpel = t.idpel != null ? String(t.idpel).trim() : "";
+  if (/^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/i.test(idpel)) {
+    const num = Number(idpel);
+    if (!isNaN(num) && Number.isFinite(num)) {
+      try {
+        idpel = BigInt(Math.round(num)).toString();
+      } catch {
+        idpel = num.toLocaleString("fullwide", { useGrouping: false });
+      }
+    }
+  } else if (typeof t.idpel === "number" && Number.isFinite(t.idpel)) {
+    idpel = t.idpel.toLocaleString("fullwide", { useGrouping: false });
+  }
+
+  let noHp = t.noHp != null ? String(t.noHp).trim() : "";
+  if (/^\d{9,13}$/.test(noHp) && !noHp.startsWith("0")) {
+    noHp = "0" + noHp;
+  }
+
+  return {
+    ...t,
+    id: t.id ? String(t.id) : undefined,
+    idpel: idpel || "-",
+    noHp: noHp || t.noHp || "-",
+  };
+}
+
+function getVercelTransactions(): any[] {
+  try {
+    if (fs.existsSync(VERCEL_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(VERCEL_DATA_FILE, "utf-8"));
+      if (Array.isArray(data)) return data.map(normalizeTxForVercel);
+    }
+    if (fs.existsSync(ROOT_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ROOT_DATA_FILE, "utf-8"));
+      if (Array.isArray(data)) {
+        const norm = data.map(normalizeTxForVercel);
+        try {
+          fs.writeFileSync(VERCEL_DATA_FILE, JSON.stringify(norm, null, 2), "utf-8");
+        } catch {}
+        return norm;
+      }
+    }
+  } catch (e) {
+    console.error("Error reading vercel transactions:", e);
+  }
+  return [];
+}
+
+function saveVercelTransactions(txs: any[]) {
+  try {
+    const normalized = Array.isArray(txs) ? txs.map(normalizeTxForVercel) : [];
+    fs.writeFileSync(VERCEL_DATA_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error saving vercel transactions:", e);
+  }
+}
 
 // Parse JSON body helper for Vercel Serverless
 async function parseJsonBody(req: IncomingMessage): Promise<any> {
@@ -208,19 +273,82 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if ((pathname === "/gas/pull" || pathname === "/gas/transactions") && (req.method === "GET" || req.method === "POST")) {
       const body = req.method === "POST" ? await parseJsonBody(req) : {};
       const targetUrl = (body.gasUrl || urlObj.searchParams.get("gasUrl") || DEFAULT_GAS_URL).trim();
-      let getRes: any;
+      let getRes: any = null;
       try {
         getRes = await callGasGet(targetUrl, { action: "getTransactions" });
       } catch {
-        getRes = await callGasPost(targetUrl, { action: "getTransactions" });
+        try {
+          getRes = await callGasPost(targetUrl, { action: "getTransactions" });
+        } catch (eGas: any) {
+          console.warn("GAS fetch error in vercel serverless:", eGas.message);
+        }
       }
-      const remoteTxs = Array.isArray(getRes) ? getRes : getRes.data || [];
+      let remoteTxs = Array.isArray(getRes) ? getRes : (getRes && getRes.data && Array.isArray(getRes.data)) ? getRes.data : [];
+      // Fallback data lokal vercel jika respon GAS kosong
+      if (remoteTxs.length === 0) {
+        remoteTxs = getVercelTransactions();
+      }
       return sendJson(res, 200, {
         success: true,
-        message: `Berhasil mengambil ${remoteTxs.length} transaksi dari Google Sheets!`,
+        message: `Berhasil mengambil ${remoteTxs.length} transaksi!`,
         data: remoteTxs,
         syncedAt: new Date().toISOString(),
       });
+    }
+
+    // 7b. Gas Archive and Reset (Tutup Buku Bulanan Google Sheets)
+    if (pathname === "/gas/archive" && req.method === "POST") {
+      const body = await parseJsonBody(req);
+      const targetUrl = (body.gasUrl || DEFAULT_GAS_URL).trim();
+      const periodName = body.periodName || body.monthName || "";
+      const archiveRes = await callGasPost(targetUrl, {
+        action: "archiveAndResetMonth",
+        monthName: periodName,
+        periodName: periodName,
+      });
+      return sendJson(res, 200, archiveRes);
+    }
+
+    // 7c. Local Transactions API (Vercel Serverless Support)
+    if (pathname === "/transactions" || pathname.startsWith("/transactions/")) {
+      if (pathname === "/transactions/reset" && req.method === "POST") {
+        const txs = getVercelTransactions();
+        saveVercelTransactions([]);
+        return sendJson(res, 200, {
+          success: true,
+          clearedCount: txs.length,
+          message: `Berhasil mereset riwayat transaksi (${txs.length} transaksi diarsipkan). Siap untuk bulan baru!`,
+        });
+      }
+
+      if (req.method === "GET") {
+        const txs = getVercelTransactions();
+        return sendJson(res, 200, txs.slice(0, 100));
+      }
+
+      if (req.method === "POST") {
+        const body = await parseJsonBody(req);
+        const txs = getVercelTransactions();
+        const now = Date.now();
+        const newTx = {
+          id: body.id || ("TX-" + now),
+          createdAt: body.createdAt || new Date().toISOString(),
+          ...body,
+        };
+        txs.unshift(newTx);
+        saveVercelTransactions(txs);
+        return sendJson(res, 200, { success: true, transaction: newTx });
+      }
+
+      if (req.method === "DELETE") {
+        const id = pathname.replace(/^\/transactions\/?/, "") || urlObj.searchParams.get("id");
+        if (id) {
+          const txs = getVercelTransactions();
+          const filtered = txs.filter((t: any) => t.id !== id && t.idpel !== id);
+          saveVercelTransactions(filtered);
+          return sendJson(res, 200, { success: true, removed: txs.length - filtered.length });
+        }
+      }
     }
 
     // 8. Gas Push

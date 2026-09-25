@@ -335,7 +335,11 @@ export default function App() {
         )}
 
         {activeTab === 'gas' && (
-          <GasIntegrationTab onSyncSuccess={fetchTransactions} />
+          <GasIntegrationTab
+            onSyncSuccess={fetchTransactions}
+            transactions={transactions}
+            onRefreshTransactions={fetchTransactions}
+          />
         )}
       </main>
 

@@ -17,10 +17,13 @@ import {
   Zap,
   ChevronDown,
   ChevronRight,
+  Archive,
+  RotateCcw,
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
 import { formatIdpelAsText } from '../utils/exportExcel';
+import { MonthlyResetModal } from './MonthlyResetModal';
 import {
   executeTwoWaySync,
   directGasCall,
@@ -40,6 +43,8 @@ import {
 
 interface GasIntegrationTabProps {
   onSyncSuccess?: () => void;
+  transactions?: ReceiptData[];
+  onRefreshTransactions?: () => void;
 }
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
@@ -62,7 +67,11 @@ async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
   }
 }
 
-export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
+export function GasIntegrationTab({
+  onSyncSuccess,
+  transactions,
+  onRefreshTransactions,
+}: GasIntegrationTabProps) {
   const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
   const [gasUrl, setGasUrl] = useState(DEFAULT_GAS_URL);
@@ -100,6 +109,7 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
   // Preview of live data from GAS/Sheet
   const [previewData, setPreviewData] = useState<ReceiptData[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
 
   // Subscribe to live sync events
   useEffect(() => {
@@ -221,7 +231,17 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       if (onSyncSuccess) onSyncSuccess();
     } else {
       // 4. Fallback jika sheet kosong atau koneksi belum siap: ambil data riwayat tersimpan di aplikasi
-      const stored = getStoredTransactions();
+      let stored = getStoredTransactions();
+      if (stored.length === 0) {
+        try {
+          const srv = await safeFetchJson('/api/transactions');
+          if (Array.isArray(srv) && srv.length > 0) {
+            saveStoredTransactions(srv);
+            stored = srv;
+          }
+        } catch {}
+      }
+
       if (stored.length > 0) {
         const formatted = stored.map((item: any) => ({
           ...item,
@@ -823,6 +843,15 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                     <Upload className={`w-3.5 h-3.5 text-emerald-600 ${isPushing ? 'animate-bounce' : ''}`} />
                     <span>Kirim (Push)</span>
                   </button>
+
+                  <button
+                    onClick={() => setIsMonthlyResetModalOpen(true)}
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-indigo-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                    title="Tutup buku bulanan, arsipkan sheet aktif ke tab baru & kosongkan sheet untuk bulan baru"
+                  >
+                    <Archive className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Tutup Buku & Arsip Bulan</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1029,6 +1058,18 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
             </div>
           </div>
         )}
+
+        {/* Modal Tutup Buku & Reset Periode Bulan Baru */}
+        <MonthlyResetModal
+          isOpen={isMonthlyResetModalOpen}
+          onClose={() => setIsMonthlyResetModalOpen(false)}
+          transactions={transactions && transactions.length > 0 ? transactions : previewData.length > 0 ? previewData : getStoredTransactions()}
+          onResetComplete={() => {
+            loadPreview();
+            if (onRefreshTransactions) onRefreshTransactions();
+            if (onSyncSuccess) onSyncSuccess();
+          }}
+        />
       </div>
     </div>
   );
