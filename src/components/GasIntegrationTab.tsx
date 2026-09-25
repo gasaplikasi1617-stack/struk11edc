@@ -20,12 +20,14 @@ import {
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
+import { formatIdpelAsText } from '../utils/exportExcel';
 import {
   executeTwoWaySync,
   directGasCall,
   getStoredTransactions,
   saveStoredTransactions,
   setStoredGasUrl,
+  getStoredGasUrl,
   getStoredSheetUrl,
   setStoredSheetUrl,
   isAutoSyncEnabled,
@@ -123,30 +125,35 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
       })
       .catch((err) => console.log('Using default GAS code:', err.message));
 
-    // 2. Load stored GAS config
+    // 2. Load stored GAS config (Bekerja baik di local maupun Vercel)
     fetch('/api/gas/config')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((cfg: GasSyncConfig) => {
-        const urlToSet = cfg.gasUrl || DEFAULT_GAS_URL;
+        const urlToSet = cfg.gasUrl || getStoredGasUrl() || DEFAULT_GAS_URL;
         setGasUrl(urlToSet);
         if (typeof cfg.autoSync === 'boolean') setAutoSync(cfg.autoSync);
         if (cfg.lastSyncedAt) setLastSyncedAt(cfg.lastSyncedAt);
 
-        // If URL exists, fetch preview
+        // Langsung muat data terkini
         if (urlToSet) {
           loadPreview(urlToSet);
         }
       })
       .catch(() => {
-        // Fallback local storage
-        const savedUrl = localStorage.getItem('gas_web_app_url');
-        const urlToSet = savedUrl || DEFAULT_GAS_URL;
-        setGasUrl(urlToSet);
+        // Fallback local storage (Vercel / hosting statis)
+        const savedUrl = getStoredGasUrl() || localStorage.getItem('gas_web_app_url') || DEFAULT_GAS_URL;
+        setGasUrl(savedUrl);
+        if (savedUrl) {
+          loadPreview(savedUrl);
+        }
       });
   }, []);
 
   const loadPreview = async (targetUrl?: string) => {
-    const urlToUse = targetUrl || gasUrl;
+    const urlToUse = targetUrl || gasUrl || getStoredGasUrl() || DEFAULT_GAS_URL;
     if (!urlToUse || !urlToUse.trim()) {
       setSyncNotice({
         type: 'error',
@@ -156,27 +163,80 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
     }
 
     setIsLoadingPreview(true);
+    let extractedRows: ReceiptData[] = [];
+    let loadError: string | null = null;
+
+    // 1. Coba lewat backend proxy internal
     try {
       const json = await safeFetchJson('/api/gas/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gasUrl: urlToUse.trim() }),
       });
-      if (json.success && Array.isArray(json.data)) {
-        setPreviewData(json.data.slice(0, 10));
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        extractedRows = json.data;
         if (json.lastSyncedAt) setLastSyncedAt(json.lastSyncedAt);
-        if (onSyncSuccess) onSyncSuccess();
-      } else if (json.error) {
+      } else if (json && json.error) {
+        loadError = json.error;
+      }
+    } catch (proxyErr: any) {
+      console.warn('Backend proxy /api/gas/pull failed (normal di Vercel), mencoba direct browser call:', proxyErr.message);
+    }
+
+    // 2. Fallback PENTING: Panggilan langsung browser ke Google Apps Script (Bekerja 100% di Vercel!)
+    if (extractedRows.length === 0) {
+      try {
+        const directRes = await directGasCall(urlToUse.trim(), 'getTransactions');
+        if (directRes) {
+          if (Array.isArray(directRes)) {
+            extractedRows = directRes;
+          } else if (Array.isArray(directRes.data)) {
+            extractedRows = directRes.data;
+          }
+        }
+      } catch (directErr: any) {
+        console.warn('Direct getTransactions failed, trying twoWaySync fallback:', directErr.message);
+        try {
+          const syncRes = await directGasCall(urlToUse.trim(), 'twoWaySync', { transactions: [] });
+          if (syncRes && Array.isArray(syncRes.data)) {
+            extractedRows = syncRes.data;
+          }
+        } catch (syncErr: any) {
+          loadError = directErr.message || syncErr.message;
+        }
+      }
+    }
+
+    // 3. Jika berhasil mendapatkan data transaksi dari Google Sheets
+    if (extractedRows.length > 0) {
+      const formatted = extractedRows.map((item: any) => ({
+        ...item,
+        idpel: formatIdpelAsText(item.idpel),
+      }));
+
+      // Batasi maksimal 10 transaksi terbaru untuk kecepatan performa
+      setPreviewData(formatted.slice(0, 10));
+      const now = new Date().toISOString();
+      setLastSyncedAt(now);
+      if (onSyncSuccess) onSyncSuccess();
+    } else {
+      // 4. Fallback jika sheet kosong atau koneksi belum siap: ambil data riwayat tersimpan di aplikasi
+      const stored = getStoredTransactions();
+      if (stored.length > 0) {
+        const formatted = stored.map((item: any) => ({
+          ...item,
+          idpel: formatIdpelAsText(item.idpel),
+        }));
+        setPreviewData(formatted.slice(0, 10));
+      } else if (loadError) {
         setSyncNotice({
           type: 'error',
-          text: `Gagal memuat data sheet: ${json.error}`,
+          text: `Gagal memuat data dari Google Sheets: ${loadError}`,
         });
       }
-    } catch (err: any) {
-      console.error('Preview error:', err);
-    } finally {
-      setIsLoadingPreview(false);
     }
+
+    setIsLoadingPreview(false);
   };
 
   const handleSaveConfig = async () => {
@@ -672,12 +732,16 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                         setSyncInterval(num);
                         setAutoSyncInterval(num);
                       }}
-                      className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-blue-500 font-semibold"
+                      className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 font-semibold shadow-xs"
                     >
                       <option value={15}>Setiap 15 Detik (Sangat Cepat)</option>
                       <option value={30}>Setiap 30 Detik (Direkomendasikan)</option>
                       <option value={60}>Setiap 1 Menit</option>
                       <option value={120}>Setiap 2 Menit</option>
+                      <option value={300}>Setiap 5 Menit</option>
+                      <option value={600}>Setiap 10 Menit</option>
+                      <option value={1200}>Setiap 20 Menit</option>
+                      <option value={1800}>Setiap 30 Menit</option>
                     </select>
                   </div>
 
@@ -705,7 +769,9 @@ export function GasIntegrationTab({ onSyncSuccess }: GasIntegrationTabProps) {
                       ) : (
                         <>
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>Tersinkronisasi Otomatis</span>
+                          <span>
+                            Tersinkronisasi Otomatis ({syncInterval < 60 ? `${syncInterval} Detik` : `${Math.round(syncInterval / 60)} Menit`})
+                          </span>
                         </>
                       )}
                     </span>

@@ -117,7 +117,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   const urlObj = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const pathname = urlObj.pathname.replace(/^\/api/, "") || "/";
+  let pathname = (urlObj.searchParams.get("route") ? `/${urlObj.searchParams.get("route")}` : "") ||
+                 (typeof req.headers["x-matched-path"] === "string" ? req.headers["x-matched-path"] : "") ||
+                 urlObj.pathname;
+  pathname = pathname.replace(/^\/api/, "") || "/";
+  if (!pathname.startsWith("/")) pathname = "/" + pathname;
 
   try {
     // 1. Health check

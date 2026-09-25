@@ -66,6 +66,9 @@ export function setAutoSyncEnabled(enabled: boolean): void {
   localStorage.setItem(STORAGE_KEY_AUTO_SYNC, String(enabled));
 }
 
+let autoSyncTimerId: any = null;
+let currentRunSyncFn: (() => Promise<void>) | null = null;
+
 export function getAutoSyncInterval(): number {
   const val = localStorage.getItem(STORAGE_KEY_SYNC_INTERVAL);
   if (val) {
@@ -78,6 +81,11 @@ export function getAutoSyncInterval(): number {
 export function setAutoSyncInterval(seconds: number): void {
   const clamped = Math.max(15, seconds);
   localStorage.setItem(STORAGE_KEY_SYNC_INTERVAL, String(clamped));
+  // Segera perbarui timer yang sedang berjalan ke interval baru
+  if (autoSyncTimerId && currentRunSyncFn) {
+    clearInterval(autoSyncTimerId);
+    autoSyncTimerId = setInterval(currentRunSyncFn, clamped * 1000);
+  }
 }
 
 export function getStoredGasUrl(): string {
@@ -198,7 +206,40 @@ export async function directGasCall(
   const url = normalizeGasUrl(gasUrl || getStoredGasUrl());
   if (!url) throw new Error('URL Google Apps Script belum diisi');
 
-  // 1. Coba POST text/plain (CORS-friendly di browser)
+  const isReadAction = action === 'getTransactions' || action === 'pull' || action === 'ping' || action === 'test';
+
+  if (isReadAction) {
+    // 1. Coba GET terlebih dahulu untuk read (paling stabil di browser & Vercel, tanpa CORS issue)
+    try {
+      const u = new URL(url);
+      u.searchParams.set('action', action);
+      if (payload.id) u.searchParams.set('id', String(payload.id));
+      const getRes = await fetch(u.toString(), { method: 'GET' });
+      const getText = await getRes.text();
+      const parsed = parseGasRawResponse(getText);
+      if (parsed && (parsed.success || Array.isArray(parsed) || Array.isArray(parsed.data))) {
+        return parsed;
+      }
+    } catch (errGet: any) {
+      console.warn('Direct GET to GAS failed, falling back to POST:', errGet.message);
+    }
+
+    // 2. Fallback POST jika GET gagal
+    try {
+      const postBody = JSON.stringify({ action, ...payload });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: postBody,
+      });
+      const text = await res.text();
+      return parseGasRawResponse(text);
+    } catch (errPost: any) {
+      throw errPost;
+    }
+  }
+
+  // Untuk Write Action (save, sync): POST text/plain terlebih dahulu
   try {
     const postBody = JSON.stringify({ action, ...payload });
     const res = await fetch(url, {
@@ -212,7 +253,7 @@ export async function directGasCall(
     console.warn('Direct POST to GAS failed, falling back to GET:', errPost.message);
   }
 
-  // 2. Coba GET sebagai fallback
+  // Fallback GET untuk write
   const u = new URL(url);
   u.searchParams.set('action', action);
   if (payload.id) u.searchParams.set('id', String(payload.id));
@@ -271,7 +312,6 @@ export function mergeTransactions(
 }
 
 let isSyncInProgress = false;
-let autoSyncTimerId: any = null;
 
 /**
  * SINKRONISASI 2 ARAH CERDAS (TWO-WAY SYNC)
@@ -418,6 +458,8 @@ export function startAutoSync(
     }
   };
 
+  currentRunSyncFn = runSync;
+
   // Run initial auto-sync after 1.5 seconds
   setTimeout(runSync, 1500);
 
@@ -439,6 +481,7 @@ export function startAutoSync(
       clearInterval(autoSyncTimerId);
       autoSyncTimerId = null;
     }
+    currentRunSyncFn = null;
     window.removeEventListener('focus', handleVisibility);
     document.removeEventListener('visibilitychange', handleVisibility);
   };
