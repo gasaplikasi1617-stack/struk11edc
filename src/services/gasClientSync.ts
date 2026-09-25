@@ -221,6 +221,25 @@ export async function directGasCall(
   return parseGasRawResponse(getText);
 }
 
+function cleanIdpel(val: any): string {
+  if (val === null || val === undefined || val === '') return '-';
+  if (typeof val === 'number' && Number.isFinite(val)) {
+    return Number.isInteger(val) ? val.toLocaleString('fullwide', { useGrouping: false }) : BigInt(Math.round(val)).toString();
+  }
+  let s = String(val).trim();
+  if (/^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/i.test(s)) {
+    const num = Number(s);
+    if (!isNaN(num) && Number.isFinite(num)) {
+      try {
+        return BigInt(Math.round(num)).toString();
+      } catch {
+        return num.toLocaleString('fullwide', { useGrouping: false });
+      }
+    }
+  }
+  return s || '-';
+}
+
 /**
  * Gabung daftar transaksi lokal & cloud tanpa duplikasi
  */
@@ -233,13 +252,13 @@ export function mergeTransactions(
   // Masukkan data remote
   remoteList.forEach((t) => {
     const id = t.id || `TX-${new Date(t.createdAt || Date.now()).getTime()}`;
-    map.set(id, { ...t, id });
+    map.set(id, { ...t, id, idpel: cleanIdpel(t.idpel) });
   });
 
   // Masukkan/Pertahankan data lokal
   localList.forEach((t) => {
     if (t.id && !map.has(t.id)) {
-      map.set(t.id, t);
+      map.set(t.id, { ...t, idpel: cleanIdpel(t.idpel) });
     }
   });
 

@@ -349,13 +349,43 @@ function mergeTransactions(localList: any[], sheetList: any[]) {
   };
 }
 
+function normalizeTransaction(t: any): any {
+  if (!t || typeof t !== "object") return t;
+  let idpel = t.idpel != null ? String(t.idpel).trim() : "";
+  if (/^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/i.test(idpel)) {
+    const num = Number(idpel);
+    if (!isNaN(num) && Number.isFinite(num)) {
+      try {
+        idpel = BigInt(Math.round(num)).toString();
+      } catch {
+        idpel = num.toLocaleString("fullwide", { useGrouping: false });
+      }
+    }
+  } else if (typeof t.idpel === "number" && Number.isFinite(t.idpel)) {
+    idpel = t.idpel.toLocaleString("fullwide", { useGrouping: false });
+  }
+
+  let noHp = t.noHp != null ? String(t.noHp).trim() : "";
+  if (/^\d{9,13}$/.test(noHp) && !noHp.startsWith("0")) {
+    noHp = "0" + noHp;
+  }
+
+  return {
+    ...t,
+    id: t.id ? String(t.id) : undefined,
+    idpel: idpel || "-",
+    noHp: noHp || t.noHp || "-",
+  };
+}
+
 function getTransactions(): any[] {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
       const list = JSON.parse(data);
       if (Array.isArray(list)) {
-        const { cleaned, removedCount } = deduplicateList(list);
+        const normalized = list.map(normalizeTransaction);
+        const { cleaned, removedCount } = deduplicateList(normalized);
         if (removedCount > 0) {
           saveTransactions(cleaned);
         }
@@ -370,7 +400,8 @@ function getTransactions(): any[] {
 
 function saveTransactions(txs: any[]) {
   try {
-    const { cleaned } = deduplicateList(txs);
+    const normalized = Array.isArray(txs) ? txs.map(normalizeTransaction) : [];
+    const { cleaned } = deduplicateList(normalized);
     fs.writeFileSync(DATA_FILE, JSON.stringify(cleaned, null, 2), "utf-8");
   } catch (e) {
     console.error("Error saving transactions:", e);

@@ -61,7 +61,10 @@ function getOrCreateSheet() {
       .setBackground("#1e40af")
       .setFontColor("#ffffff");
     sheet.setFrozenRows(1);
+    sheet.getRange("A2:A").setNumberFormat("@");
+    sheet.getRange("C2:C").setNumberFormat("@");
     sheet.getRange("I2:L").setNumberFormat("#,##0");
+    sheet.getRange("O2:O").setNumberFormat("@");
   }
   return sheet;
 }
@@ -87,9 +90,13 @@ function onOpen() {
 function setupDatabase() {
   var ss = getSpreadsheet();
   var sheet = getOrCreateSheet();
+  sheet.getRange("A2:A").setNumberFormat("@");
+  sheet.getRange("C2:C").setNumberFormat("@");
+  sheet.getRange("I2:L").setNumberFormat("#,##0");
+  sheet.getRange("O2:O").setNumberFormat("@");
   return {
     success: true,
-    message: "Database Google Sheets 'RiwayatTransaksi' berhasil disiapkan!",
+    message: "Database Google Sheets 'RiwayatTransaksi' berhasil disiapkan (Format ID Pelanggan = Teks)!",
     spreadsheetName: ss.getName(),
     spreadsheetUrl: ss.getUrl(),
     sheetName: sheet.getName(),
@@ -112,10 +119,18 @@ function getAllTransactionsFromSheet() {
   for (var i = 0; i < values.length; i++) {
     var row = values[i];
     if (!row[0] && !row[2]) continue; // Lewati baris kosong
+    var rawIdpel = row[2];
+    var cleanIdpel = String(rawIdpel || "");
+    if (typeof rawIdpel === "number" || /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/i.test(cleanIdpel)) {
+      var n = Number(rawIdpel);
+      if (!isNaN(n) && isFinite(n)) {
+        cleanIdpel = Math.round(n).toLocaleString("fullwide", { useGrouping: false });
+      }
+    }
     result.push({
       id: String(row[0] || ("TX-" + (i + 1))),
       tanggal: String(row[1] || ""),
-      idpel: String(row[2] || ""),
+      idpel: cleanIdpel || "-",
       namaPelanggan: String(row[3] || ""),
       pemakaian: String(row[4] || ""),
       standMeter: String(row[5] || ""),
@@ -152,10 +167,15 @@ function saveSingleTransaction(tx) {
     }
   }
 
+  var cIdpel = String(tx.idpel || "-");
+  if (typeof tx.idpel === "number" && isFinite(tx.idpel)) {
+    cIdpel = tx.idpel.toLocaleString("fullwide", { useGrouping: false });
+  }
+
   sheet.appendRow([
     txId,
     tx.tanggal || new Date().toLocaleDateString("id-ID"),
-    tx.idpel || "-",
+    "'" + cIdpel,
     tx.namaPelanggan || "PELANGGAN",
     tx.pemakaian || "-",
     tx.standMeter || "-",
@@ -196,10 +216,14 @@ function executeTwoWaySync(incomingTransactions) {
     var tSig = (String(t.idpel || "") + "_" + String(t.bulanTagihan || "") + "_" + String(t.tanggal || "")).toLowerCase();
 
     if (!existingMap[tId] && !existingMap[tSig]) {
+      var rowIdpel = String(t.idpel || "-");
+      if (typeof t.idpel === "number" && isFinite(t.idpel)) {
+        rowIdpel = t.idpel.toLocaleString("fullwide", { useGrouping: false });
+      }
       newRows.push([
         tId,
         t.tanggal || new Date().toLocaleDateString("id-ID"),
-        t.idpel || "-",
+        "'" + rowIdpel,
         t.namaPelanggan || "PELANGGAN",
         t.pemakaian || "-",
         t.standMeter || "-",
