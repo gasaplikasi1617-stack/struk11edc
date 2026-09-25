@@ -124,7 +124,24 @@ export function getStoredTransactions(): ReceiptData[] {
     const raw = localStorage.getItem(STORAGE_KEY_TXS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        const deletedIds = getDeletedTransactionIds();
+        const resetTime = getLastResetTimestamp();
+        return parsed.filter(isValidTransaction).filter((t) => {
+          if (t.id && deletedIds.has(t.id)) return false;
+          if (t.idpel && deletedIds.has(t.idpel)) return false;
+          if (resetTime > 0) {
+            let tTime = 0;
+            if (t.createdAt) tTime = new Date(t.createdAt).getTime();
+            if (!tTime && t.id && String(t.id).startsWith('TX-')) {
+              const num = Number(String(t.id).replace('TX-', ''));
+              if (!isNaN(num) && num > 1000000000) tTime = num;
+            }
+            if (tTime > 0 && tTime < resetTime) return false;
+          }
+          return true;
+        });
+      }
     }
   } catch (e) {
     console.warn('Failed reading transactions from localStorage:', e);
@@ -281,24 +298,113 @@ function cleanIdpel(val: any): string {
   return s || '-';
 }
 
+const STORAGE_KEY_DELETED_IDS = 'agent_batara_deleted_tx_ids';
+const STORAGE_KEY_RESET_TIMESTAMP = 'agent_batara_last_reset_timestamp';
+
+export function getDeletedTransactionIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED_IDS);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedTransactionId(id: string): void {
+  if (!id) return;
+  try {
+    const set = getDeletedTransactionIds();
+    set.add(id);
+    localStorage.setItem(STORAGE_KEY_DELETED_IDS, JSON.stringify(Array.from(set).slice(-1000)));
+  } catch {}
+}
+
+export function clearDeletedTransactionIds(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_DELETED_IDS);
+  } catch {}
+}
+
+export function getLastResetTimestamp(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_RESET_TIMESTAMP);
+    if (raw) return Number(raw) || 0;
+  } catch {}
+  return 0;
+}
+
+export function setLastResetTimestamp(ts: number): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_RESET_TIMESTAMP, String(ts));
+  } catch {}
+}
+
 /**
- * Gabung daftar transaksi lokal & cloud tanpa duplikasi
+ * Hapus transaksi dari Google Sheets (Cloud)
+ */
+export async function deleteGoogleSheetTransaction(id: string): Promise<any> {
+  if (!id) return;
+  addDeletedTransactionId(id);
+  const url = getStoredGasUrl();
+  if (!url) return;
+  try {
+    return await directGasCall(url, 'deleteTransaction', { id });
+  } catch (err: any) {
+    console.warn('Gagal menghapus baris di Google Sheets:', err.message);
+  }
+}
+
+export function isValidTransaction(t: any): boolean {
+  if (!t || typeof t !== 'object') return false;
+  const name = String(t.namaPelanggan || '').trim();
+  const idpel = String(t.idpel || '').trim();
+  const total = Number(t.totalBayar) || Number(t.rpTagihan) || 0;
+  if (!name && (idpel === '' || idpel === '-') && total === 0) return false;
+  return true;
+}
+
+/**
+ * Gabung daftar transaksi lokal & cloud tanpa duplikasi,
+ * DILENGKAPI FILTER ANTI-BANGKIT (Mencegah transaksi yang sudah dihapus / direset muncul kembali)
  */
 export function mergeTransactions(
   localList: ReceiptData[],
   remoteList: ReceiptData[]
 ): ReceiptData[] {
   const map = new Map<string, ReceiptData>();
+  const deletedIds = getDeletedTransactionIds();
+  const resetTime = getLastResetTimestamp();
 
-  // Masukkan data remote
-  remoteList.forEach((t) => {
+  // Masukkan data remote HANYA jika valid, bukan transaksi yang sudah dihapus, atau sebelum waktu reset
+  remoteList.filter(isValidTransaction).forEach((t) => {
     const id = t.id || `TX-${new Date(t.createdAt || Date.now()).getTime()}`;
+    // Jika sudah dihapus oleh pengguna, jangan pernah dimasukkan lagi!
+    if (deletedIds.has(id)) return;
+    if (t.idpel && deletedIds.has(t.idpel)) return;
+
+    // Jika ada waktu reset tutup buku, lewati transaksi lama yang dibuat sebelum waktu reset
+    if (resetTime > 0) {
+      let tTime = 0;
+      if (t.createdAt) {
+        tTime = new Date(t.createdAt).getTime();
+      }
+      if (!tTime && t.id && String(t.id).startsWith('TX-')) {
+        const parsedNum = Number(String(t.id).replace('TX-', ''));
+        if (!isNaN(parsedNum) && parsedNum > 1000000000) tTime = parsedNum;
+      }
+      if (tTime > 0 && tTime < resetTime) {
+        return; // Lewati data lama sebelum tutup buku!
+      }
+    }
+
     map.set(id, { ...t, id, idpel: cleanIdpel(t.idpel) });
   });
 
-  // Masukkan/Pertahankan data lokal
-  localList.forEach((t) => {
-    if (t.id && !map.has(t.id)) {
+  // Masukkan/Pertahankan data lokal (yang valid dan tidak dihapus)
+  localList.filter(isValidTransaction).forEach((t) => {
+    if (t.id && !deletedIds.has(t.id) && !map.has(t.id)) {
       map.set(t.id, { ...t, idpel: cleanIdpel(t.idpel) });
     }
   });

@@ -14,6 +14,8 @@ import {
   saveStoredTransactions,
   startAutoSync,
   executeTwoWaySync,
+  addDeletedTransactionId,
+  deleteGoogleSheetTransaction,
 } from './services/gasClientSync';
 
 export default function App() {
@@ -221,6 +223,9 @@ export default function App() {
     if (!targetKey) return;
     if (!confirm('Apakah Anda yakin ingin menghapus data transaksi ini dari riwayat?')) return;
 
+    // Catat ID ke tombstone agar tidak pernah ditarik kembali oleh sinkronisasi otomatis
+    addDeletedTransactionId(targetKey);
+
     // Filter local state by id, idpel, or namaPelanggan
     const updated = transactions.filter((t) => {
       if (t.id && t.id === targetKey) return false;
@@ -235,11 +240,15 @@ export default function App() {
       localStorage.setItem('agent_batara_txs', JSON.stringify(updated));
     } catch (err) {}
 
+    // Hapus di server lokal
     try {
       await fetch(`/api/transactions/${encodeURIComponent(targetKey)}`, { method: 'DELETE' });
     } catch (e) {
       console.warn('Server delete error:', e);
     }
+
+    // Hapus di Google Sheets (Cloud)
+    deleteGoogleSheetTransaction(targetKey).catch(() => {});
   };
 
   const handleToggleStatus = async (tx: ReceiptData) => {

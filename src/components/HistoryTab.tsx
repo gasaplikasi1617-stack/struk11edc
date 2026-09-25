@@ -33,9 +33,20 @@ import {
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
-import { executeTwoWaySync } from '../services/gasClientSync';
+import {
+  executeTwoWaySync,
+  addDeletedTransactionId,
+  setLastResetTimestamp,
+  archiveAndResetGoogleSheet,
+  getStoredGasUrl,
+} from '../services/gasClientSync';
 import { MonthlyResetModal } from './MonthlyResetModal';
-import { RolloverResult } from '../utils/monthlyArchive';
+import {
+  RolloverResult,
+  getDefaultPeriodName,
+  downloadExcelBackup,
+  downloadJsonBackup,
+} from '../utils/monthlyArchive';
 
 interface HistoryTabProps {
   transactions: ReceiptData[];
@@ -216,6 +227,80 @@ export function HistoryTab({
     } finally {
       setIsDeduplicating(false);
       setTimeout(() => setExportSuccessNotice(null), 5000);
+    }
+  };
+
+  const [isClearingAll, setIsClearingAll] = useState(false);
+
+  const handleQuickClearAll = async () => {
+    if (transactions.length === 0) {
+      alert('Riwayat transaksi sudah kosong (0 data).');
+      return;
+    }
+
+    const conf = confirm(
+      `PERINGATAN TUTUP BUKU / BERSIHKAN DATA:\n\n` +
+      `Anda akan menghapus seluruh ${transactions.length} data riwayat transaksi saat ini.\n\n` +
+      `1. File backup Excel (.xlsx) & cadangan JSON akan OTOMATIS diunduh agar data lama Anda aman 100% di komputer/HP.\n` +
+      `2. Riwayat aplikasi akan menjadi 0 transaksi bersih.\n` +
+      `3. Data lama dijamin TIDAK AKAN MUNCUL KEMBALI di bulan baru.\n\n` +
+      `Apakah Anda yakin ingin melanjutkan?`
+    );
+    if (!conf) return;
+
+    setIsClearingAll(true);
+    try {
+      const periodName = getDefaultPeriodName();
+      const safePeriodTag = periodName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // 1. Download Backup Otomatis
+      downloadExcelBackup(transactions, `Backup_Transaksi_${safePeriodTag}.xlsx`, periodName);
+      await new Promise((r) => setTimeout(r, 600));
+      downloadJsonBackup(transactions, `Backup_Transaksi_${safePeriodTag}.json`, periodName);
+
+      // 2. Tandai timestamp reset dan seluruh ID agar tidak pernah ditarik kembali oleh sinkronisasi otomatis
+      const now = Date.now();
+      setLastResetTimestamp(now);
+      transactions.forEach((t) => {
+        if (t.id) addDeletedTransactionId(t.id);
+        if (t.idpel) addDeletedTransactionId(t.idpel);
+      });
+
+      // 3. Reset database server
+      try {
+        await fetch('/api/transactions/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ backupPeriod: safePeriodTag }),
+        });
+      } catch {}
+
+      // 4. Arsipkan & kosongkan Google Sheets jika terhubung
+      try {
+        const gUrl = getStoredGasUrl();
+        if (gUrl) {
+          archiveAndResetGoogleSheet(gUrl, periodName).catch(() => {});
+        }
+      } catch {}
+
+      // 5. Bersihkan storage lokal
+      try {
+        localStorage.removeItem('agent_batara_txs');
+      } catch {}
+
+      // 6. Refresh state transaksi menjadi 0
+      if (onRefreshTransactions) {
+        await onRefreshTransactions();
+      }
+
+      setExportSuccessNotice(
+        `Sukses! Seluruh ${transactions.length} data riwayat telah dibersihkan dan dicadangkan. Aplikasi kini fresh dengan 0 transaksi untuk bulan baru.`
+      );
+    } catch (err: any) {
+      alert(`Terjadi kendala saat membersihkan data: ${err.message || String(err)}`);
+    } finally {
+      setIsClearingAll(false);
+      setTimeout(() => setExportSuccessNotice(null), 6000);
     }
   };
 
@@ -572,7 +657,18 @@ export function HistoryTab({
               title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & kosongkan riwayat untuk bulan baru (0 data)"
             >
               <Archive className="w-4 h-4" />
-              <span>Tutup Buku & Reset Bulan</span>
+              <span>Tutup Buku Bulanan</span>
+            </button>
+
+            <button
+              id="btn-clear-all-history"
+              onClick={handleQuickClearAll}
+              disabled={isClearingAll || transactions.length === 0}
+              className="bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-rose-200 shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Hapus seluruh riwayat transaksi sekarang (fresh 0 data)"
+            >
+              <Trash2 className={`w-4 h-4 text-rose-600 ${isClearingAll ? 'animate-bounce' : ''}`} />
+              <span>{isClearingAll ? 'Membersihkan...' : 'Hapus Semua (0)'}</span>
             </button>
           </div>
         </div>

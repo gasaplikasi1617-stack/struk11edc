@@ -312,10 +312,64 @@ function deduplicateList(list: any[]): { cleaned: any[]; removedCount: number } 
   return { cleaned, removedCount };
 }
 
-// Two-way merge helper without duplicates
+const RESET_INFO_FILE = path.join(process.cwd(), "reset_info.json");
+
+function getResetInfo(): { lastResetTimestamp: number; deletedIds: string[] } {
+  try {
+    if (fs.existsSync(RESET_INFO_FILE)) {
+      const data = JSON.parse(fs.readFileSync(RESET_INFO_FILE, "utf-8"));
+      return {
+        lastResetTimestamp: Number(data.lastResetTimestamp) || 0,
+        deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds : [],
+      };
+    }
+  } catch (e) {}
+  return { lastResetTimestamp: 0, deletedIds: [] };
+}
+
+function saveResetInfo(info: { lastResetTimestamp: number; deletedIds: string[] }) {
+  try {
+    fs.writeFileSync(RESET_INFO_FILE, JSON.stringify(info, null, 2), "utf-8");
+  } catch (e) {}
+}
+
+function addDeletedId(id: string) {
+  if (!id) return;
+  const current = getResetInfo();
+  if (!current.deletedIds.includes(id)) {
+    current.deletedIds.push(id);
+    if (current.deletedIds.length > 1000) current.deletedIds = current.deletedIds.slice(-1000);
+    saveResetInfo(current);
+  }
+}
+
+// Two-way merge helper without duplicates (with reset & delete protection)
 function mergeTransactions(localList: any[], sheetList: any[]) {
-  const localDedupe = deduplicateList(localList).cleaned;
-  const sheetDedupe = deduplicateList(sheetList).cleaned;
+  const { lastResetTimestamp, deletedIds } = getResetInfo();
+  const deletedSet = new Set(deletedIds);
+
+  const localDedupe = deduplicateList(localList).cleaned.filter((t: any) => {
+    if (t.id && deletedSet.has(t.id)) return false;
+    if (t.idpel && deletedSet.has(t.idpel)) return false;
+    return true;
+  });
+
+  const sheetDedupe = deduplicateList(sheetList).cleaned.filter((t: any) => {
+    if (t.id && deletedSet.has(t.id)) return false;
+    if (t.idpel && deletedSet.has(t.idpel)) return false;
+    if (lastResetTimestamp > 0) {
+      let tTime = 0;
+      if (t.createdAt) tTime = new Date(t.createdAt).getTime();
+      if (!tTime && t.id && String(t.id).startsWith("TX-")) {
+        const num = Number(String(t.id).replace("TX-", ""));
+        if (!isNaN(num) && num > 1000000000) tTime = num;
+      }
+      if (tTime > 0 && tTime < lastResetTimestamp) {
+        return false; // Lewati transaksi sebelum waktu reset tutup buku!
+      }
+    }
+    return true;
+  });
 
   const merged: any[] = [...localDedupe];
   const newFromSheet: any[] = [];
@@ -378,15 +432,45 @@ function normalizeTransaction(t: any): any {
   };
 }
 
+function isValidTransaction(t: any): boolean {
+  if (!t || typeof t !== "object") return false;
+  const name = String(t.namaPelanggan || "").trim();
+  const idpel = String(t.idpel || "").trim();
+  const total = Number(t.totalBayar) || Number(t.rpTagihan) || 0;
+  if (!name && (idpel === "" || idpel === "-") && total === 0) return false;
+  return true;
+}
+
 function getTransactions(): any[] {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
       const list = JSON.parse(data);
       if (Array.isArray(list)) {
-        const normalized = list.map(normalizeTransaction);
+        const { lastResetTimestamp, deletedIds } = getResetInfo();
+        const deletedSet = new Set(deletedIds);
+
+        const filtered = list.filter((t: any) => {
+          if (!isValidTransaction(t)) return false;
+          if (t.id && deletedSet.has(t.id)) return false;
+          if (t.idpel && deletedSet.has(t.idpel)) return false;
+          if (lastResetTimestamp > 0) {
+            let tTime = 0;
+            if (t.createdAt) tTime = new Date(t.createdAt).getTime();
+            if (!tTime && t.id && String(t.id).startsWith("TX-")) {
+              const num = Number(String(t.id).replace("TX-", ""));
+              if (!isNaN(num) && num > 1000000000) tTime = num;
+            }
+            if (tTime > 0 && tTime < lastResetTimestamp) {
+              return false; // Abaikan data sebelum tutup buku
+            }
+          }
+          return true;
+        });
+
+        const normalized = filtered.map(normalizeTransaction);
         const { cleaned, removedCount } = deduplicateList(normalized);
-        if (removedCount > 0) {
+        if (removedCount > 0 || filtered.length < list.length) {
           saveTransactions(cleaned);
         }
         return cleaned;
@@ -400,7 +484,8 @@ function getTransactions(): any[] {
 
 function saveTransactions(txs: any[]) {
   try {
-    const normalized = Array.isArray(txs) ? txs.map(normalizeTransaction) : [];
+    const valid = Array.isArray(txs) ? txs.filter(isValidTransaction) : [];
+    const normalized = valid.map(normalizeTransaction);
     const { cleaned } = deduplicateList(normalized);
     fs.writeFileSync(DATA_FILE, JSON.stringify(cleaned, null, 2), "utf-8");
   } catch (e) {
@@ -515,6 +600,17 @@ app.post("/api/transactions/reset", (req, res) => {
         console.warn("Gagal menulis file backup disk:", bErr);
       }
     }
+
+    // Set waktu reset sekarang dan masukkan semua ID ke deletedIds agar tidak pernah ditarik lagi
+    const now = Date.now();
+    const info = getResetInfo();
+    info.lastResetTimestamp = now;
+    txs.forEach((t: any) => {
+      if (t.id && !info.deletedIds.includes(t.id)) info.deletedIds.push(t.id);
+      if (t.idpel && !info.deletedIds.includes(t.idpel)) info.deletedIds.push(t.idpel);
+    });
+    saveResetInfo(info);
+
     saveTransactions([]);
     res.json({
       success: true,
@@ -531,8 +627,16 @@ app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
   const targetKey = decodeURIComponent(req.params.id || "");
   const initialLength = txs.length;
+  addDeletedId(targetKey);
   txs = txs.filter((t: any) => t.id !== targetKey && t.idpel !== targetKey && t.namaPelanggan !== targetKey);
   saveTransactions(txs);
+
+  // Notify Google Sheets to delete row so it doesn't resurrect
+  const gasCfg = getGasConfig();
+  if (gasCfg.gasUrl) {
+    callGasPost(gasCfg.gasUrl, { action: "deleteTransaction", id: targetKey }).catch(() => {});
+  }
+
   res.json({ success: true, removed: initialLength - txs.length, total: txs.length });
 });
 

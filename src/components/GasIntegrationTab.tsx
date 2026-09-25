@@ -39,6 +39,8 @@ import {
   setAutoSyncInterval,
   subscribeSyncState,
   SyncState,
+  getDeletedTransactionIds,
+  getLastResetTimestamp,
 } from '../services/gasClientSync';
 
 interface GasIntegrationTabProps {
@@ -219,7 +221,25 @@ export function GasIntegrationTab({
 
     // 3. Jika berhasil mendapatkan data transaksi dari Google Sheets
     if (extractedRows.length > 0) {
-      const formatted = extractedRows.map((item: any) => ({
+      const deletedIds = getDeletedTransactionIds();
+      const resetTime = getLastResetTimestamp();
+
+      const activeRows = extractedRows.filter((item: any) => {
+        if (item.id && deletedIds.has(item.id)) return false;
+        if (item.idpel && deletedIds.has(item.idpel)) return false;
+        if (resetTime > 0) {
+          let tTime = 0;
+          if (item.createdAt) tTime = new Date(item.createdAt).getTime();
+          if (!tTime && item.id && String(item.id).startsWith('TX-')) {
+            const num = Number(String(item.id).replace('TX-', ''));
+            if (!isNaN(num) && num > 1000000000) tTime = num;
+          }
+          if (tTime > 0 && tTime < resetTime) return false;
+        }
+        return true;
+      });
+
+      const formatted = activeRows.map((item: any) => ({
         ...item,
         idpel: formatIdpelAsText(item.idpel),
       }));
