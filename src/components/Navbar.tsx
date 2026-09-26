@@ -42,8 +42,15 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-3">
-            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-md flex items-center justify-center">
-              <Receipt className="w-6 h-6" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 shadow-md border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
+              <img
+                src="https://iili.io/nRihMkG.png"
+                alt="Logo Aplikasi Cetak Resi"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

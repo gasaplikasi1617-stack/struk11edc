@@ -614,8 +614,17 @@ export function HistoryTab({
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
           <div>
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-50 p-0.5 border border-slate-200 shrink-0 flex items-center justify-center shadow-xs">
+                <img
+                  src="https://iili.io/nRihMkG.png"
+                  alt="Logo"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                  }}
+                />
+              </div>
               <span>Riwayat Transaksi (Maksimal 100 Transaksi)</span>
             </h2>
             <p className="text-xs text-slate-500 mt-1">

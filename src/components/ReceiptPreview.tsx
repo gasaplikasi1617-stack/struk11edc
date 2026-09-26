@@ -481,6 +481,17 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
         >
           {/* Header Agen (Bukopin PPOB Style: Centered, Bold, Larger Header Title at Very Top) */}
           <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
+            <div className="flex justify-center mb-2">
+              <img
+                src="https://iili.io/nRihMkG.png"
+                alt="Logo Agen"
+                className="h-10 w-auto object-contain max-h-12"
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
+              />
+            </div>
             <h2 className="text-base sm:text-lg font-extrabold tracking-wide uppercase text-black leading-tight">
               {getReceiptHeaderTitle(receipt)}
             </h2>

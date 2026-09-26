@@ -312,25 +312,65 @@ export default function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'create' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-7">
-              <ReceiptForm
-                receipt={receipt}
-                setReceipt={setReceipt}
-                agentConfig={agentConfig}
-                setAgentConfig={setAgentConfig}
-                onSave={handleSaveTransaction}
-                onPrint={handlePrint}
-                resetTrigger={resetTrigger}
-              />
+          <div className="space-y-6">
+            {/* Dashboard Brand Header with Logo */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-50 border border-slate-200/80 p-1.5 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src="https://iili.io/nRihMkG.png"
+                    alt="Logo Dashboard"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                    }}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">
+                      Dashboard Cetak Resi Tagihan
+                    </h2>
+                    <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-200">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                      Loket: {agentConfig.namaAgen || 'Agen Batara'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    Sistem loket kasir &amp; pembayaran tagihan PPOB multi-institusi (PLN, PDAM, Telkom, BPJS). Input otomatis, cetak A6 &amp; Dot Matrix LX-310 langsung tersimpan ke riwayat.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                <div className="text-right">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status Loket</div>
+                  <div className="text-xs font-bold text-emerald-600 flex items-center gap-1 justify-end">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Siap Cetak &amp; Simpan
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="lg:col-span-5 sticky top-24">
-              <ReceiptPreview
-                receipt={receipt}
-                onPrint={handlePrint}
-                onSave={handleSaveTransaction}
-                savedStatus={savedStatus}
-              />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-7">
+                <ReceiptForm
+                  receipt={receipt}
+                  setReceipt={setReceipt}
+                  agentConfig={agentConfig}
+                  setAgentConfig={setAgentConfig}
+                  onSave={handleSaveTransaction}
+                  onPrint={handlePrint}
+                  resetTrigger={resetTrigger}
+                />
+              </div>
+              <div className="lg:col-span-5 sticky top-24">
+                <ReceiptPreview
+                  receipt={receipt}
+                  onPrint={handlePrint}
+                  onSave={handleSaveTransaction}
+                  savedStatus={savedStatus}
+                />
+              </div>
             </div>
           </div>
         )}
