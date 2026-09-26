@@ -399,25 +399,10 @@ export function ReceiptForm({
 
       {/* 2. Kustomisasi Header Agen */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Building className="w-5 h-5 text-blue-600" />
-            <span>3. Kustomisasi Header Resi (Agen)</span>
-          </h2>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-            <div className="w-6 h-6 rounded-md overflow-hidden bg-white p-0.5 border border-slate-200 shrink-0 flex items-center justify-center">
-              <img
-                src="https://iili.io/nRihMkG.png"
-                alt="Logo Agen"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
-                }}
-              />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-600">Logo Dashboard &amp; Loket Aktif</span>
-          </div>
-        </div>
+        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <Building className="w-5 h-5 text-blue-600" />
+          <span>3. Kustomisasi Header Resi (Agen)</span>
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
