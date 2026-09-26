@@ -605,7 +605,8 @@ export function ReceiptForm({
           <button
             type="button"
             onClick={onSave}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+            title="Simpan data transaksi ke riwayat"
           >
             <CheckCircle className="w-4 h-4" />
             <span>Simpan</span>
@@ -613,11 +614,11 @@ export function ReceiptForm({
           <button
             type="button"
             onClick={onPrint}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm"
-            title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+            title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi ke riwayat"
           >
             <Printer className="w-4 h-4" />
-            <span>Cetak Resi</span>
+            <span>Cetak Resi (Otomatis Simpan)</span>
           </button>
         </div>
       </div>

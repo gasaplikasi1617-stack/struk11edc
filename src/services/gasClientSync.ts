@@ -327,6 +327,55 @@ export function clearDeletedTransactionIds(): void {
   } catch {}
 }
 
+export function removeDeletedTransactionId(id: string): void {
+  if (!id) return;
+  try {
+    const set = getDeletedTransactionIds();
+    set.delete(id);
+    localStorage.setItem(STORAGE_KEY_DELETED_IDS, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function restoreTransactionsLocally(
+  transactions: ReceiptData[],
+  mode: 'replace' | 'merge' = 'replace'
+): ReceiptData[] {
+  const set = getDeletedTransactionIds();
+  transactions.forEach((t) => {
+    if (t.id) set.delete(t.id);
+    if (t.idpel) set.delete(t.idpel);
+  });
+  localStorage.setItem(STORAGE_KEY_DELETED_IDS, JSON.stringify(Array.from(set)));
+
+  if (mode === 'replace') {
+    setLastResetTimestamp(0);
+    const valid = transactions.filter(isValidTransaction);
+    const toSave = valid.slice(0, 100);
+    saveStoredTransactions(toSave);
+    try {
+      localStorage.setItem('agent_batara_txs', JSON.stringify(toSave));
+    } catch {}
+    return toSave;
+  } else {
+    const current = getStoredTransactions();
+    const map = new Map<string, ReceiptData>();
+    transactions.filter(isValidTransaction).forEach((t) => {
+      const id = t.id || `TX-${Date.now()}`;
+      map.set(id, t);
+    });
+    current.filter(isValidTransaction).forEach((t) => {
+      const id = t.id || `TX-${Date.now()}`;
+      if (!map.has(id)) map.set(id, t);
+    });
+    const toSave = Array.from(map.values()).slice(0, 100);
+    saveStoredTransactions(toSave);
+    try {
+      localStorage.setItem('agent_batara_txs', JSON.stringify(toSave));
+    } catch {}
+    return toSave;
+  }
+}
+
 export function getLastResetTimestamp(): number {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_RESET_TIMESTAMP);

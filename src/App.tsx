@@ -15,6 +15,7 @@ import {
   startAutoSync,
   executeTwoWaySync,
   addDeletedTransactionId,
+  removeDeletedTransactionId,
   deleteGoogleSheetTransaction,
 } from './services/gasClientSync';
 
@@ -116,20 +117,25 @@ export default function App() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveTransaction = async (force: boolean = false) => {
-    if (isSaving) return;
-    setIsSaving(true);
+  const handleSaveTransaction = async (force: boolean = false): Promise<ReceiptData | null> => {
+    let txId = receipt.id;
+    // Jika force simpan (misalnya saat tombol Cetak ditekan) dan ID transaksi ini sudah ada di riwayat,
+    // buat ID baru agar tidak bentrok dengan transaksi yang sudah dicetak sebelumnya
+    if (!txId || (force && transactions.some((t) => t.id === txId))) {
+      txId = generateRandomTransactionId();
+      setReceipt((prev) => ({ ...prev, id: txId }));
+    }
 
     const payload: ReceiptData = {
       ...receipt,
-      id: receipt.id || generateRandomTransactionId(),
-      createdAt: new Date().toISOString(),
+      id: txId,
+      createdAt: receipt.createdAt || new Date().toISOString(),
       namaAgen: agentConfig.namaAgen,
       alamat: agentConfig.alamat,
       noHp: agentConfig.noHp,
     };
 
-    // 1. Strict Anti-Duplicate Check
+    // 1. Strict Anti-Duplicate Check (Hanya aktif jika user klik manual tombol "Simpan", bukan saat "Cetak")
     if (!force) {
       const dupResult = checkDuplicateTransaction(payload, transactions);
       if (dupResult.isDuplicate) {
@@ -140,10 +146,30 @@ export default function App() {
           incoming: payload,
           matched: dupResult.matchedTransaction,
         });
-        return;
+        return null;
       }
     }
 
+    // 2. Synchronous Immediate Local Persistence (PASTI tersimpan ke localStorage & state riwayat seketika!)
+    try {
+      removeDeletedTransactionId(payload.id);
+      if (payload.idpel) removeDeletedTransactionId(payload.idpel);
+
+      const current = [payload, ...transactions.filter((t) => t.id !== payload.id)];
+      const { cleaned } = deduplicateTransactionList(current);
+      const toKeep = cleaned.slice(0, 100);
+      setTransactions(toKeep);
+      saveStoredTransactions(toKeep);
+      try {
+        localStorage.setItem('agent_batara_txs', JSON.stringify(toKeep));
+      } catch {}
+      setSavedStatus(true);
+      setTimeout(() => setSavedStatus(false), 3000);
+    } catch (localErr) {
+      console.warn('Local persistence warning:', localErr);
+    }
+
+    // 3. Simpan ke Backend Server
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
@@ -161,16 +187,13 @@ export default function App() {
             incoming: payload,
             matched: data.transaction,
           });
-          return;
+          return null;
         }
         if (data.success) {
-          setSavedStatus(true);
           fetchTransactions();
-          setResetTrigger(prev => prev + 1);
-          setTimeout(() => setSavedStatus(false), 3000);
-          setIsSaving(false);
+          setResetTrigger((prev) => prev + 1);
 
-          // Trigger instant background 2-way sync to Google Sheets
+          // Background sync to Google Sheets
           executeTwoWaySync(undefined, [payload, ...transactionsRef.current])
             .then((syncRes) => {
               if (syncRes && Array.isArray(syncRes.mergedTransactions)) {
@@ -179,44 +202,24 @@ export default function App() {
               }
             })
             .catch(() => {});
-          return;
+          return payload;
         }
       }
     } catch (e: any) {
-      console.error('Server save error, falling back to localStorage:', e);
+      console.warn('Server save warning (transaksi aman di local persistence):', e);
     }
 
-    // LocalStorage fallback with deduplication
-    try {
-      const current = [payload, ...transactions];
-      const { cleaned } = deduplicateTransactionList(current);
-      setTransactions(cleaned.slice(0, 100));
-      saveStoredTransactions(cleaned.slice(0, 100));
-      localStorage.setItem('agent_batara_txs', JSON.stringify(cleaned.slice(0, 100)));
-      setSavedStatus(true);
-      setResetTrigger(prev => prev + 1);
-      setTimeout(() => setSavedStatus(false), 3000);
-
-      // Trigger instant background 2-way sync to Google Sheets
-      executeTwoWaySync(undefined, cleaned)
-        .then((syncRes) => {
-          if (syncRes && Array.isArray(syncRes.mergedTransactions)) {
-            const { cleaned: deduped } = deduplicateTransactionList(syncRes.mergedTransactions);
-            setTransactions(deduped);
-          }
-        })
-        .catch(() => {});
-    } catch (err) {}
-    setIsSaving(false);
+    // Background sync to Google Sheets
+    executeTwoWaySync(undefined, [payload, ...transactionsRef.current]).catch(() => {});
+    return payload;
   };
 
-  const handlePrint = () => {
-    // Check if it's already in history before saving on print
-    const dupResult = checkDuplicateTransaction(receipt, transactions);
-    if (!dupResult.isDuplicate) {
-      handleSaveTransaction(false);
-    }
-    window.print();
+  const handlePrint = async () => {
+    // 100% PASTI tersimpan ke riwayat sebelum browser membuka dialog cetak
+    await handleSaveTransaction(true);
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const handleDeleteTransaction = async (targetKey: string) => {

@@ -29,6 +29,7 @@ import {
   Calendar,
   Zap,
   Archive,
+  UploadCloud,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -41,6 +42,7 @@ import {
   getStoredGasUrl,
 } from '../services/gasClientSync';
 import { MonthlyResetModal } from './MonthlyResetModal';
+import { RestoreDataModal } from './RestoreDataModal';
 import {
   RolloverResult,
   getDefaultPeriodName,
@@ -151,6 +153,17 @@ export function HistoryTab({
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
   const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+
+  const handleRestoreComplete = async (count: number, mode: 'replace' | 'merge') => {
+    setExportSuccessNotice(
+      `Sukses memulihkan ${count} transaksi ke riwayat (${mode === 'replace' ? 'Mode Gantikan Semua' : 'Mode Gabungkan'})! Riwayat telah diperbarui.`
+    );
+    if (onRefreshTransactions) {
+      await onRefreshTransactions();
+    }
+    setTimeout(() => setExportSuccessNotice(null), 6000);
+  };
 
   const handlePrintQZTrayFromHistory = async (tx: ReceiptData) => {
     try {
@@ -651,6 +664,16 @@ export function HistoryTab({
             </button>
 
             <button
+              id="btn-restore-data"
+              onClick={() => setIsRestoreModalOpen(true)}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              title="Restore / upload data dari file backup JSON atau tarik langsung dari Google Sheets"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Restore Data</span>
+            </button>
+
+            <button
               id="btn-monthly-reset"
               onClick={() => setIsMonthlyResetModalOpen(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
@@ -1097,14 +1120,25 @@ export function HistoryTab({
                 {sortedAndFiltered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-12 text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <AlertCircle className="w-8 h-8 text-slate-300" />
-                        <p className="text-sm font-medium">Tidak ada data transaksi yang sesuai.</p>
-                        <p className="text-xs text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <AlertCircle className="w-9 h-9 text-slate-300" />
+                        <p className="text-sm font-bold text-slate-700">
+                          {transactions.length === 0 ? 'Belum Ada Transaksi di Riwayat Aktif' : 'Tidak ada data transaksi yang sesuai.'}
+                        </p>
+                        <p className="text-xs text-slate-500 max-w-md">
                           {transactions.length === 0
-                            ? 'Belum ada transaksi tersimpan. Buat dan simpan resi pertama Anda!'
+                            ? 'Riwayat kosong setelah Tutup Buku bulanan atau pembersihan data? Anda dapat memulihkan kembali data lama dari file backup JSON atau tarik dari Google Sheets.'
                             : 'Coba ubah kata kunci pencarian atau filter kategori.'}
                         </p>
+                        {transactions.length === 0 && (
+                          <button
+                            onClick={() => setIsRestoreModalOpen(true)}
+                            className="mt-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <UploadCloud className="w-4 h-4" />
+                            <span>Restore / Upload File Backup JSON</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1380,6 +1414,13 @@ export function HistoryTab({
             onRefreshTransactions();
           }
         }}
+      />
+
+      {/* Modal Restore Data (JSON Backup & Google Sheets) */}
+      <RestoreDataModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        onRestoreComplete={handleRestoreComplete}
       />
     </div>
   );

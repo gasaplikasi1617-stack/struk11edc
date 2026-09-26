@@ -1,4 +1,6 @@
 {
   "lastResetTimestamp": 1790325750000,
-  "deletedIds": []
+  "deletedIds": [
+    "TEST-1"
+  ]
 }

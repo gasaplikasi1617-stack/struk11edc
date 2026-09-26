@@ -39,7 +39,7 @@ import {
 interface ReceiptPreviewProps {
   receipt: ReceiptData;
   onPrint: () => void;
-  onSave: () => void;
+  onSave: (force?: boolean) => void | Promise<any>;
   savedStatus: boolean;
 }
 
@@ -73,13 +73,13 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   const [showJspmHelpModal, setShowJspmHelpModal] = useState(false);
 
   const handlePrintJSPM = async (overridePrinterName?: string) => {
-    onSave();
+    await onSave(true);
     setIsJspmPrinting(true);
-    showActionNotice('Menghubungkan ke JSPrintManager & Mengirim Perintah Cetak ke LX-310...');
+    showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke JSPrintManager & Mengirim Perintah Cetak ke LX-310...');
     try {
       const printerName = overridePrinterName || selectedJspmPrinter;
       const printedTo = await printDirectJSPM(receipt, printerName || undefined);
-      showActionNotice(`SUKSES! Struk dikirim ke ${printedTo} via JSPrintManager (RAW Mode).`);
+      showActionNotice(`SUKSES! Data tersimpan & struk dikirim ke ${printedTo} via JSPrintManager (RAW Mode).`);
       setShowJspmModal(false);
     } catch (err: any) {
       console.error(err);
@@ -91,10 +91,10 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handleOpenJspmModal = async () => {
-    onSave();
+    await onSave(true);
     setIsJspmPrinting(true);
     try {
-      showActionNotice('Menghubungkan ke JSPrintManager Client...');
+      showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke JSPrintManager Client...');
       await connectJSPM();
       const printers = await getJSPMPrinters();
       setJspmPrinterList(printers);
@@ -112,13 +112,13 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handlePrintQZTray = async (overridePrinterName?: string) => {
-    onSave();
+    await onSave(true);
     setIsQzPrinting(true);
-    showActionNotice('Menghubungkan ke QZ Tray & Mengirim Perintah Cetak ke LX-310...');
+    showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke QZ Tray & Mengirim Perintah Cetak ke LX-310...');
     try {
       const printerName = overridePrinterName || selectedQzPrinter;
       const printedTo = await printDirectQZTray(receipt, printerName || undefined);
-      showActionNotice(`SUKSES! Struk berhasil dicetak ke ${printedTo} via QZ Tray (Direct Hardware RAW).`);
+      showActionNotice(`SUKSES! Data tersimpan & struk berhasil dicetak ke ${printedTo} via QZ Tray (Direct Hardware RAW).`);
       setShowQzModal(false);
     } catch (err: any) {
       console.error(err);
@@ -130,10 +130,10 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   };
 
   const handleOpenQzModal = async () => {
-    onSave();
+    await onSave(true);
     setIsQzPrinting(true);
     try {
-      showActionNotice('Menghubungkan ke QZ Tray...');
+      showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke QZ Tray...');
       await connectQZTray();
       const printers = await getQZTrayPrinters();
       setQzPrinterList(printers);
@@ -149,20 +149,24 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     }
   };
 
-  const handleDotMatrixPrintClick = () => {
-    onSave();
-    showActionNotice(`Data tersimpan! Menyiapkan cetak Dot Matrix Layout...`);
-    printDotMatrixReceipt(receipt, undefined, dotMatrixFontSize);
+  const handleDotMatrixPrintClick = async () => {
+    await onSave(true);
+    showActionNotice(`Data otomatis tersimpan ke riwayat! Menyiapkan cetak Dot Matrix Layout...`);
+    setTimeout(() => {
+      printDotMatrixReceipt(receipt, undefined, dotMatrixFontSize);
+    }, 100);
   };
 
-  const handleRawTextLX310PrintClick = () => {
-    onSave();
-    showActionNotice('Data tersimpan! Menyiapkan Cetak Direct Text LX-310 (Pasti Tajam 100%)...');
-    printRawTextLX310(receipt, undefined);
+  const handleRawTextLX310PrintClick = async () => {
+    await onSave(true);
+    showActionNotice('Data otomatis tersimpan ke riwayat! Menyiapkan Cetak Direct Text LX-310 (Pasti Tajam 100%)...');
+    setTimeout(() => {
+      printRawTextLX310(receipt, undefined);
+    }, 100);
   };
 
-  const handleDownloadTxtFile = () => {
-    onSave();
+  const handleDownloadTxtFile = async () => {
+    await onSave(true);
     const rawText = generatePlainTextReceipt(receipt);
     const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -173,7 +177,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showActionNotice('File Struk .TXT diunduh! Buka file di Notepad & tekan Ctrl+P untuk cetak 100% tajam.');
+    showActionNotice('Data tersimpan ke riwayat & File Struk .TXT diunduh! Buka file di Notepad & tekan Ctrl+P untuk cetak 100% tajam.');
   };
 
   const handleCopyRawText = async () => {
@@ -195,9 +199,9 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     }, 5000);
   };
 
-  const handleDirectPrint = (isPdf = false) => {
+  const handleDirectPrint = async (isPdf = false) => {
     // 1. Otomatis simpan data transaksi ke riwayat
-    onSave();
+    await onSave(true);
     showActionNotice(
       isPdf
         ? 'Data otomatis tersimpan ke riwayat! Menyiapkan dokumen PDF A6...'
@@ -292,10 +296,10 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
 
   const handleDownloadImage = async () => {
     // 1. Otomatis simpan data transaksi ke riwayat & Google Sheets
-    onSave();
+    await onSave(true);
 
     setIsDownloadingImage(true);
-    showActionNotice('Menyiapkan gambar struk resolusi tajam (A6)...');
+    showActionNotice('Data tersimpan ke riwayat! Menyiapkan gambar struk resolusi tajam (A6)...');
 
     const safeId = String(receipt.idpel || 'Resi').replace(/[^a-zA-Z0-9]/g, '_');
     const safeName = String(receipt.namaPelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
@@ -417,7 +421,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             </span>
           )}
           <button
-            onClick={onSave}
+            onClick={() => onSave(false)}
             className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-all"
             title="Simpan manual data transaksi ke database riwayat"
           >

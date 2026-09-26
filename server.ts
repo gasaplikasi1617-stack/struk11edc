@@ -531,7 +531,22 @@ app.post("/api/transactions", (req, res) => {
   };
   delete newTx.force;
 
-  txs.unshift(newTx); // Add to beginning
+  // Clear tombstone if ID was previously recorded
+  if (newTx.id) {
+    const info = getResetInfo();
+    if (info.deletedIds.includes(newTx.id)) {
+      info.deletedIds = info.deletedIds.filter((id) => id !== newTx.id);
+      saveResetInfo(info);
+    }
+  }
+
+  const existingIdx = txs.findIndex((t: any) => t.id === newTx.id);
+  if (existingIdx >= 0) {
+    txs[existingIdx] = newTx;
+  } else {
+    txs.unshift(newTx); // Add to beginning
+  }
+
   const { cleaned } = deduplicateList(txs);
   if (cleaned.length > 100) cleaned.splice(100);
   saveTransactions(cleaned);
@@ -545,6 +560,87 @@ app.post("/api/transactions", (req, res) => {
   }
 
   res.json({ success: true, transaction: newTx });
+});
+
+// Restore transactions from JSON backup or Google Sheets
+app.post("/api/transactions/restore", (req, res) => {
+  try {
+    const { transactions: incomingList, mode = "replace", syncToGas = true } = req.body || {};
+    if (!Array.isArray(incomingList) || incomingList.length === 0) {
+      return res.status(400).json({ success: false, message: "Daftar transaksi untuk restore tidak valid atau kosong." });
+    }
+
+    const validList = incomingList.filter(isValidTransaction).map(normalizeTransaction);
+    if (validList.length === 0) {
+      return res.status(400).json({ success: false, message: "Tidak ada transaksi valid yang dapat dipulihkan." });
+    }
+
+    // Reset tombstone IDs for all restored transactions
+    const restoredIds = new Set<string>();
+    validList.forEach((t) => {
+      if (t.id) restoredIds.add(String(t.id));
+      if (t.idpel && t.idpel !== "-") restoredIds.add(String(t.idpel));
+    });
+
+    const info = getResetInfo();
+    info.deletedIds = info.deletedIds.filter((id) => !restoredIds.has(id));
+
+    if (mode === "replace") {
+      // In replace mode, reset the cutoff timestamp so restored transactions are active
+      info.lastResetTimestamp = 0;
+      saveResetInfo(info);
+
+      const { cleaned } = deduplicateList(validList);
+      const finalList = cleaned.slice(0, 100);
+      saveTransactions(finalList);
+
+      if (syncToGas) {
+        const gasCfg = getGasConfig();
+        if (gasCfg.gasUrl) {
+          callGasPost(gasCfg.gasUrl, { action: "bulkSaveTransactions", data: finalList }).catch((err) => {
+            console.warn("GAS background restore sync warning:", err.message);
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        count: finalList.length,
+        mode: "replace",
+        transactions: finalList,
+        message: `Berhasil me-restore ${finalList.length} transaksi ke riwayat (mode Gantikan Semua).`,
+      });
+    } else {
+      // Merge mode
+      saveResetInfo(info);
+
+      const current = getTransactions();
+      const combined = [...validList, ...current];
+      const { cleaned } = deduplicateList(combined);
+      const finalList = cleaned.slice(0, 100);
+      saveTransactions(finalList);
+
+      if (syncToGas) {
+        const gasCfg = getGasConfig();
+        if (gasCfg.gasUrl) {
+          callGasPost(gasCfg.gasUrl, { action: "twoWaySync", transactions: finalList }).catch((err) => {
+            console.warn("GAS background restore sync warning:", err.message);
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        count: finalList.length,
+        mode: "merge",
+        transactions: finalList,
+        message: `Berhasil menggabungkan ${validList.length} data restore dengan riwayat aktif (Total sekarang: ${finalList.length} transaksi).`,
+      });
+    }
+  } catch (err: any) {
+    console.error("Error in /api/transactions/restore:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Endpoint to deduplicate all transactions
