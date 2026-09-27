@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Zap,
   FileText,
+  Sparkles,
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
@@ -33,7 +34,10 @@ import {
 import {
   printDirectJSPM,
   getJSPMPrinters,
-  connectJSPM,
+  aiAutoDiscoverJSPM,
+  aiSelectBestPrinter,
+  getStoredEndpoint,
+  JspmEndpoint,
 } from '../utils/jsPrintManagerPrinter';
 
 interface ReceiptPreviewProps {
@@ -65,25 +69,37 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   const [selectedQzPrinter, setSelectedQzPrinter] = useState<string>('');
   const [showQzModal, setShowQzModal] = useState(false);
 
-  // JSPrintManager (JSPM) State & Handlers
+  // JSPrintManager (JSPM) State & Handlers with AI Auto-Discovery
   const [isJspmPrinting, setIsJspmPrinting] = useState(false);
+  const [isJspmScanning, setIsJspmScanning] = useState(false);
+  const [jspmStatusText, setJspmStatusText] = useState<string>('');
   const [jspmPrinterList, setJspmPrinterList] = useState<string[]>([]);
   const [selectedJspmPrinter, setSelectedJspmPrinter] = useState<string>('');
+  const [detectedEndpoint, setDetectedEndpoint] = useState<JspmEndpoint | null>(() => getStoredEndpoint());
   const [showJspmModal, setShowJspmModal] = useState(false);
   const [showJspmHelpModal, setShowJspmHelpModal] = useState(false);
 
   const handlePrintJSPM = async (overridePrinterName?: string) => {
     await onSave(true);
     setIsJspmPrinting(true);
-    showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke JSPrintManager & Mengirim Perintah Cetak ke LX-310...');
+    setJspmStatusText('🤖 Menghubungkan ke JSPrintManager secara otomatis...');
+    showActionNotice('Menghubungkan otomatis ke JSPrintManager & menyiapkan struk LX-310...');
     try {
       const printerName = overridePrinterName || selectedJspmPrinter;
-      const printedTo = await printDirectJSPM(receipt, printerName || undefined);
+      const printedTo = await printDirectJSPM(
+        receipt,
+        printerName || undefined,
+        (msg) => {
+          setJspmStatusText(msg);
+          showActionNotice(msg);
+        }
+      );
       showActionNotice(`SUKSES! Data tersimpan & struk dikirim ke ${printedTo} via JSPrintManager (RAW Mode).`);
       setShowJspmModal(false);
+      setShowJspmHelpModal(false);
     } catch (err: any) {
       console.error(err);
-      alert(`Gagal Mencetak via JSPrintManager: ${err.message || err}`);
+      setJspmStatusText(err.message || String(err));
       setShowJspmHelpModal(true);
     } finally {
       setIsJspmPrinting(false);
@@ -93,21 +109,33 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   const handleOpenJspmModal = async () => {
     await onSave(true);
     setIsJspmPrinting(true);
+    setIsJspmScanning(true);
+    setJspmStatusText('🤖 AI Scanner: Memindai koneksi JSPrintManager secara otomatis...');
     try {
-      showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke JSPrintManager Client...');
-      await connectJSPM();
-      const printers = await getJSPMPrinters();
+      showActionNotice('🤖 AI Auto-Discovery: Memindai JSPrintManager di komputer Anda...');
+      const endpoint = await aiAutoDiscoverJSPM((msg) => {
+        setJspmStatusText(msg);
+        showActionNotice(msg);
+      });
+      setDetectedEndpoint(endpoint);
+      const printers = await getJSPMPrinters((msg) => {
+        setJspmStatusText(msg);
+      });
       setJspmPrinterList(printers);
       if (printers.length > 0) {
-        const lxPrinter = printers.find((p) => p.toUpperCase().includes('LX') || p.toUpperCase().includes('EPSON')) || printers[0];
-        setSelectedJspmPrinter(lxPrinter);
+        const bestPrinter = aiSelectBestPrinter(printers);
+        setSelectedJspmPrinter(bestPrinter);
       }
       setShowJspmModal(true);
+      setShowJspmHelpModal(false);
+      showActionNotice(`✅ Terhubung otomatis ke JSPrintManager (${endpoint.host}:${endpoint.port})!`);
     } catch (err: any) {
       console.error(err);
+      setJspmStatusText(err.message || 'JSPrintManager belum aktif di Windows.');
       setShowJspmHelpModal(true);
     } finally {
       setIsJspmPrinting(false);
+      setIsJspmScanning(false);
     }
   };
 
@@ -676,14 +704,14 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
           onClick={handleOpenJspmModal}
           disabled={isJspmPrinting}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-400"
-          title="Cetak langsung ke Epson LX-310 via JSPrintManager (JSPM RAW Mode)"
+          title="Cetak langsung ke Epson LX-310 via JSPrintManager (AI Auto-Discovery, RAW ESC/P)"
         >
           {isJspmPrinting ? (
             <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
           ) : (
-            <Printer className="w-4 h-4 text-indigo-200" />
+            <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
           )}
-          <span>Cetak JSPrintManager</span>
+          <span>Cetak JSPrintManager (Auto AI)</span>
         </button>
 
         <button
@@ -991,22 +1019,31 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
                 <Printer className="w-5 h-5 text-indigo-600" />
               </div>
               <div>
-                <h4 className="font-extrabold text-slate-900 text-base">Cetak JSPrintManager (JSPM)</h4>
-                <p className="text-xs text-slate-500">Koneksi Hardware RAW via JSPrintManager Client</p>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-slate-900 text-base">Cetak JSPrintManager</h4>
+                  <span className="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-indigo-600 fill-indigo-600" />
+                    AI Auto
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">Koneksi Hardware RAW ESC/P Otomatis</p>
               </div>
             </div>
 
-            <div className="space-y-4 my-2 text-xs text-slate-700">
-              <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
-                <div className="font-bold text-indigo-950">JSPrintManager Client Terhubung!</div>
-                <p className="text-indigo-900">
-                  Aplikasi JSPrintManager di Windows berhasil terdeteksi. Silakan pilih printer EPSON LX-310 Anda di bawah ini:
+            <div className="space-y-3.5 my-2 text-xs text-slate-700">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>JSPrintManager Terhubung Otomatis!</span>
+                </div>
+                <p className="text-emerald-800 text-[11px]">
+                  Endpoint terdeteksi: <b>{detectedEndpoint?.host || 'localhost'}:{detectedEndpoint?.port || '22443'}</b> (Tanpa setting manual)
                 </p>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Pilih Printer Dot Matrix (EPSON LX-310):
+                  Printer Dot Matrix (Otomatis Dipilih oleh AI):
                 </label>
                 <select
                   value={selectedJspmPrinter}
@@ -1021,41 +1058,56 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
                 </select>
               </div>
 
-              <div className="text-[11px] text-slate-500 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
-                *Mengirim perintah karakter ESC/P langsung ke port USB printer. Hasil cetakan dipastikan <b>100% tajam & tanpa raster gambar</b>.
+              <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 p-2.5 rounded-lg flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  Mengirim karakter font draft ESC/P asli ke printer USB. Hasil cetakan dipastikan <b>100% tajam, tidak buram, dan sangat cepat</b>.
+                </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
               <button
-                onClick={() => setShowJspmModal(false)}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+                onClick={handleOpenJspmModal}
+                disabled={isJspmScanning}
+                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-indigo-50 transition-colors"
+                title="Pindai ulang endpoint printer"
               >
-                Batal
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Pindai Ulang</span>
               </button>
-              <button
-                onClick={() => handlePrintJSPM()}
-                disabled={isJspmPrinting}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                {isJspmPrinting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Memproses...</span>
-                  </>
-                ) : (
-                  <>
-                    <Printer className="w-4 h-4" />
-                    <span>Cetak Sekarang (JSPM Tajam)</span>
-                  </>
-                )}
-              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowJspmModal(false)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3.5 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={() => handlePrintJSPM()}
+                  disabled={isJspmPrinting}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold py-2 px-4 rounded-xl text-xs transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isJspmPrinting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="w-4 h-4" />
+                      <span>Cetak Sekarang (RAW Tajam)</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* JSPrintManager Activation Guide Modal */}
+      {/* JSPrintManager AI Auto-Discovery & Activation Modal */}
       {showJspmHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh] overflow-y-auto">
@@ -1069,56 +1121,77 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
 
             <div className="flex items-center gap-2.5 mb-3 border-b border-slate-100 pb-3">
               <div className="bg-indigo-100 text-indigo-900 p-2.5 rounded-xl font-extrabold text-sm flex items-center justify-center">
-                <Printer className="w-5 h-5 text-indigo-600" />
+                <Sparkles className="w-5 h-5 text-indigo-600" />
               </div>
               <div>
-                <h4 className="font-extrabold text-slate-900 text-base">Panduan Mengaktifkan JSPrintManager</h4>
-                <p className="text-xs text-slate-500">3 Langkah Cepat Mengaktifkan Koneksi JSPrintManager di Windows</p>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-slate-900 text-base">JSPrintManager AI Auto-Discovery</h4>
+                </div>
+                <p className="text-xs text-slate-500">Koneksi otomatis tanpa setting host atau port manual</p>
               </div>
             </div>
 
             <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl space-y-1">
-                <div className="font-bold text-amber-950">Status: Belum Terhubung</div>
+                <div className="font-bold text-amber-950 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span>Status: JSPrintManager Belum Aktif</span>
+                </div>
                 <p className="text-amber-900 text-[11px]">
-                  Browser belum dapat berkomunikasi dengan aplikasi JSPrintManager di Komputer Anda. Ikuti 3 langkah mudah berikut:
+                  {jspmStatusText || 'Aplikasi JSPrintManager belum terbuka di komputer Windows Anda.'}
+                </p>
+              </div>
+
+              {/* 1-Click AI Auto-Detect Action */}
+              <div className="bg-indigo-50 border border-indigo-200 p-3.5 rounded-xl text-center space-y-2.5">
+                <p className="text-indigo-950 font-bold text-xs">
+                  Buka JSPrintManager di Windows, lalu klik tombol di bawah ini:
+                </p>
+                <button
+                  onClick={handleOpenJspmModal}
+                  disabled={isJspmScanning}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold py-3 px-4 rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  {isJspmScanning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>{jspmStatusText || 'AI sedang memindai port (22443, 29443, 20001, 24443)...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                      <span>Pindai & Hubungkan Otomatis Sekarang (AI Scanner)</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-indigo-700">
+                  *AI akan memindai seluruh port dan host lokal secara cerdas tanpa perlu Anda seting apapun.
                 </p>
               </div>
 
               <div className="border border-slate-200 p-3 rounded-xl space-y-1.5 bg-slate-50">
-                <div className="font-bold text-slate-900">1. Jalankan Aplikasi JSPrintManager di Windows</div>
+                <div className="font-bold text-slate-900">1. Pastikan Aplikasi JSPrintManager Berjalan</div>
                 <p className="text-slate-600 text-[11px]">
-                  Buka Start Menu Windows &gt; ketik <b>JSPrintManager</b> &gt; klik jalankan. Pastikan ikon JSPrintManager sudah muncul di pojok kanan bawah Windows (dekat jam).
+                  Buka Start Menu Windows &gt; ketik <b>JSPrintManager</b> &gt; klik jalankan. Pastikan ikon JSPrintManager muncul di pojok kanan bawah taskbar Windows (dekat jam).
                 </p>
               </div>
 
-              <div className="border border-indigo-200 p-3 rounded-xl space-y-1.5 bg-indigo-50/70">
-                <div className="font-bold text-indigo-950">2. Izinkan Sertifikat HTTPS Localhost (PENTING)</div>
-                <p className="text-indigo-900 text-[11px]">
-                  Karena web ini menggunakan HTTPS, browser Chrome memblokir koneksi ke JSPrintManager sebelum Anda mengizinkannya 1x.<br/>
-                  <b>Klik tombol biru di bawah ini untuk membuka dan mengizinkan localhost:</b>
+              <div className="border border-slate-200 p-3 rounded-xl space-y-1.5 bg-slate-50">
+                <div className="font-bold text-slate-900">2. Belum Menginstall JSPrintManager Client di Windows?</div>
+                <p className="text-slate-600 text-[11px]">
+                  Jika belum terinstall di komputer, unduh installer resmi JSPrintManager gratis di bawah ini (hanya perlu install 1x):
                 </p>
-                <div className="flex gap-2 pt-1">
+                <div className="pt-1">
                   <a
-                    href="https://localhost:20001"
+                    href="https://neodynamic.com/downloads/jspm"
                     target="_blank"
                     rel="noreferrer"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-3 rounded-lg text-[11px] inline-flex items-center gap-1 transition-colors"
+                    className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 px-3 rounded-lg text-[11px] transition-colors"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Buka https://localhost:20001</span>
+                    <span>Download JSPrintManager untuk Windows</span>
                   </a>
                 </div>
-                <p className="text-[10px] text-slate-500 pt-1">
-                  *Di tab baru yang terbuka: Klik <b>"Advanced" (Lanjutan)</b> &gt; lalu klik <b>"Proceed to localhost (unsafe)" / "Lanjutkan"</b>. Setelah itu tutup tab tersebut.
-                </p>
-              </div>
-
-              <div className="border border-slate-200 p-3 rounded-xl space-y-1.5 bg-slate-50">
-                <div className="font-bold text-slate-900">3. Klik "Cetak JSPrintManager" Kembali</div>
-                <p className="text-slate-600 text-[11px]">
-                  Setelah menjalankan JSPrintManager dan mengizinkan tautan di atas, klik tombol <b>Cetak JSPrintManager (JSPM)</b> di aplikasi ini. Struk akan langsung tercetak 100% tajam!
-                </p>
               </div>
             </div>
 
@@ -1127,7 +1200,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
                 onClick={() => setShowJspmHelpModal(false)}
                 className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-xl text-xs transition-colors cursor-pointer"
               >
-                Saya Mengerti
+                Tutup
               </button>
             </div>
           </div>

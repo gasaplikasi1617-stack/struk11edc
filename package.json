@@ -18,6 +18,7 @@
     "express": "^4.21.2",
     "html2canvas": "^1.4.1",
     "html2canvas-pro": "^2.4.3",
+    "jsprintmanager": "^9.0.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
