@@ -350,7 +350,7 @@ export function restoreTransactionsLocally(
   if (mode === 'replace') {
     setLastResetTimestamp(0);
     const valid = transactions.filter(isValidTransaction);
-    const toSave = valid.slice(0, 100);
+    const toSave = valid.slice(0, 1000);
     saveStoredTransactions(toSave);
     try {
       localStorage.setItem('agent_batara_txs', JSON.stringify(toSave));
@@ -367,7 +367,7 @@ export function restoreTransactionsLocally(
       const id = t.id || `TX-${Date.now()}`;
       if (!map.has(id)) map.set(id, t);
     });
-    const toSave = Array.from(map.values()).slice(0, 100);
+    const toSave = Array.from(map.values()).slice(0, 1000);
     saveStoredTransactions(toSave);
     try {
       localStorage.setItem('agent_batara_txs', JSON.stringify(toSave));

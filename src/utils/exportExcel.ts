@@ -246,7 +246,7 @@ export function exportTransactionsToExcel(
 
   // Determine filename
   const today = new Date().toISOString().slice(0, 10);
-  const fileName = options?.fileName || `Riwayat_Transaksi_100_${today}.xlsx`;
+  const fileName = options?.fileName || `Riwayat_Transaksi_${today}.xlsx`;
 
   // Trigger file download with cell styles enabled
   XLSX.writeFile(workbook, fileName, { cellStyles: true });

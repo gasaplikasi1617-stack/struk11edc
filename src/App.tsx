@@ -157,7 +157,7 @@ export default function App() {
 
       const current = [payload, ...transactions.filter((t) => t.id !== payload.id)];
       const { cleaned } = deduplicateTransactionList(current);
-      const toKeep = cleaned.slice(0, 100);
+      const toKeep = cleaned.slice(0, 1000);
       setTransactions(toKeep);
       saveStoredTransactions(toKeep);
       try {

@@ -30,6 +30,8 @@ import {
   Zap,
   Archive,
   UploadCloud,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -150,6 +152,8 @@ export function HistoryTab({
   const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
+  const [pageSize, setPageSize] = useState<number>(1000);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
   const [isSyncingGas, setIsSyncingGas] = useState(false);
   const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
@@ -523,6 +527,14 @@ export function HistoryTab({
     return list;
   }, [filteredList, sortCriterion]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedAndFiltered.length / pageSize));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedList = useMemo(() => {
+    const start = (validCurrentPage - 1) * pageSize;
+    return sortedAndFiltered.slice(start, start + pageSize);
+  }, [sortedAndFiltered, validCurrentPage, pageSize]);
+
   // Quick toggle column sort when clicking on table header
   const handleColumnSortClick = (field: 'date' | 'name' | 'idpel' | 'service' | 'total' | 'status') => {
     if (field === 'date') {
@@ -625,10 +637,10 @@ export function HistoryTab({
                   }}
                 />
               </div>
-              <span>Riwayat Transaksi (Maksimal 100 Transaksi)</span>
+              <span>Riwayat Transaksi (Maksimal 1000 Transaksi)</span>
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Data transaksi otomatis tersimpan hingga 100 data terakhir. Anda dapat menyortir kriteria sebelum mengekspor ke Excel.
+              Data transaksi otomatis tersimpan hingga 1000 data terakhir. Anda dapat menyortir kriteria sebelum mengekspor ke Excel.
             </p>
           </div>
 
@@ -722,7 +734,7 @@ export function HistoryTab({
             <div>
               <p className="text-[11px] font-medium text-slate-500">Kapasitas Riwayat</p>
               <p className="text-sm font-bold text-slate-800">
-                {transactions.length} <span className="text-slate-400 font-normal text-xs">/ 100 Transaksi</span>
+                {transactions.length} <span className="text-slate-400 font-normal text-xs">/ 1000 Transaksi</span>
               </p>
             </div>
           </div>
@@ -1048,13 +1060,39 @@ export function HistoryTab({
 
         {/* Transactions Table with Sortable Columns */}
         <div className="mt-6 border-t border-slate-200 pt-6">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-sm text-slate-800">
-              Daftar Transaksi ({sortedAndFiltered.length} dari {transactions.length})
-            </h3>
-            <p className="text-[11px] text-slate-400">
-              *Klik pada header kolom untuk menyortir urutan langsung.
-            </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+            <div>
+              <h3 className="font-bold text-sm text-slate-800">
+                Daftar Transaksi ({sortedAndFiltered.length} dari {transactions.length})
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Menampilkan {paginatedList.length > 0 ? (validCurrentPage - 1) * pageSize + 1 : 0} -{' '}
+                {Math.min(validCurrentPage * pageSize, sortedAndFiltered.length)} dari {sortedAndFiltered.length} transaksi
+              </p>
+            </div>
+
+            {/* Page Size Selector */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500 font-medium">Tampilkan:</span>
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                {[50, 100, 250, 500, 1000].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all cursor-pointer ${
+                      pageSize === size
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -1152,9 +1190,11 @@ export function HistoryTab({
                     </td>
                   </tr>
                 ) : (
-                  sortedAndFiltered.map((tx, idx) => (
+                  paginatedList.map((tx, idx) => (
                     <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="p-3 text-center text-xs font-mono text-slate-400">{idx + 1}</td>
+                      <td className="p-3 text-center text-xs font-mono text-slate-400">
+                        {(validCurrentPage - 1) * pageSize + idx + 1}
+                      </td>
                       <td className="p-3">
                         <p className="text-xs font-semibold text-slate-800">{tx.tanggal}</p>
                         <p className="text-[10px] text-slate-400 font-mono">
@@ -1307,7 +1347,7 @@ export function HistoryTab({
           {sortedAndFiltered.length > 0 && (
             <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between items-center text-xs text-slate-600 gap-2">
               <span>
-                Menampilkan <strong>{sortedAndFiltered.length}</strong> transaksi terpilih
+                Menampilkan <strong>{paginatedList.length}</strong> dari <strong>{sortedAndFiltered.length}</strong> transaksi terpilih
               </span>
               <div className="flex items-center gap-4">
                 <span>
@@ -1316,6 +1356,66 @@ export function HistoryTab({
                 <span className="text-blue-700 font-bold">
                   Total Bayar: Rp {totalOmset.toLocaleString('id-ID')}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 border border-slate-200 rounded-xl shadow-2xs">
+              <div className="text-xs text-slate-500 font-medium">
+                Halaman <span className="font-bold text-slate-800">{validCurrentPage}</span> dari{' '}
+                <span className="font-bold text-slate-800">{totalPages}</span> (Total {sortedAndFiltered.length} transaksi)
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={validCurrentPage <= 1}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Sebelumnya</span>
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => {
+                      if (totalPages <= 7) return true;
+                      if (p === 1 || p === totalPages) return true;
+                      return Math.abs(p - validCurrentPage) <= 1;
+                    })
+                    .map((p, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev && p - prev > 1;
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(p)}
+                            className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                              validCurrentPage === p
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={validCurrentPage >= totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <span>Selanjutnya</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}

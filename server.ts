@@ -397,7 +397,7 @@ function mergeTransactions(localList: any[], sheetList: any[]) {
   });
 
   return {
-    merged: merged.slice(0, 100),
+    merged: merged.slice(0, 1000),
     newFromSheet,
     newFromLocal,
   };
@@ -498,10 +498,10 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Get all transactions (up to 100)
+// Get all transactions (up to 1000)
 app.get("/api/transactions", (req, res) => {
   const txs = getTransactions();
-  res.json(txs.slice(0, 100));
+  res.json(txs.slice(0, 1000));
 });
 
 // Save a new transaction with strict anti-duplicate guarantee
@@ -548,7 +548,7 @@ app.post("/api/transactions", (req, res) => {
   }
 
   const { cleaned } = deduplicateList(txs);
-  if (cleaned.length > 100) cleaned.splice(100);
+  if (cleaned.length > 1000) cleaned.splice(1000);
   saveTransactions(cleaned);
 
   // Auto-sync to Google Apps Script if enabled and configured
@@ -591,7 +591,7 @@ app.post("/api/transactions/restore", (req, res) => {
       saveResetInfo(info);
 
       const { cleaned } = deduplicateList(validList);
-      const finalList = cleaned.slice(0, 100);
+      const finalList = cleaned.slice(0, 1000);
       saveTransactions(finalList);
 
       if (syncToGas) {
@@ -617,7 +617,7 @@ app.post("/api/transactions/restore", (req, res) => {
       const current = getTransactions();
       const combined = [...validList, ...current];
       const { cleaned } = deduplicateList(combined);
-      const finalList = cleaned.slice(0, 100);
+      const finalList = cleaned.slice(0, 1000);
       saveTransactions(finalList);
 
       if (syncToGas) {
