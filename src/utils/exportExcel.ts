@@ -71,49 +71,24 @@ export function exportTransactionsToExcel(
   }
 
   // Format the rows for Excel
-  const rows = transactions.map((t, index) => {
-    let formattedDate = t.tanggal || '-';
-    let formattedTime = '-';
-    if (t.createdAt) {
-      try {
-        const d = new Date(t.createdAt);
-        formattedTime = d.toLocaleDateString('id-ID', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        });
-      } catch (err) {}
-    }
-
+  const rows = transactions.map((t) => {
+    const formattedDate = t.tanggal || '-';
     const cat = getTransactionCategory(t);
     const categoryName = getCategoryLabel(cat);
     const idpelText = formatIdpelAsText(t.idpel);
-    const noHpText = formatPhoneAsText(t.noHp);
-    const idTransaksiText = String(t.id || '-');
 
     return {
-      'No': index + 1,
-      'Status': t.status === 'tidak_aktif' ? 'Tidak Aktif' : 'Aktif',
-      'Kategori': categoryName,
-      'ID Transaksi': idTransaksiText,
       'Tanggal': formattedDate,
-      'Waktu Pencatatan': formattedTime,
-      'ID Pelanggan': idpelText,
-      'Nama Pelanggan': (t.namaPelanggan || '').toUpperCase(),
-      'Layanan / Rincian Tagihan': t.rincianTagihan || '-',
-      'Bulan / Periode': t.bulanTagihan || '-',
+      'Kategori': categoryName,
+      'Idpel': idpelText,
+      'Nama': (t.namaPelanggan || '').toUpperCase(),
+      'Bln/Periode': t.bulanTagihan || '-',
       'Pemakaian': t.pemakaian || '-',
-      'Stand Meter': String(t.standMeter || '-'),
-      'Tagihan Murni (Rp)': Number(t.rpTagihan) || 0,
-      'Biaya Lain-lain (Rp)': Number(t.lainLain) || 0,
-      'Admin Bank (Rp)': Number(t.adminBank) || 0,
-      'Total Bayar (Rp)': Number(t.totalBayar) || 0,
-      'Nama Agen': t.namaAgen || 'Agen Batara',
-      'Alamat Agen': t.alamat || 'Bekasi',
-      'No HP Agen': noHpText,
+      'Stan Meter': String(t.standMeter || '-'),
+      'Tagihan Murni': Number(t.rpTagihan) || 0,
+      'Biaya Lain-lain': Number(t.lainLain) || 0,
+      'Admin Bank': Number(t.adminBank) || 0,
+      'Total Bayar': Number(t.totalBayar) || 0,
     };
   });
 
@@ -125,25 +100,17 @@ export function exportTransactionsToExcel(
 
   // Append Total Row
   rows.push({
-    'No': '' as any,
-    'Status': '',
-    'Kategori': 'TOTAL' as any,
-    'ID Transaksi': 'TOTAL KESELURUHAN',
     'Tanggal': '',
-    'Waktu Pencatatan': '',
-    'ID Pelanggan': `(${transactions.length} Data)`,
-    'Nama Pelanggan': '',
-    'Layanan / Rincian Tagihan': '',
-    'Bulan / Periode': '',
+    'Kategori': 'TOTAL' as any,
+    'Idpel': `(${transactions.length} Data)`,
+    'Nama': 'TOTAL KESELURUHAN',
+    'Bln/Periode': '',
     'Pemakaian': '',
-    'Stand Meter': '',
-    'Tagihan Murni (Rp)': totalTagihan,
-    'Biaya Lain-lain (Rp)': totalLainLain,
-    'Admin Bank (Rp)': totalAdmin,
-    'Total Bayar (Rp)': grandTotal,
-    'Nama Agen': '',
-    'Alamat Agen': '',
-    'No HP Agen': '',
+    'Stan Meter': '',
+    'Tagihan Murni': totalTagihan,
+    'Biaya Lain-lain': totalLainLain,
+    'Admin Bank': totalAdmin,
+    'Total Bayar': grandTotal,
   });
 
   // Convert to worksheet with explicit text preservation
@@ -161,39 +128,41 @@ export function exportTransactionsToExcel(
     const headerCell = worksheet[XLSX.utils.encode_cell({ r: 0, c: C })];
     const headerTitle = headerCell ? String(headerCell.v || '') : '';
 
-    if (headerTitle === 'ID Pelanggan') {
+    if (headerTitle === 'Idpel' || headerTitle === 'ID Pelanggan') {
       idpelCol = C;
       textColIndices.push(C);
     } else if (
-      headerTitle === 'ID Transaksi' ||
-      headerTitle === 'No HP Agen' ||
-      headerTitle === 'Stand Meter' ||
-      headerTitle === 'Tanggal' ||
-      headerTitle === 'Waktu Pencatatan' ||
-      headerTitle === 'Bulan / Periode' ||
-      headerTitle === 'Pemakaian' ||
-      headerTitle === 'Layanan / Rincian Tagihan' ||
-      headerTitle === 'Nama Pelanggan' ||
-      headerTitle === 'Nama Agen' ||
-      headerTitle === 'Alamat Agen' ||
-      headerTitle === 'Status' ||
-      headerTitle === 'Kategori'
+      headerTitle.includes('Meter') ||
+      headerTitle.includes('Tanggal') ||
+      headerTitle.includes('Bulan') ||
+      headerTitle.includes('Periode') ||
+      headerTitle.includes('Bln') ||
+      headerTitle.includes('Pemakaian') ||
+      headerTitle.includes('Nama') ||
+      headerTitle.includes('Kategori') ||
+      headerTitle.includes('Kategory')
     ) {
       textColIndices.push(C);
-    } else if (headerTitle.includes('(Rp)')) {
+    } else if (
+      headerTitle.includes('(Rp)') ||
+      headerTitle.includes('Tagihan') ||
+      headerTitle.includes('Biaya') ||
+      headerTitle.includes('Admin') ||
+      headerTitle.includes('Total')
+    ) {
       currencyColIndices.push(C);
     }
   }
 
   // Iterate over all data rows and apply explicit Excel cell formatting
   for (let R = 1; R <= range.e.r; ++R) {
-    // 1. Text format (@) for ID Pelanggan and text columns
+    // 1. Text format (@) for Idpel and text columns
     for (const C of textColIndices) {
       const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
       const cell = worksheet[cellRef];
       if (cell) {
         let textVal = cell.v != null ? String(cell.v) : '';
-        if (C === idpelCol) {
+        if (C === idpelCol && R < range.e.r) {
           textVal = formatIdpelAsText(cell.v);
         }
         cell.t = 's'; // Excel string / text type
@@ -216,27 +185,19 @@ export function exportTransactionsToExcel(
     }
   }
 
-  // Set column widths for comfortable reading (all 19 columns)
+  // Set column widths for comfortable reading (11 columns matching exact requested order)
   worksheet['!cols'] = [
-    { wch: 6 },  // 0: No
-    { wch: 14 }, // 1: Status
-    { wch: 18 }, // 2: Kategori
-    { wch: 22 }, // 3: ID Transaksi
-    { wch: 16 }, // 4: Tanggal
-    { wch: 22 }, // 5: Waktu Pencatatan
-    { wch: 24 }, // 6: ID Pelanggan (lebar lapang agar angka panjang terbaca sempurna)
-    { wch: 28 }, // 7: Nama Pelanggan
-    { wch: 30 }, // 8: Layanan / Rincian Tagihan
-    { wch: 18 }, // 9: Bulan / Periode
-    { wch: 16 }, // 10: Pemakaian
-    { wch: 20 }, // 11: Stand Meter
-    { wch: 18 }, // 12: Tagihan Murni (Rp)
-    { wch: 18 }, // 13: Biaya Lain-lain (Rp)
-    { wch: 16 }, // 14: Admin Bank (Rp)
-    { wch: 18 }, // 15: Total Bayar (Rp)
-    { wch: 20 }, // 16: Nama Agen
-    { wch: 22 }, // 17: Alamat Agen
-    { wch: 18 }, // 18: No HP Agen
+    { wch: 16 }, // 1. Tanggal
+    { wch: 18 }, // 2. Kategori
+    { wch: 22 }, // 3. Idpel
+    { wch: 28 }, // 4. Nama
+    { wch: 16 }, // 5. Bln/Periode
+    { wch: 16 }, // 6. Pemakaian
+    { wch: 18 }, // 7. Stan Meter
+    { wch: 18 }, // 8. Tagihan Murni
+    { wch: 18 }, // 9. Biaya Lain-lain
+    { wch: 16 }, // 10. Admin Bank
+    { wch: 18 }, // 11. Total Bayar
   ];
 
   // Create workbook
