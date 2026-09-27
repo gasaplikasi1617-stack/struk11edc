@@ -70,7 +70,7 @@ export function exportTransactionsToExcel(
     return;
   }
 
-  // Format the rows for Excel
+  // Format the rows for Excel (Only 5 requested columns)
   const rows = transactions.map((t) => {
     const formattedDate = t.tanggal || '-';
     const cat = getTransactionCategory(t);
@@ -82,20 +82,11 @@ export function exportTransactionsToExcel(
       'Kategori': categoryName,
       'Idpel': idpelText,
       'Nama': (t.namaPelanggan || '').toUpperCase(),
-      'Bln/Periode': t.bulanTagihan || '-',
-      'Pemakaian': t.pemakaian || '-',
-      'Stan Meter': String(t.standMeter || '-'),
-      'Tagihan Murni': Number(t.rpTagihan) || 0,
-      'Biaya Lain-lain': Number(t.lainLain) || 0,
-      'Admin Bank': Number(t.adminBank) || 0,
       'Total Bayar': Number(t.totalBayar) || 0,
     };
   });
 
-  // Calculate totals
-  const totalTagihan = transactions.reduce((sum, t) => sum + (Number(t.rpTagihan) || 0), 0);
-  const totalLainLain = transactions.reduce((sum, t) => sum + (Number(t.lainLain) || 0), 0);
-  const totalAdmin = transactions.reduce((sum, t) => sum + (Number(t.adminBank) || 0), 0);
+  // Calculate grand total
   const grandTotal = transactions.reduce((sum, t) => sum + (Number(t.totalBayar) || 0), 0);
 
   // Append Total Row
@@ -104,12 +95,6 @@ export function exportTransactionsToExcel(
     'Kategori': 'TOTAL' as any,
     'Idpel': `(${transactions.length} Data)`,
     'Nama': 'TOTAL KESELURUHAN',
-    'Bln/Periode': '',
-    'Pemakaian': '',
-    'Stan Meter': '',
-    'Tagihan Murni': totalTagihan,
-    'Biaya Lain-lain': totalLainLain,
-    'Admin Bank': totalAdmin,
     'Total Bayar': grandTotal,
   });
 
@@ -132,12 +117,7 @@ export function exportTransactionsToExcel(
       idpelCol = C;
       textColIndices.push(C);
     } else if (
-      headerTitle.includes('Meter') ||
       headerTitle.includes('Tanggal') ||
-      headerTitle.includes('Bulan') ||
-      headerTitle.includes('Periode') ||
-      headerTitle.includes('Bln') ||
-      headerTitle.includes('Pemakaian') ||
       headerTitle.includes('Nama') ||
       headerTitle.includes('Kategori') ||
       headerTitle.includes('Kategory')
@@ -146,8 +126,6 @@ export function exportTransactionsToExcel(
     } else if (
       headerTitle.includes('(Rp)') ||
       headerTitle.includes('Tagihan') ||
-      headerTitle.includes('Biaya') ||
-      headerTitle.includes('Admin') ||
       headerTitle.includes('Total')
     ) {
       currencyColIndices.push(C);
@@ -185,19 +163,13 @@ export function exportTransactionsToExcel(
     }
   }
 
-  // Set column widths for comfortable reading (11 columns matching exact requested order)
+  // Set column widths for comfortable reading (5 columns)
   worksheet['!cols'] = [
     { wch: 16 }, // 1. Tanggal
     { wch: 18 }, // 2. Kategori
     { wch: 22 }, // 3. Idpel
-    { wch: 28 }, // 4. Nama
-    { wch: 16 }, // 5. Bln/Periode
-    { wch: 16 }, // 6. Pemakaian
-    { wch: 18 }, // 7. Stan Meter
-    { wch: 18 }, // 8. Tagihan Murni
-    { wch: 18 }, // 9. Biaya Lain-lain
-    { wch: 16 }, // 10. Admin Bank
-    { wch: 18 }, // 11. Total Bayar
+    { wch: 30 }, // 4. Nama
+    { wch: 20 }, // 5. Total Bayar
   ];
 
   // Create workbook
