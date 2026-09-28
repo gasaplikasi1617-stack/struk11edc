@@ -45,6 +45,7 @@ interface ReceiptPreviewProps {
   onPrint: () => void;
   onSave: (force?: boolean) => void | Promise<any>;
   savedStatus: boolean;
+  historyCount?: number;
 }
 
 interface DownloadedModalState {
@@ -53,7 +54,7 @@ interface DownloadedModalState {
   fileName: string;
 }
 
-export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: ReceiptPreviewProps) {
+export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyCount = 0 }: ReceiptPreviewProps) {
   const [previewMode, setPreviewMode] = useState<'a6' | 'dotmatrix'>('a6');
   const [dotMatrixFontSize, setDotMatrixFontSize] = useState<DotMatrixFontSize>('normal');
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
@@ -475,9 +476,18 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
       <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-          <span>Preview</span>
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+            <span>Preview</span>
+          </h3>
+          {/* Angka Jumlah Riwayat yang mencolok agak besar */}
+          <span
+            className="inline-flex items-center justify-center font-black text-2xl sm:text-3xl text-blue-600 bg-blue-50/90 border-2 border-blue-400 px-3.5 py-0.5 rounded-xl shadow-xs min-w-[46px] leading-tight select-none"
+            title={`Total ${historyCount} data riwayat transaksi`}
+          >
+            {historyCount}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           {savedStatus && (
             <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">

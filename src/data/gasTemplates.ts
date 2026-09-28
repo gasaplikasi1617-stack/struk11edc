@@ -69,6 +69,109 @@ function getOrCreateSheet() {
   return sheet;
 }
 
+// 2b. HELPER SHEET USER LOKET (AKUN KASIR & ADMIN LOKET)
+function getOrCreateUserSheet() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName("UserLoket");
+  if (!sheet) {
+    sheet = ss.insertSheet("UserLoket");
+    var headers = [
+      "ID User", "Username", "Password", "Nama Lengkap",
+      "Role", "Status", "Created At", "Last Login"
+    ];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight("bold")
+      .setBackground("#047857")
+      .setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+    sheet.getRange("A2:H").setNumberFormat("@");
+    // Akun default kustana
+    sheet.appendRow([
+      "usr-kustana", "kustana", "222324", "Kustana",
+      "admin", "aktif", new Date().toISOString(), ""
+    ]);
+  }
+  return sheet;
+}
+
+function getAllUsersFromSheet() {
+  var sheet = getOrCreateUserSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return [
+      { id: "usr-kustana", username: "kustana", password: "222324", namaLengkap: "Kustana", role: "admin", status: "aktif", createdAt: new Date().toISOString() }
+    ];
+  }
+
+  var numRows = lastRow - 1;
+  var numCols = Math.min(sheet.getLastColumn(), 8);
+  var values = sheet.getRange(2, 1, numRows, numCols).getValues();
+
+  var result = [];
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var uName = String(row[1] || "").trim();
+    if (!uName) continue;
+    result.push({
+      id: String(row[0] || ("usr-" + (i + 1))),
+      username: uName.toLowerCase(),
+      password: String(row[2] || "222324"),
+      namaLengkap: String(row[3] || uName),
+      role: String(row[4] || "kasir"),
+      status: String(row[5] || "aktif"),
+      createdAt: String(row[6] || new Date().toISOString()),
+      lastLogin: String(row[7] || "")
+    });
+  }
+
+  if (!result.some(function(u) { return u.username === "kustana"; })) {
+    result.unshift({ id: "usr-kustana", username: "kustana", password: "222324", namaLengkap: "Kustana", role: "admin", status: "aktif", createdAt: new Date().toISOString() });
+  }
+
+  return result;
+}
+
+function saveUsersToSheet(usersList) {
+  var sheet = getOrCreateUserSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.deleteRows(2, lastRow - 1);
+  }
+  var list = Array.isArray(usersList) ? usersList : [];
+  if (list.length === 0) {
+    list = [
+      { id: "usr-kustana", username: "kustana", password: "222324", namaLengkap: "Kustana", role: "admin", status: "aktif", createdAt: new Date().toISOString() }
+    ];
+  }
+
+  var rows = [];
+  for (var i = 0; i < list.length; i++) {
+    var u = list[i];
+    rows.push([
+      String(u.id || ("usr-" + (i + 1))),
+      String(u.username || "").toLowerCase().trim(),
+      String(u.password || "222324"),
+      String(u.namaLengkap || u.username || ""),
+      String(u.role || "kasir"),
+      String(u.status || "aktif"),
+      String(u.createdAt || new Date().toISOString()),
+      String(u.lastLogin || "")
+    ]);
+  }
+
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    sheet.getRange("A2:H").setNumberFormat("@");
+  }
+
+  return {
+    success: true,
+    total: rows.length,
+    users: getAllUsersFromSheet()
+  };
+}
+
 // 3. RESPONS JSON HELPER (CORS SUPPORT)
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -92,17 +195,20 @@ function onOpen() {
 function setupDatabase() {
   var ss = getSpreadsheet();
   var sheet = getOrCreateSheet();
+  var userSheet = getOrCreateUserSheet();
   sheet.getRange("A2:A").setNumberFormat("@");
   sheet.getRange("C2:C").setNumberFormat("@");
   sheet.getRange("I2:L").setNumberFormat("#,##0");
   sheet.getRange("O2:O").setNumberFormat("@");
   return {
     success: true,
-    message: "Database Google Sheets 'RiwayatTransaksi' berhasil disiapkan (Format ID Pelanggan = Teks)!",
+    message: "Database Google Sheets 'RiwayatTransaksi' & 'UserLoket' berhasil disiapkan (Format ID = Teks)!",
     spreadsheetName: ss.getName(),
     spreadsheetUrl: ss.getUrl(),
     sheetName: sheet.getName(),
+    userSheetName: userSheet.getName(),
     totalRecords: Math.max(0, sheet.getLastRow() - 1),
+    totalUsers: Math.max(0, userSheet.getLastRow() - 1),
     timestamp: new Date().toISOString()
   };
 }

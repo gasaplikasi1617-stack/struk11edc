@@ -443,6 +443,7 @@ export default function App() {
                   onPrint={handlePrint}
                   onSave={handleSaveTransaction}
                   savedStatus={savedStatus}
+                  historyCount={transactions.length}
                 />
               </div>
             </div>
