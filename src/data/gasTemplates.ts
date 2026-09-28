@@ -629,8 +629,8 @@ function testInitAndPing() {
       if (!text) { alert('Masukkan teks struk!'); return; }
       const lines = text.split('\\n').map(l => l.trim()).filter(Boolean);
       document.getElementById('tanggal').value = new Date().toLocaleDateString('id-ID');
-      let idpel = '541293847210';
-      let rp = 100000;
+      let idpel = '';
+      let rp = 0;
       for (let l of lines) {
         if (/\\b\\d{10,13}\\b/.test(l)) {
           let m = l.match(/\\b\\d{10,13}\\b/);

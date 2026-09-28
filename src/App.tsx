@@ -30,16 +30,16 @@ export default function App() {
   const [receipt, setReceipt] = useState<ReceiptData>({
     id: generateRandomTransactionId(),
     tanggal: formatReceiptDateTime(),
-    idpel: '541293847210',
-    namaPelanggan: 'BUDI SANTOSO',
-    pemakaian: '145 kWh',
-    standMeter: '014230 - 014380',
-    rincianTagihan: 'Tagihan Listrik PLN Pascabayar',
-    bulanTagihan: getCurrentMonthPeriod(),
-    rpTagihan: 150000,
+    idpel: '',
+    namaPelanggan: '',
+    pemakaian: '',
+    standMeter: '',
+    rincianTagihan: '',
+    bulanTagihan: '',
+    rpTagihan: 0,
     lainLain: 0,
-    adminBank: 2500,
-    totalBayar: 152500,
+    adminBank: 0,
+    totalBayar: 0,
     namaAgen: 'Agen Batara',
     alamat: 'Bekasi',
     noHp: '081234567890',
@@ -66,13 +66,23 @@ export default function App() {
 
   // Fetch transactions and start background 2-way auto-sync
   useEffect(() => {
+    // Pastikan data sampel lama BUDI SANTOSO diblokir dari riwayat
+    addDeletedTransactionId('541293847210');
+    addDeletedTransactionId('TRX-85485204');
+
     fetchTransactions();
 
     // Start background auto-sync orchestrator
     const stopSync = startAutoSync(
       () => transactionsRef.current,
       (merged) => {
-        const { cleaned } = deduplicateTransactionList(merged);
+        const filtered = merged.filter(
+          (t) =>
+            t.idpel !== '541293847210' &&
+            t.id !== 'TRX-85485204' &&
+            t.namaPelanggan !== 'BUDI SANTOSO'
+        );
+        const { cleaned } = deduplicateTransactionList(filtered);
         setTransactions(cleaned);
         saveStoredTransactions(cleaned);
       }
@@ -88,7 +98,13 @@ export default function App() {
       if (contentType && contentType.includes("application/json")) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          const { cleaned } = deduplicateTransactionList(data);
+          const filtered = data.filter(
+            (t) =>
+              t.idpel !== '541293847210' &&
+              t.id !== 'TRX-85485204' &&
+              t.namaPelanggan !== 'BUDI SANTOSO'
+          );
+          const { cleaned } = deduplicateTransactionList(filtered);
           setTransactions(cleaned);
           saveStoredTransactions(cleaned);
           return;
@@ -101,14 +117,28 @@ export default function App() {
     try {
       const stored = getStoredTransactions();
       if (stored.length > 0) {
-        const { cleaned } = deduplicateTransactionList(stored);
+        const filtered = stored.filter(
+          (t) =>
+            t.idpel !== '541293847210' &&
+            t.id !== 'TRX-85485204' &&
+            t.namaPelanggan !== 'BUDI SANTOSO'
+        );
+        const { cleaned } = deduplicateTransactionList(filtered);
         setTransactions(cleaned);
         return;
       }
       const local = localStorage.getItem('agent_batara_txs');
       if (local) {
         const parsed = JSON.parse(local);
-        const { cleaned } = deduplicateTransactionList(parsed);
+        const filtered = Array.isArray(parsed)
+          ? parsed.filter(
+              (t: any) =>
+                t.idpel !== '541293847210' &&
+                t.id !== 'TRX-85485204' &&
+                t.namaPelanggan !== 'BUDI SANTOSO'
+            )
+          : [];
+        const { cleaned } = deduplicateTransactionList(filtered);
         setTransactions(cleaned);
         saveStoredTransactions(cleaned);
       }
@@ -118,6 +148,18 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveTransaction = async (force: boolean = false): Promise<ReceiptData | null> => {
+    // Validasi data kosong: jangan simpan form kosong ke riwayat
+    const hasData =
+      Boolean(receipt.namaPelanggan && receipt.namaPelanggan.trim()) ||
+      Boolean(receipt.idpel && receipt.idpel.trim() && receipt.idpel !== '-') ||
+      ((Number(receipt.rpTagihan) || 0) > 0) ||
+      ((Number(receipt.totalBayar) || 0) > 0);
+
+    if (!hasData) {
+      console.warn('Form transaksi masih kosong, tidak disimpan ke riwayat.');
+      return null;
+    }
+
     let txId = receipt.id;
     // Jika force simpan (misalnya saat tombol Cetak ditekan) dan ID transaksi ini sudah ada di riwayat,
     // buat ID baru agar tidak bentrok dengan transaksi yang sudah dicetak sebelumnya

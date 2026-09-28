@@ -37,12 +37,12 @@ export function ReceiptForm({
       namaPelanggan: '',
       pemakaian: '',
       standMeter: '',
-      rincianTagihan: 'Tagihan Pembayaran',
+      rincianTagihan: '',
       bulanTagihan: '',
       rpTagihan: 0,
       lainLain: 0,
-      adminBank: 2500,
-      totalBayar: 2500,
+      adminBank: 0,
+      totalBayar: 0,
     }));
   };
 
@@ -228,7 +228,7 @@ export function ReceiptForm({
         }
       }
       if (!namaPelanggan) {
-        namaPelanggan = "BUDI SANTOSO";
+        namaPelanggan = "";
       }
     }
 
@@ -515,6 +515,7 @@ export function ReceiptForm({
               type="text"
               value={receipt.namaPelanggan}
               onChange={(e) => handleInputChange('namaPelanggan', e.target.value)}
+              placeholder="NAMA LENGKAP PELANGGAN"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-semibold uppercase"
             />
           </div>
@@ -525,6 +526,7 @@ export function ReceiptForm({
               type="text"
               value={receipt.pemakaian}
               onChange={(e) => handleInputChange('pemakaian', e.target.value)}
+              placeholder="Contoh: R1M/900 VA atau 29 m3"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -535,6 +537,7 @@ export function ReceiptForm({
               type="text"
               value={receipt.standMeter}
               onChange={(e) => handleInputChange('standMeter', e.target.value)}
+              placeholder="Contoh: 014230 - 014380"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
             />
           </div>
@@ -545,6 +548,7 @@ export function ReceiptForm({
               type="text"
               value={receipt.bulanTagihan}
               onChange={(e) => handleInputChange('bulanTagihan', e.target.value)}
+              placeholder="Contoh: Sep 26"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -555,6 +559,7 @@ export function ReceiptForm({
               type="text"
               value={receipt.rincianTagihan}
               onChange={(e) => handleInputChange('rincianTagihan', e.target.value)}
+              placeholder="Contoh: Tagihan Listrik PLN Pascabayar / PDAM"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -563,8 +568,9 @@ export function ReceiptForm({
             <label className="block text-xs font-semibold text-slate-600 mb-1">Rp Tagihan (Pokok)</label>
             <input
               type="number"
-              value={receipt.rpTagihan}
-              onChange={(e) => handleInputChange('rpTagihan', e.target.value)}
+              value={receipt.rpTagihan === 0 ? '' : receipt.rpTagihan}
+              onChange={(e) => handleInputChange('rpTagihan', e.target.value === '' ? 0 : Number(e.target.value))}
+              placeholder="0"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-blue-600"
             />
           </div>
@@ -573,8 +579,9 @@ export function ReceiptForm({
             <label className="block text-xs font-semibold text-slate-600 mb-1">Lain-Lain (Denda/Admin)</label>
             <input
               type="number"
-              value={receipt.lainLain}
-              onChange={(e) => handleInputChange('lainLain', e.target.value)}
+              value={receipt.lainLain === 0 ? '' : receipt.lainLain}
+              onChange={(e) => handleInputChange('lainLain', e.target.value === '' ? 0 : Number(e.target.value))}
+              placeholder="0"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -583,8 +590,9 @@ export function ReceiptForm({
             <label className="block text-xs font-semibold text-slate-600 mb-1">Admin Bank / Loket</label>
             <input
               type="number"
-              value={receipt.adminBank}
-              onChange={(e) => handleInputChange('adminBank', e.target.value)}
+              value={receipt.adminBank === 0 ? '' : receipt.adminBank}
+              onChange={(e) => handleInputChange('adminBank', e.target.value === '' ? 0 : Number(e.target.value))}
+              placeholder="0"
               className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
