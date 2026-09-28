@@ -157,6 +157,42 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
     }
   };
 
+  const handleQuickQzTrayPrint = async () => {
+    // 1. Fungsi Simpan ke Riwayat (Dua-arah / otomatis)
+    await onSave(true);
+    setIsQzPrinting(true);
+    showActionNotice('Data otomatis tersimpan ke riwayat! Menghubungkan ke QZ Tray...');
+
+    // 2. Fungsi Cetak via QZ Tray
+    try {
+      const printedTo = await printDirectQZTray(receipt, selectedQzPrinter || undefined);
+      showActionNotice(`SUKSES! Data tersimpan ke riwayat & struk dicetak ke ${printedTo} via QZ Tray.`);
+    } catch (err: any) {
+      console.warn('Direct QZ Tray error, membuka jendela QZ Tray:', err);
+      try {
+        await connectQZTray();
+        const printers = await getQZTrayPrinters();
+        setQzPrinterList(printers);
+        if (printers.length > 0) {
+          const lxPrinter =
+            printers.find((p) => p.toUpperCase().includes('LX') || p.toUpperCase().includes('EPSON')) ||
+            printers[0];
+          setSelectedQzPrinter(lxPrinter);
+        }
+        setShowQzModal(true);
+      } catch (connErr: any) {
+        alert(
+          `Data transaksi TELAH TERSIMPAN ke riwayat.\n\n` +
+          `Untuk mencetak dengan QZ Tray: Pastikan aplikasi QZ Tray sudah terbuka dan aktif (ikon hijau di dekat jam Windows).\n\n` +
+          `Detail: ${err.message || connErr.message || 'QZ Tray tidak aktif'}`
+        );
+        setShowLx310GuideModal(true);
+      }
+    } finally {
+      setIsQzPrinting(false);
+    }
+  };
+
   const handleOpenQzModal = async () => {
     await onSave(true);
     setIsQzPrinting(true);
@@ -456,12 +492,17 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus }: Receip
             Simpan
           </button>
           <button
-            onClick={() => handleDirectPrint(false)}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
-            title="Cetak struk dan otomatis simpan ke riwayat"
+            onClick={handleQuickQzTrayPrint}
+            disabled={isQzPrinting}
+            className="text-xs bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60 border border-emerald-500/60"
+            title="Cetak via QZ Tray & Otomatis Simpan ke Riwayat Transaksi"
           >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Cetak / PDF</span>
+            {isQzPrinting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+            ) : (
+              <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+            )}
+            <span>Cetak QZ/Tray</span>
           </button>
         </div>
       </div>
