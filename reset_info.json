@@ -1,8 +1,7 @@
 {
-  "lastResetTimestamp": 1790325750000,
+  "lastResetTimestamp": 0,
   "deletedIds": [
-    "TEST-1",
-    "TRX-85485204",
-    "541293847210"
+    "541293847210",
+    "TRX-85485204"
   ]
 }

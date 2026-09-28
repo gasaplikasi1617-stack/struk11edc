@@ -26,6 +26,7 @@ import { formatIdpelAsText } from '../utils/exportExcel';
 import { MonthlyResetModal } from './MonthlyResetModal';
 import {
   executeTwoWaySync,
+  forceSyncWithGoogleSheets,
   directGasCall,
   getStoredTransactions,
   saveStoredTransactions,
@@ -526,6 +527,42 @@ export function GasIntegrationTab({
     }
   };
 
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+
+  const handleForceSync = async () => {
+    if (!gasUrl.trim()) {
+      setSyncNotice({
+        type: 'error',
+        text: 'Silakan isi URL Web App Google Apps Script terlebih dahulu.',
+      });
+      return;
+    }
+
+    setIsForceSyncing(true);
+    setSyncNotice({
+      type: 'info',
+      text: 'Menyamakan seluruh data dari Google Sheets (Reset filter lokal & menarik seluruh baris)...',
+    });
+
+    try {
+      const res = await forceSyncWithGoogleSheets(gasUrl.trim());
+      setSyncNotice({
+        type: 'success',
+        text: `SUKSES! Seluruh data perangkat ini telah disamakan persis dengan Google Sheets (${res.count} transaksi).`,
+      });
+      setPreviewData(res.transactions.slice(0, 10));
+      if (onSyncSuccess) onSyncSuccess();
+      if (onRefreshTransactions) onRefreshTransactions();
+    } catch (e: any) {
+      setSyncNotice({
+        type: 'error',
+        text: `Gagal menyamakan dengan Google Sheets: ${e.message}`,
+      });
+    } finally {
+      setIsForceSyncing(false);
+    }
+  };
+
   const copyToClipboard = (text: string, type: 'gs' | 'html') => {
     navigator.clipboard.writeText(text);
     if (type === 'gs') {
@@ -873,6 +910,28 @@ export function GasIntegrationTab({
                     <span>Tutup Buku & Arsip Bulan</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Multi-Device Master Sync Helper Banner */}
+              <div className="mt-3 pt-3 border-t border-blue-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/80 p-3.5 rounded-xl">
+                <div>
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span>Solusi Pindah Device / Sinkronisasi Master Google Sheets:</span>
+                  </p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Data di perangkat baru kosong atau sehabis hapus riwayat? Klik tombol ini untuk menarik seluruh data aktif dari Google Sheets tanpa terhalang filter lokal, sehingga data antar device sama persis 100%.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleForceSync}
+                  disabled={isForceSyncing || !gasUrl.trim()}
+                  className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isForceSyncing ? 'Menyamakan...' : '⚡ Samakan Persis (Master Sheets)'}</span>
+                </button>
               </div>
             </div>
           </div>

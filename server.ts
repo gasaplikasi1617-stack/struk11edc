@@ -1209,6 +1209,64 @@ app.post("/api/gas/sync", async (req, res) => {
   }
 });
 
+// Force Pull: Samakan Persis / Jadikan Google Sheets Master Database
+// Mengabaikan / mereset cutoff timestamp dan tombstone agar seluruh transaksi Google Sheets ditarik 100%
+app.post("/api/gas/force-pull", async (req, res) => {
+  try {
+    const gasCfg = getGasConfig();
+    const targetUrl = (req.body.gasUrl || gasCfg.gasUrl || "").trim();
+    if (!targetUrl) {
+      return res.status(400).json({ success: false, error: "URL Web App Google Apps Script belum dikonfigurasi." });
+    }
+
+    let sheetTxs: any[] = [];
+    try {
+      const getRes = await callGasGet(targetUrl, { action: "getTransactions" });
+      sheetTxs = Array.isArray(getRes?.data) ? getRes.data : (Array.isArray(getRes) ? getRes : []);
+    } catch {
+      const postRes = await callGasPost(targetUrl, { action: "getTransactions" });
+      sheetTxs = Array.isArray(postRes?.data) ? postRes.data : (Array.isArray(postRes) ? postRes : []);
+    }
+
+    // Reset tombstone & reset timestamp di server
+    const info = getResetInfo();
+    info.lastResetTimestamp = 0;
+    // Sisakan hanya proteksi data dummy sampel
+    info.deletedIds = ["541293847210", "TRX-85485204"];
+    saveResetInfo(info);
+
+    const valid = sheetTxs
+      .filter(isValidTransaction)
+      .filter(
+        (t: any) =>
+          t.idpel !== "541293847210" &&
+          t.id !== "TRX-85485204" &&
+          t.namaPelanggan !== "BUDI SANTOSO"
+      )
+      .map(normalizeTransaction);
+
+    const { cleaned } = deduplicateList(valid);
+    const finalList = cleaned.slice(0, 1000);
+    saveTransactions(finalList);
+
+    const now = new Date().toISOString();
+    saveGasConfig({ lastSyncedAt: now });
+
+    return res.json({
+      success: true,
+      message: `Berhasil menyamakan persis ${finalList.length} transaksi dari Google Sheets ke database lokal!`,
+      count: finalList.length,
+      transactions: finalList,
+      lastSyncedAt: now,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: "Gagal menarik data dari Google Sheets: " + (err.message || String(err)),
+    });
+  }
+});
+
 // Pull transactions from Google Sheets
 app.post("/api/gas/pull", async (req, res) => {
   try {

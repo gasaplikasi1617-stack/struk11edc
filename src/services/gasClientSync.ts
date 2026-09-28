@@ -592,6 +592,117 @@ export async function executeTwoWaySync(
 }
 
 /**
+ * FORCE SYNC / SAMAKAN PERSIS DENGAN GOOGLE SHEETS (MULTI-DEVICE MASTER SYNC)
+ * Menghilangkan seluruh pemblokiran lokal (tombstone & waktu reset) sehingga seluruh transaksi
+ * aktif dari Google Sheets disalin 100% persis ke memori perangkat ini.
+ * Sangat berguna ketika:
+ * 1. Pindah ke HP / Laptop / Komputer kasir baru.
+ * 2. Perangkat baru saja menghapus semua riwayat secara tidak sengaja.
+ * 3. Ingin data lokal dan Google Sheets sama persis tanpa terfilter.
+ */
+export async function forceSyncWithGoogleSheets(customGasUrl?: string): Promise<{
+  success: boolean;
+  message: string;
+  transactions: ReceiptData[];
+  count: number;
+}> {
+  const gasUrl = normalizeGasUrl(customGasUrl || getStoredGasUrl());
+  if (!gasUrl) {
+    throw new Error('URL Google Apps Script belum terpasang. Konfigurasi terlebih dahulu di tab Google Sheet.');
+  }
+
+  notifySyncListeners({ status: 'syncing', lastError: null });
+
+  // 1. Bersihkan proteksi lokal tombstone & waktu reset
+  clearDeletedTransactionIds();
+  // Tetap proteksi data sampel palsu lama agar tidak masuk
+  addDeletedTransactionId('541293847210');
+  addDeletedTransactionId('TRX-85485204');
+  setLastResetTimestamp(0);
+
+  let fetchedList: any[] = [];
+
+  // 2. Coba lewat backend /api/gas/force-pull
+  try {
+    const res = await fetch('/api/gas/force-pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gasUrl }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.transactions)) {
+        fetchedList = json.transactions;
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Backend force-pull failed, falling back to direct GAS:', srvErr);
+  }
+
+  // 3. Fallback direct call jika backend gagal
+  if (fetchedList.length === 0) {
+    try {
+      const directRes = await directGasCall(gasUrl, 'getTransactions');
+      const rawData = Array.isArray(directRes) ? directRes : (Array.isArray(directRes?.data) ? directRes.data : []);
+      fetchedList = rawData;
+    } catch (gasErr: any) {
+      notifySyncListeners({ status: 'error', lastError: gasErr.message });
+      throw gasErr;
+    }
+  }
+
+  // 4. Normalisasi dan saring
+  const normalized: ReceiptData[] = fetchedList
+    .filter(isValidTransaction)
+    .filter(
+      (t) =>
+        t.idpel !== '541293847210' &&
+        t.id !== 'TRX-85485204' &&
+        t.namaPelanggan !== 'BUDI SANTOSO'
+    )
+    .map((t, idx) => {
+      const totalBayar = Number(t.totalBayar) || ((Number(t.rpTagihan) || 0) + (Number(t.adminBank) || 0));
+      return {
+        ...t,
+        id: t.id ? String(t.id) : `TX-SHEET-${idx}`,
+        idpel: cleanIdpel(t.idpel),
+        rpTagihan: Number(t.rpTagihan) || 0,
+        lainLain: Number(t.lainLain) || 0,
+        adminBank: Number(t.adminBank) || 0,
+        totalBayar,
+        status: t.status === 'tidak_aktif' ? 'tidak_aktif' : 'aktif',
+        createdAt: t.createdAt || new Date().toISOString(),
+      };
+    });
+
+  // Simpan secara permanen ke localStorage
+  saveStoredTransactions(normalized);
+  try {
+    localStorage.setItem('agent_batara_txs', JSON.stringify(normalized));
+  } catch {}
+
+  const now = new Date().toISOString();
+  setLastSyncedTime(now);
+
+  notifySyncListeners(
+    {
+      status: 'synced',
+      lastSyncedAt: now,
+      lastError: null,
+      totalInSheet: normalized.length,
+    },
+    normalized
+  );
+
+  return {
+    success: true,
+    message: `SUKSES! Berhasil menyamakan persis ${normalized.length} transaksi dari Google Sheets ke perangkat ini.`,
+    transactions: normalized,
+    count: normalized.length,
+  };
+}
+
+/**
  * START BACKGROUND AUTO-SYNC TIMER
  */
 export function startAutoSync(

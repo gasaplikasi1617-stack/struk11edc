@@ -38,6 +38,7 @@ import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import {
   executeTwoWaySync,
+  forceSyncWithGoogleSheets,
   addDeletedTransactionId,
   setLastResetTimestamp,
   archiveAndResetGoogleSheet,
@@ -225,6 +226,26 @@ export function HistoryTab({
     } finally {
       setIsSyncingGas(false);
       setTimeout(() => setExportSuccessNotice(null), 6000);
+    }
+  };
+
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+
+  const handleForceSyncFromSheets = async () => {
+    setIsForceSyncing(true);
+    try {
+      const res = await forceSyncWithGoogleSheets();
+      setExportSuccessNotice(
+        `SUKSES! Berhasil menyamakan persis ${res.count} data transaksi dari Google Sheets ke perangkat ini. Data kini 100% identik!`
+      );
+      if (onRefreshTransactions) {
+        await onRefreshTransactions();
+      }
+    } catch (e: any) {
+      setExportSuccessNotice(`Gagal menyamakan dengan Google Sheets: ${e.message}`);
+    } finally {
+      setIsForceSyncing(false);
+      setTimeout(() => setExportSuccessNotice(null), 7000);
     }
   };
 
@@ -661,11 +682,22 @@ export function HistoryTab({
               id="btn-gas-sync-history"
               onClick={handleGasSyncClick}
               disabled={isSyncingGas}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all"
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
               title="Sinkronisasi 2 arah dengan Google Sheets"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
               <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron'}</span>
+            </button>
+
+            <button
+              id="btn-force-sync-sheets"
+              onClick={handleForceSyncFromSheets}
+              disabled={isForceSyncing}
+              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer border border-teal-500/80"
+              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini (Solusi multi-device / setelah hapus riwayat)"
+            >
+              <RefreshCw className={`w-4 h-4 ${isForceSyncing ? 'animate-spin' : ''}`} />
+              <span>{isForceSyncing ? 'Menyamakan...' : 'Samakan dgn Google Sheets'}</span>
             </button>
 
             <button
@@ -1170,21 +1202,33 @@ export function HistoryTab({
                       <div className="flex flex-col items-center justify-center gap-2.5">
                         <AlertCircle className="w-9 h-9 text-slate-300" />
                         <p className="text-sm font-bold text-slate-700">
-                          {transactions.length === 0 ? 'Belum Ada Transaksi di Riwayat Aktif' : 'Tidak ada data transaksi yang sesuai.'}
+                          {transactions.length === 0 ? 'Belum Ada Transaksi di Riwayat Perangkat Ini' : 'Tidak ada data transaksi yang sesuai.'}
                         </p>
-                        <p className="text-xs text-slate-500 max-w-md">
+                        <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
                           {transactions.length === 0
-                            ? 'Riwayat kosong setelah Tutup Buku bulanan atau pembersihan data? Anda dapat memulihkan kembali data lama dari file backup JSON atau tarik dari Google Sheets.'
+                            ? 'Baru buka di HP/Laptop lain atau baru saja menghapus riwayat? Jika Anda memiliki data di Google Sheets, Anda dapat langsung menarik dan menyamakannya 100% persis ke perangkat ini.'
                             : 'Coba ubah kata kunci pencarian atau filter kategori.'}
                         </p>
                         {transactions.length === 0 && (
-                          <button
-                            onClick={() => setIsRestoreModalOpen(true)}
-                            className="mt-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <UploadCloud className="w-4 h-4" />
-                            <span>Restore / Upload File Backup JSON</span>
-                          </button>
+                          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
+                            <button
+                              type="button"
+                              onClick={handleForceSyncFromSheets}
+                              disabled={isForceSyncing}
+                              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+                            >
+                              <RefreshCw className={`w-4 h-4 ${isForceSyncing ? 'animate-spin' : ''}`} />
+                              <span>{isForceSyncing ? 'Menyamakan dari Google Sheets...' : '⚡ Tarik & Samakan dari Google Sheets'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsRestoreModalOpen(true)}
+                              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <UploadCloud className="w-4 h-4" />
+                              <span>Upload File Backup JSON</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
