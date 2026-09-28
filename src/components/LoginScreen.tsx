@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Eye, EyeOff, LogIn, AlertCircle, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 import { loginUser } from '../services/userService';
 import { AppUser } from '../types';
 
@@ -27,12 +27,6 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickFillDefault = () => {
-    setUsername('kustana');
-    setPassword('222324');
-    setError(null);
   };
 
   return (
@@ -151,30 +145,6 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 )}
               </button>
             </form>
-
-            {/* Quick Fill Default Credentials Tip */}
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 text-xs text-slate-600">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
-                    <span>User Login Default:</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleQuickFillDefault}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-blue-200"
-                    title="Klik untuk mengisi otomatis kustana & 222324"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-                <div className="font-mono text-[11px] text-slate-700 space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
-                  <div>Username: <strong className="text-blue-700 font-bold">kustana</strong></div>
-                  <div>Password: <strong className="text-blue-700 font-bold">222324</strong></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

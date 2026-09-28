@@ -341,12 +341,12 @@ export function UserManagementSection() {
         </table>
       </div>
 
-      {/* Info default user card */}
+      {/* Info user card */}
       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
         <div className="flex items-center gap-2.5">
           <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
           <span>
-            User default utama loket: <strong>kustana</strong> (Sandi: <code>222324</code>). Anda dapat mengubah kata sandi atau menambahkan user kasir lainnya melalui tombol di atas.
+            Kelola akun user kasir dan administrator melalui tombol di atas. Anda dapat menambah akun baru, mengubah nama, role, maupun mengganti kata sandi.
           </span>
         </div>
       </div>
