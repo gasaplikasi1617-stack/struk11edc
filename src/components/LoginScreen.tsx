@@ -47,7 +47,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               />
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Cetak Resi Tagihan
+              PPOB Agen11EDC
             </h1>
             <p className="text-xs text-blue-100 font-medium mt-1">
               Agen Batara — Sistem Loket Pembayaran &amp; Kasir PPOB
@@ -150,7 +150,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-400 mt-6 font-medium">
-          Sistem Cetak Resi Tagihan &copy; 2026 Agen Batara — Bekasi
+          PPOB Agen11EDC &copy; 2026 Agen Batara — Bekasi
         </p>
       </div>
     </div>
