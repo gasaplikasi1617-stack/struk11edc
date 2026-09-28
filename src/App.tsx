@@ -222,16 +222,29 @@ export default function App() {
     }, 100);
   };
 
-  const handleDeleteTransaction = async (targetKey: string) => {
+  const handleDeleteTransaction = async (targetKey: string, txData?: ReceiptData) => {
     if (!targetKey) return;
-    if (!confirm('Apakah Anda yakin ingin menghapus data transaksi ini dari riwayat?')) return;
+    const targetTx = txData || transactions.find((t) => t.id === targetKey || t.idpel === targetKey || t.namaPelanggan === targetKey);
+    const displayName = targetTx?.namaPelanggan || targetTx?.idpel || targetKey;
+    const idpel = targetTx?.idpel && targetTx.idpel !== '-' ? targetTx.idpel : '';
 
-    // Catat ID ke tombstone agar tidak pernah ditarik kembali oleh sinkronisasi otomatis
-    addDeletedTransactionId(targetKey);
+    const confirmMsg =
+      `Apakah Anda yakin ingin menghapus data transaksi "${displayName}" ${idpel ? `(ID Pelanggan: ${idpel})` : ''} dari riwayat?\n\n` +
+      `Catatan: Data akan dihapus secara permanen dan DIJAMIN TIDAK AKAN MUNCUL KEMBALI saat disinkronkan ke Google Sheets.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const idToBlock = targetTx?.id || targetKey;
+    const idpelToBlock = targetTx?.idpel;
+
+    // Catat ID dan IDPEL ke tombstone agar tidak pernah ditarik kembali oleh sinkronisasi otomatis
+    if (idToBlock) addDeletedTransactionId(idToBlock);
+    if (idpelToBlock && idpelToBlock !== '-') addDeletedTransactionId(idpelToBlock);
 
     // Filter local state by id, idpel, or namaPelanggan
     const updated = transactions.filter((t) => {
-      if (t.id && t.id === targetKey) return false;
+      if (t.id && (t.id === targetKey || t.id === idToBlock)) return false;
+      if (t.idpel && idpelToBlock && idpelToBlock !== '-' && t.idpel === idpelToBlock) return false;
       if (t.idpel && t.idpel === targetKey) return false;
       if (t.namaPelanggan && t.namaPelanggan === targetKey) return false;
       return true;
@@ -245,13 +258,14 @@ export default function App() {
 
     // Hapus di server lokal
     try {
-      await fetch(`/api/transactions/${encodeURIComponent(targetKey)}`, { method: 'DELETE' });
+      const qParam = idpelToBlock && idpelToBlock !== '-' ? `?idpel=${encodeURIComponent(idpelToBlock)}` : '';
+      await fetch(`/api/transactions/${encodeURIComponent(idToBlock)}${qParam}`, { method: 'DELETE' });
     } catch (e) {
       console.warn('Server delete error:', e);
     }
 
     // Hapus di Google Sheets (Cloud)
-    deleteGoogleSheetTransaction(targetKey).catch(() => {});
+    deleteGoogleSheetTransaction(idToBlock, idpelToBlock).catch(() => {});
   };
 
   const handleToggleStatus = async (tx: ReceiptData) => {

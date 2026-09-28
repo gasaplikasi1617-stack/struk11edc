@@ -263,21 +263,35 @@ function executeTwoWaySync(incomingTransactions) {
   };
 }
 
-// 9. HAPUS TRANSAKSI DI SHEET
-function deleteTransactionRow(id) {
-  if (!id) return { success: false, error: "ID tidak valid" };
+// 9. HAPUS TRANSAKSI DI SHEET (Mendukung pencarian berdasarkan ID Transaksi atau ID Pelanggan)
+function deleteTransactionRow(id, idpel) {
+  if (!id && !idpel) return { success: false, error: "ID atau ID Pelanggan tidak valid" };
   var sheet = getOrCreateSheet();
   var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return { success: false, error: "Sheet kosong" };
 
-  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (var i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]) === String(id)) {
+  var targetId = id ? String(id).trim() : "";
+  var targetIdpel = idpel ? String(idpel).trim().replace(/^'/, "") : "";
+
+  var values = sheet.getRange(2, 1, lastRow - 1, Math.min(sheet.getLastColumn(), 4)).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var rowId = String(values[i][0] || "").trim();
+    var rowIdpel = String(values[i][2] || "").trim().replace(/^'/, "");
+
+    var isMatch = false;
+    if (targetId && (rowId === targetId || rowIdpel === targetId)) {
+      isMatch = true;
+    }
+    if (targetIdpel && (rowIdpel === targetIdpel || rowId === targetIdpel)) {
+      isMatch = true;
+    }
+
+    if (isMatch) {
       sheet.deleteRow(i + 2);
-      return { success: true, deletedId: id };
+      return { success: true, deletedId: id || idpel, deletedRow: i + 2, message: "Transaksi berhasil dihapus dari Google Sheets" };
     }
   }
-  return { success: false, error: "Transaksi ID tidak ditemukan di Google Sheets" };
+  return { success: false, error: "Transaksi tidak ditemukan di Google Sheets" };
 }
 
 // 9b. TUTUP BUKU & ARSIPKAN DATA BULANAN KE TAB BARU
@@ -381,6 +395,12 @@ function doGet(e) {
       return jsonResponse(archiveAndResetSheet(mName));
     }
 
+    if (action === "deleteTransaction" || action === "delete") {
+      var delGetId = p.id || "";
+      var delGetIdpel = p.idpel || "";
+      return jsonResponse(deleteTransactionRow(delGetId, delGetIdpel));
+    }
+
     // Tampilkan Web App Index HTML
     try {
       return HtmlService.createHtmlOutputFromFile("Index")
@@ -445,7 +465,9 @@ function doPost(e) {
     }
 
     if (action === "deleteTransaction" || action === "delete") {
-      return jsonResponse(deleteTransactionRow(payload.id));
+      var delId = payload.id || (e && e.parameter ? e.parameter.id : "");
+      var delIdpel = payload.idpel || (e && e.parameter ? e.parameter.idpel : "");
+      return jsonResponse(deleteTransactionRow(delId, delIdpel));
     }
 
     if (action === "archiveAndResetMonth" || action === "resetMonth" || action === "archive") {

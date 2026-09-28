@@ -718,19 +718,27 @@ app.post("/api/transactions/reset", (req, res) => {
   }
 });
 
-// Delete a transaction
+// Delete a transaction (anti-resurrection support: blocks both id and idpel)
 app.delete("/api/transactions/:id", (req, res) => {
   let txs = getTransactions();
   const targetKey = decodeURIComponent(req.params.id || "");
+  const idpelParam = req.query.idpel ? decodeURIComponent(String(req.query.idpel)) : "";
   const initialLength = txs.length;
-  addDeletedId(targetKey);
-  txs = txs.filter((t: any) => t.id !== targetKey && t.idpel !== targetKey && t.namaPelanggan !== targetKey);
+
+  if (targetKey) addDeletedId(targetKey);
+  if (idpelParam && idpelParam !== "-") addDeletedId(idpelParam);
+
+  txs = txs.filter((t: any) => {
+    if (targetKey && (t.id === targetKey || t.idpel === targetKey || t.namaPelanggan === targetKey)) return false;
+    if (idpelParam && idpelParam !== "-" && t.idpel === idpelParam) return false;
+    return true;
+  });
   saveTransactions(txs);
 
   // Notify Google Sheets to delete row so it doesn't resurrect
   const gasCfg = getGasConfig();
   if (gasCfg.gasUrl) {
-    callGasPost(gasCfg.gasUrl, { action: "deleteTransaction", id: targetKey }).catch(() => {});
+    callGasPost(gasCfg.gasUrl, { action: "deleteTransaction", id: targetKey, idpel: idpelParam }).catch(() => {});
   }
 
   res.json({ success: true, removed: initialLength - txs.length, total: txs.length });

@@ -55,7 +55,7 @@ import {
 interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
-  onDeleteTransaction: (id: string) => void;
+  onDeleteTransaction: (id: string, tx?: ReceiptData) => void;
   onToggleStatus?: (tx: ReceiptData) => void;
   onRefreshTransactions?: () => Promise<void> | void;
   onNavigateToGasTab?: () => void;
@@ -1326,7 +1326,7 @@ export function HistoryTab({
                               e.stopPropagation();
                               const deleteKey = tx.id || tx.idpel || tx.namaPelanggan || '';
                               if (deleteKey) {
-                                onDeleteTransaction(deleteKey);
+                                onDeleteTransaction(deleteKey, tx);
                               }
                             }}
                             className="bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 text-xs p-1.5 rounded-lg transition-all border border-rose-200 cursor-pointer"

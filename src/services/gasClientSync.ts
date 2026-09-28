@@ -231,6 +231,7 @@ export async function directGasCall(
       const u = new URL(url);
       u.searchParams.set('action', action);
       if (payload.id) u.searchParams.set('id', String(payload.id));
+      if (payload.idpel) u.searchParams.set('idpel', String(payload.idpel));
       const getRes = await fetch(u.toString(), { method: 'GET' });
       const getText = await getRes.text();
       const parsed = parseGasRawResponse(getText);
@@ -274,6 +275,7 @@ export async function directGasCall(
   const u = new URL(url);
   u.searchParams.set('action', action);
   if (payload.id) u.searchParams.set('id', String(payload.id));
+  if (payload.idpel) u.searchParams.set('idpel', String(payload.idpel));
   const getRes = await fetch(u.toString(), { method: 'GET' });
   const getText = await getRes.text();
   return parseGasRawResponse(getText);
@@ -392,14 +394,17 @@ export function setLastResetTimestamp(ts: number): void {
 
 /**
  * Hapus transaksi dari Google Sheets (Cloud)
+ * Menjamin ID Transaksi dan ID Pelanggan dicatat ke tombstone agar tidak akan bangkit lagi saat disinkronkan
  */
-export async function deleteGoogleSheetTransaction(id: string): Promise<any> {
-  if (!id) return;
-  addDeletedTransactionId(id);
+export async function deleteGoogleSheetTransaction(id: string, idpel?: string): Promise<any> {
+  if (!id && !idpel) return;
+  if (id) addDeletedTransactionId(id);
+  if (idpel && idpel !== '-') addDeletedTransactionId(idpel);
+
   const url = getStoredGasUrl();
   if (!url) return;
   try {
-    return await directGasCall(url, 'deleteTransaction', { id });
+    return await directGasCall(url, 'deleteTransaction', { id, idpel });
   } catch (err: any) {
     console.warn('Gagal menghapus baris di Google Sheets:', err.message);
   }
