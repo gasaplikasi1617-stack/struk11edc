@@ -1,0 +1,188 @@
+import React, { useState } from 'react';
+import { User, Lock, Eye, EyeOff, LogIn, AlertCircle, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { loginUser } from '../services/userService';
+import { AppUser } from '../types';
+
+interface LoginScreenProps {
+  onLoginSuccess: (user: AppUser) => void;
+}
+
+export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const user = await loginUser(username, password);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setError(err.message || 'Login gagal. Silakan periksa kembali username dan password Anda.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickFillDefault = () => {
+    setUsername('kustana');
+    setPassword('222324');
+    setError(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 flex flex-col justify-center items-center p-4 sm:p-6 font-sans">
+      <div className="w-full max-w-md">
+        {/* Card Login */}
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden backdrop-blur-xs">
+          {/* Header Brand */}
+          <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-6 sm:p-8 text-white text-center relative">
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-lg p-2 border-2 border-white/60 mb-3 mx-auto overflow-hidden">
+              <img
+                src="https://iili.io/nRihMkG.png"
+                alt="Logo Agen Batara"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
+              />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              Cetak Resi Tagihan
+            </h1>
+            <p className="text-xs text-blue-100 font-medium mt-1">
+              Agen Batara — Sistem Loket Pembayaran &amp; Kasir PPOB
+            </p>
+          </div>
+
+          {/* Form Login */}
+          <div className="p-6 sm:p-8">
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-slate-800">Silakan Masuk</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Masukkan akun pengguna Anda untuk mengakses sistem
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-start gap-2.5 animate-fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="font-medium leading-relaxed">{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Masukkan username"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-medium"
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Masukkan password"
+                    className="w-full pl-10 pr-11 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-medium"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    tabIndex={-1}
+                    title={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Memverifikasi Akun...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>Masuk ke Dashboard</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Quick Fill Default Credentials Tip */}
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 text-xs text-slate-600">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>User Login Default:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleQuickFillDefault}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-blue-200"
+                    title="Klik untuk mengisi otomatis kustana & 222324"
+                  >
+                    Auto-Fill
+                  </button>
+                </div>
+                <div className="font-mono text-[11px] text-slate-700 space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
+                  <div>Username: <strong className="text-blue-700 font-bold">kustana</strong></div>
+                  <div>Password: <strong className="text-blue-700 font-bold">222324</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <p className="text-center text-xs text-slate-400 mt-6 font-medium">
+          Sistem Cetak Resi Tagihan &copy; 2026 Agen Batara — Bekasi
+        </p>
+      </div>
+    </div>
+  );
+}

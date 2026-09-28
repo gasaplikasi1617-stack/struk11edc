@@ -19,11 +19,13 @@ import {
   ChevronRight,
   Archive,
   RotateCcw,
+  Users,
 } from 'lucide-react';
 import { GasSyncConfig, ReceiptData } from '../types';
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
 import { formatIdpelAsText } from '../utils/exportExcel';
 import { MonthlyResetModal } from './MonthlyResetModal';
+import { UserManagementSection } from './UserManagementSection';
 import {
   executeTwoWaySync,
   forceSyncWithGoogleSheets,
@@ -113,6 +115,7 @@ export function GasIntegrationTab({
   const [previewData, setPreviewData] = useState<ReceiptData[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
+  const [integrationSubTab, setIntegrationSubTab] = useState<'sheets' | 'users'>('sheets');
 
   // Subscribe to live sync events
   useEffect(() => {
@@ -576,8 +579,41 @@ export function GasIntegrationTab({
 
   return (
     <div className="space-y-6">
-      {/* 1. Integration Header & Sync Controls Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+      {/* Sub-Tab Navigation Header (Google Sheets vs Manajemen User) */}
+      <div className="flex flex-wrap items-center gap-2 bg-slate-200/80 p-1.5 rounded-2xl w-fit border border-slate-300 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setIntegrationSubTab('sheets')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            integrationSubTab === 'sheets'
+              ? 'bg-white text-blue-700 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Database className="w-4 h-4 text-emerald-600" />
+          <span>Integrasi Google Sheets</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIntegrationSubTab('users')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            integrationSubTab === 'users'
+              ? 'bg-white text-indigo-700 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Users className="w-4 h-4 text-indigo-600" />
+          <span>Manajemen User Kasir</span>
+        </button>
+      </div>
+
+      {integrationSubTab === 'users' ? (
+        <UserManagementSection />
+      ) : (
+        <>
+          {/* 1. Integration Header & Sync Controls Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -1149,7 +1185,9 @@ export function GasIntegrationTab({
             if (onSyncSuccess) onSyncSuccess();
           }}
         />
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

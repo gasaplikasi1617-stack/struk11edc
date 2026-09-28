@@ -57,6 +57,55 @@ function saveGasConfig(cfg: Partial<GasConfig>): GasConfig {
   return updated;
 }
 
+// User Management Storage & Helpers
+const USERS_FILE = path.join(process.cwd(), "users.json");
+
+interface ServerUser {
+  id: string;
+  username: string;
+  password?: string;
+  namaLengkap: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+const DEFAULT_USERS_DATA: ServerUser[] = [
+  {
+    id: "usr-kustana",
+    username: "kustana",
+    password: "222324",
+    namaLengkap: "Kustana",
+    role: "admin",
+    status: "aktif",
+    createdAt: "2026-09-28T00:00:00.000Z",
+  },
+];
+
+function getUsers(): ServerUser[] {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, "utf-8");
+      const list = JSON.parse(data);
+      if (Array.isArray(list) && list.length > 0) {
+        return list;
+      }
+    }
+  } catch (e) {
+    console.error("Error reading users.json:", e);
+  }
+  return DEFAULT_USERS_DATA;
+}
+
+function saveUsers(users: ServerUser[]) {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error saving users.json:", e);
+  }
+}
+
 // Helpers for calling Google Apps Script Web App
 function parseGasResponse(text: string): any {
   if (!text || !text.trim()) {
@@ -496,6 +545,144 @@ function saveTransactions(txs: any[]) {
 // API Routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// User Authentication & Management Routes
+app.post("/api/auth/login", (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    const uClean = String(username || "").trim().toLowerCase();
+    const pClean = String(password || "").trim();
+
+    if (!uClean || !pClean) {
+      return res.status(400).json({ success: false, message: "Username dan password wajib diisi." });
+    }
+
+    const users = getUsers();
+    const matched = users.find(
+      (u) => u.username.toLowerCase() === uClean && (u.password === pClean || (!u.password && pClean === "222324"))
+    );
+
+    if (!matched) {
+      return res.status(401).json({ success: false, message: "Username atau password salah. Silakan coba kembali." });
+    }
+
+    if (matched.status === "nonaktif") {
+      return res.status(403).json({ success: false, message: "Akun Anda dinonaktifkan oleh administrator." });
+    }
+
+    matched.lastLogin = new Date().toISOString();
+    saveUsers(users);
+
+    const safeUser = {
+      id: matched.id,
+      username: matched.username,
+      namaLengkap: matched.namaLengkap,
+      role: matched.role,
+      status: matched.status,
+      lastLogin: matched.lastLogin,
+    };
+
+    return res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: "Terjadi kesalahan saat memproses login: " + err.message });
+  }
+});
+
+app.get("/api/users", (req, res) => {
+  const users = getUsers();
+  res.json(users);
+});
+
+app.post("/api/users", (req, res) => {
+  try {
+    const { username, password, namaLengkap, role } = req.body || {};
+    const uClean = String(username || "").trim().toLowerCase();
+    const pClean = String(password || "").trim();
+
+    if (!uClean || !pClean) {
+      return res.status(400).json({ success: false, message: "Username dan password wajib diisi." });
+    }
+
+    const users = getUsers();
+    if (users.some((u) => u.username.toLowerCase() === uClean)) {
+      return res.status(400).json({ success: false, message: `Username "${uClean}" sudah digunakan.` });
+    }
+
+    const newUser: ServerUser = {
+      id: `usr-${Date.now()}`,
+      username: uClean,
+      password: pClean,
+      namaLengkap: String(namaLengkap || uClean).trim(),
+      role: String(role || "kasir").trim(),
+      status: "aktif",
+      createdAt: new Date().toISOString(),
+    };
+
+    users.unshift(newUser);
+    saveUsers(users);
+
+    return res.json({ success: true, user: newUser });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: "Gagal membuat user: " + err.message });
+  }
+});
+
+app.put("/api/users/:id", (req, res) => {
+  try {
+    const id = decodeURIComponent(req.params.id);
+    const { username, password, namaLengkap, role, status } = req.body || {};
+
+    const users = getUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: "User tidak ditemukan." });
+    }
+
+    const current = users[idx];
+    let newUsername = current.username;
+    if (username && username.trim()) {
+      newUsername = username.trim().toLowerCase();
+      if (newUsername !== current.username && users.some((u) => u.id !== id && u.username.toLowerCase() === newUsername)) {
+        return res.status(400).json({ success: false, message: `Username "${newUsername}" sudah digunakan.` });
+      }
+    }
+
+    users[idx] = {
+      ...current,
+      username: newUsername,
+      password: password && password.trim() ? password.trim() : current.password,
+      namaLengkap: namaLengkap !== undefined ? String(namaLengkap).trim() : current.namaLengkap,
+      role: role !== undefined ? String(role).trim() : current.role,
+      status: status !== undefined ? String(status).trim() : current.status,
+    };
+
+    saveUsers(users);
+    return res.json({ success: true, user: users[idx] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: "Gagal memperbarui user: " + err.message });
+  }
+});
+
+app.delete("/api/users/:id", (req, res) => {
+  try {
+    const id = decodeURIComponent(req.params.id);
+    const users = getUsers();
+
+    if (users.length <= 1) {
+      return res.status(400).json({ success: false, message: "Sistem harus memiliki minimal 1 user administrator." });
+    }
+
+    const filtered = users.filter((u) => u.id !== id);
+    if (filtered.length === users.length) {
+      return res.status(404).json({ success: false, message: "User tidak ditemukan." });
+    }
+
+    saveUsers(filtered);
+    return res.json({ success: true, message: "User berhasil dihapus." });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: "Gagal menghapus user: " + err.message });
+  }
 });
 
 // Get all transactions (up to 1000)

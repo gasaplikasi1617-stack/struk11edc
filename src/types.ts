@@ -40,3 +40,20 @@ export interface GasSyncResult {
   error?: string;
   data?: ReceiptData[];
 }
+
+export interface AppUser {
+  id: string;
+  username: string;
+  password?: string;
+  namaLengkap: string;
+  role: 'admin' | 'kasir' | 'petugas';
+  status: 'aktif' | 'nonaktif';
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export interface AuthSession {
+  user: AppUser;
+  token: string;
+  loginAt: string;
+}

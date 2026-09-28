@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AgentConfig, ReceiptData } from './types';
+import { AgentConfig, ReceiptData, AppUser } from './types';
 import { Navbar } from './components/Navbar';
 import { ReceiptForm } from './components/ReceiptForm';
 import { ReceiptPreview } from './components/ReceiptPreview';
 import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
+import { LoginScreen } from './components/LoginScreen';
+import { getCurrentUser, logoutUser } from './services/userService';
 import { formatReceiptDateTime, generateRandomTransactionId } from './utils/dateFormatter';
 import { getCurrentMonthPeriod } from './utils/billParser';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
@@ -51,6 +53,16 @@ export default function App() {
 
   const [savedStatus, setSavedStatus] = useState(false);
   const [resetTrigger, setResetTrigger] = useState(0);
+
+  // User Auth State
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => getCurrentUser());
+
+  const handleLogout = () => {
+    if (confirm('Apakah Anda yakin ingin keluar / logout dari sistem?')) {
+      logoutUser();
+      setCurrentUser(null);
+    }
+  };
 
   // Duplicate Warning State
   const [duplicateModal, setDuplicateModal] = useState<{
@@ -357,6 +369,10 @@ export default function App() {
     setActiveTab('create');
   };
 
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
       <Navbar
@@ -364,6 +380,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         historyCount={transactions.length}
         onSyncTrigger={fetchTransactions}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

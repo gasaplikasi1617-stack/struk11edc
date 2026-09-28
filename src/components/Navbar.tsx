@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, History, Receipt, RefreshCw } from 'lucide-react';
+import { Printer, History, Receipt, RefreshCw, LogOut, UserCheck } from 'lucide-react';
 import { subscribeSyncState, SyncState, executeTwoWaySync } from '../services/gasClientSync';
+import { AppUser } from '../types';
 
 interface NavbarProps {
   activeTab: 'create' | 'history' | 'gas';
   setActiveTab: (tab: 'create' | 'history' | 'gas') => void;
   historyCount: number;
   onSyncTrigger?: () => void;
+  currentUser?: AppUser | null;
+  onLogout?: () => void;
 }
 
-export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }: NavbarProps) {
+export function Navbar({
+  activeTab,
+  setActiveTab,
+  historyCount,
+  onSyncTrigger,
+  currentUser,
+  onLogout,
+}: NavbarProps) {
   const [syncState, setSyncState] = useState<SyncState>({
     status: 'idle',
     lastSyncedAt: null,
@@ -131,6 +141,31 @@ export function Navbar({ activeTab, setActiveTab, historyCount, onSyncTrigger }:
               <RefreshCw className="w-4 h-4" />
               <span>Integrasi</span>
             </button>
+
+            {/* User Profile Badge & Logout Button */}
+            {currentUser && (
+              <div className="flex items-center pl-2 sm:pl-3 border-l border-slate-700/80 gap-2">
+                <div className="hidden sm:flex flex-col text-right">
+                  <span className="text-xs font-bold text-slate-100 flex items-center justify-end gap-1">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{currentUser.username}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium capitalize">
+                    {currentUser.role || 'Admin'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="bg-rose-900/40 hover:bg-rose-800/80 text-rose-200 hover:text-white p-2 rounded-lg border border-rose-700/60 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                  title={`Logout (${currentUser.username})`}
+                >
+                  <LogOut className="w-4 h-4 text-rose-400" />
+                  <span className="hidden lg:inline">Keluar</span>
+                </button>
+              </div>
+            )}
           </nav>
         </div>
       </div>
