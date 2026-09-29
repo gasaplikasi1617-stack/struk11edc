@@ -50,17 +50,7 @@ export function getStoredUsers(): AppUser[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Gabungkan dengan default users list agar akun bawaan tidak pernah hilang
-        const userMap = new Map<string, AppUser>();
-        for (const def of DEFAULT_USERS_LIST) {
-          userMap.set(def.username.toLowerCase(), def);
-        }
-        for (const item of parsed) {
-          if (item && item.username) {
-            userMap.set(item.username.toLowerCase(), item);
-          }
-        }
-        return Array.from(userMap.values());
+        return parsed;
       }
     }
   } catch (e) {
@@ -275,6 +265,9 @@ export async function updateUser(
         return json.user;
       }
       throw new Error(json.message || 'Gagal memperbarui user');
+    } else {
+      const errJson = await res.json().catch(() => ({}));
+      if (errJson.message) throw new Error(errJson.message);
     }
   } catch (err: any) {
     if (err.message && !err.message.includes('fetch')) throw err;
@@ -282,13 +275,13 @@ export async function updateUser(
 
   // Fallback local
   const current = getStoredUsers();
-  const idx = current.findIndex((u) => u.id === id);
+  const idx = current.findIndex((u) => u.id === id || u.username.toLowerCase() === id.toLowerCase());
   if (idx < 0) throw new Error('User tidak ditemukan');
 
   const target = current[idx];
   const newUsername = updates.username ? updates.username.trim().toLowerCase() : target.username;
 
-  if (newUsername !== target.username && current.some((u) => u.id !== id && u.username.toLowerCase() === newUsername)) {
+  if (newUsername !== target.username && current.some((u) => u.id !== target.id && u.username.toLowerCase() === newUsername)) {
     throw new Error(`Username "${newUsername}" sudah digunakan oleh user lain.`);
   }
 
@@ -304,7 +297,7 @@ export async function updateUser(
 
   // If current logged in user was modified, update session
   const currentUser = getCurrentUser();
-  if (currentUser && currentUser.id === id) {
+  if (currentUser && (currentUser.id === target.id || currentUser.username.toLowerCase() === target.username.toLowerCase())) {
     setCurrentUser(updatedItem);
   }
 
@@ -313,11 +306,16 @@ export async function updateUser(
 
 export async function deleteUser(id: string): Promise<boolean> {
   const currentUser = getCurrentUser();
-  if (currentUser && currentUser.id === id) {
+  if (currentUser && (currentUser.id === id || currentUser.username.toLowerCase() === id.toLowerCase())) {
     throw new Error('Anda tidak dapat menghapus akun yang sedang aktif digunakan untuk login.');
   }
 
-  // Try API first
+  // Update local immediately
+  const current = getStoredUsers();
+  const filtered = current.filter((u) => u.id !== id && u.username.toLowerCase() !== id.toLowerCase());
+  saveStoredUsers(filtered);
+
+  // Try API
   try {
     const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -330,19 +328,14 @@ export async function deleteUser(id: string): Promise<boolean> {
         return true;
       }
       throw new Error(json.message || 'Gagal menghapus user');
+    } else {
+      const errJson = await res.json().catch(() => ({}));
+      if (errJson.message) throw new Error(errJson.message);
     }
   } catch (err: any) {
     if (err.message && !err.message.includes('fetch')) throw err;
   }
 
-  // Fallback local
-  const current = getStoredUsers();
-  if (current.length <= 1) {
-    throw new Error('Sistem harus memiliki minimal 1 user administrator.');
-  }
-
-  const filtered = current.filter((u) => u.id !== id);
-  saveStoredUsers(filtered);
   return true;
 }
 

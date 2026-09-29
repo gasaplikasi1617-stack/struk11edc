@@ -38,6 +38,11 @@ export function UserManagementSection() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Delete Confirmation State
+  const [userToDeleteConfirm, setUserToDeleteConfirm] = useState<AppUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form Fields
   const [formUsername, setFormUsername] = useState('');
@@ -89,6 +94,7 @@ export function UserManagementSection() {
 
   const openAddModal = () => {
     setEditingUser(null);
+    setModalError(null);
     setFormUsername('');
     setFormPassword('');
     setFormNamaLengkap('');
@@ -100,6 +106,7 @@ export function UserManagementSection() {
 
   const openEditModal = (u: AppUser) => {
     setEditingUser(u);
+    setModalError(null);
     setFormUsername(u.username);
     setFormPassword(u.password || '');
     setFormNamaLengkap(u.namaLengkap || '');
@@ -112,11 +119,13 @@ export function UserManagementSection() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingUser(null);
+    setModalError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setModalError(null);
     setNotice(null);
 
     try {
@@ -153,35 +162,32 @@ export function UserManagementSection() {
       await loadUsers();
       closeModal();
     } catch (err: any) {
-      alert(`Gagal menyimpan user: ${err.message || String(err)}`);
+      setModalError(err.message || String(err));
     } finally {
       setIsSubmitting(false);
       setTimeout(() => setNotice(null), 5000);
     }
   };
 
-  const handleDelete = async (userToDelete: AppUser) => {
-    if (currentUser && currentUser.id === userToDelete.id) {
-      alert('Anda tidak dapat menghapus akun yang sedang aktif Anda gunakan saat ini!');
-      return;
-    }
-
-    const conf = confirm(
-      `Apakah Anda yakin ingin menghapus user "${userToDelete.username}" (${userToDelete.namaLengkap})?\n\n` +
-      `User yang dihapus tidak akan dapat login lagi ke sistem.`
-    );
-    if (!conf) return;
+  const executeDelete = async () => {
+    if (!userToDeleteConfirm) return;
+    setIsDeleting(true);
 
     try {
-      await deleteUser(userToDelete.id);
+      await deleteUser(userToDeleteConfirm.id);
       setNotice({
         type: 'success',
-        message: `User "${userToDelete.username}" berhasil dihapus.`,
+        message: `User "${userToDeleteConfirm.username}" berhasil dihapus.`,
       });
+      setUserToDeleteConfirm(null);
       await loadUsers();
     } catch (err: any) {
-      alert(`Gagal menghapus user: ${err.message || String(err)}`);
+      setNotice({
+        type: 'error',
+        message: `Gagal menghapus user: ${err.message || String(err)}`,
+      });
     } finally {
+      setIsDeleting(false);
       setTimeout(() => setNotice(null), 5000);
     }
   };
@@ -365,7 +371,17 @@ export function UserManagementSection() {
 
                         <button
                           type="button"
-                          onClick={() => handleDelete(u)}
+                          onClick={() => {
+                            if (isCurrent) {
+                              setNotice({
+                                type: 'error',
+                                message: 'Anda tidak dapat menghapus akun yang sedang aktif Anda gunakan saat ini!',
+                              });
+                              setTimeout(() => setNotice(null), 4000);
+                              return;
+                            }
+                            setUserToDeleteConfirm(u);
+                          }}
                           disabled={isCurrent || users.length <= 1}
                           className="bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed p-1.5 rounded-lg transition-colors cursor-pointer border border-rose-200"
                           title={
@@ -426,6 +442,13 @@ export function UserManagementSection() {
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+              {modalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-start gap-2 animate-fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="font-medium">{modalError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Username <span className="text-rose-500">*</span>
@@ -525,6 +548,42 @@ export function UserManagementSection() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus User */}
+      {userToDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-800">Hapus Pengguna?</h4>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Apakah Anda yakin ingin menghapus user <strong className="text-slate-800 font-bold">"{userToDeleteConfirm.username}"</strong> ({userToDeleteConfirm.namaLengkap})? User ini tidak akan dapat login lagi ke sistem loket.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setUserToDeleteConfirm(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                disabled={isDeleting}
+                className="bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Akun'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

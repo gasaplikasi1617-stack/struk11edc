@@ -110,19 +110,56 @@ const DEFAULT_USERS_DATA: ServerUser[] = [
   },
 ];
 
+const DELETED_USERS_FILE = path.join(process.cwd(), "deleted_users.json");
+
+function getDeletedUsernames(): Set<string> {
+  try {
+    if (fs.existsSync(DELETED_USERS_FILE)) {
+      const data = fs.readFileSync(DELETED_USERS_FILE, "utf-8");
+      const list = JSON.parse(data);
+      if (Array.isArray(list)) {
+        return new Set(list.map((s) => String(s).toLowerCase().trim()));
+      }
+    }
+  } catch {}
+  return new Set();
+}
+
+function addDeletedUsername(username: string) {
+  if (!username) return;
+  const set = getDeletedUsernames();
+  set.add(username.toLowerCase().trim());
+  try {
+    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify(Array.from(set)), "utf-8");
+  } catch (e) {
+    console.error("Error saving deleted_users.json:", e);
+  }
+}
+
+function removeDeletedUsername(username: string) {
+  if (!username) return;
+  const set = getDeletedUsernames();
+  if (set.delete(username.toLowerCase().trim())) {
+    try {
+      fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify(Array.from(set)), "utf-8");
+    } catch {}
+  }
+}
+
 function getUsers(): ServerUser[] {
   try {
     if (fs.existsSync(USERS_FILE)) {
       const data = fs.readFileSync(USERS_FILE, "utf-8");
       const list = JSON.parse(data);
       if (Array.isArray(list) && list.length > 0) {
-        // Gabungkan dengan default users agar akun bawaan selalu tersedia
-        return mergeUsersList(list, DEFAULT_USERS_DATA);
+        return list;
       }
     }
   } catch (e) {
     console.error("Error reading users.json:", e);
   }
+  // Hanya inisialisasi awal jika users.json belum ada
+  saveUsers(DEFAULT_USERS_DATA);
   return DEFAULT_USERS_DATA;
 }
 
@@ -134,19 +171,15 @@ function saveUsers(users: ServerUser[]) {
   }
 }
 
-function mergeUsersList(localList: ServerUser[], gasList: ServerUser[]): ServerUser[] {
+function mergeUsersList(localList: ServerUser[], incomingList: ServerUser[]): ServerUser[] {
+  const deletedSet = getDeletedUsernames();
   const map = new Map<string, ServerUser>();
 
-  // Inisialisasi admin kustana default
-  for (const u of DEFAULT_USERS_DATA) {
-    map.set(u.username.toLowerCase(), u);
-  }
-
-  // Tambahkan dari GAS terlebih dahulu
-  if (Array.isArray(gasList)) {
-    for (const u of gasList) {
+  if (Array.isArray(incomingList)) {
+    for (const u of incomingList) {
       if (!u || !u.username) continue;
       const key = String(u.username).toLowerCase().trim();
+      if (deletedSet.has(key)) continue; // Jangan re-import user yang sudah dihapus
       map.set(key, {
         id: u.id || `usr-${key}`,
         username: key,
@@ -160,11 +193,11 @@ function mergeUsersList(localList: ServerUser[], gasList: ServerUser[]): ServerU
     }
   }
 
-  // Gabungkan dengan data lokal (simpan password & login terbaru)
   if (Array.isArray(localList)) {
     for (const u of localList) {
       if (!u || !u.username) continue;
       const key = String(u.username).toLowerCase().trim();
+      if (deletedSet.has(key)) continue; // Jangan re-import user yang sudah dihapus
       const existing = map.get(key);
       if (!existing) {
         map.set(key, u);
@@ -752,18 +785,8 @@ app.get("/api/users/public", (req, res) => {
   res.json(safeList);
 });
 
-app.get("/api/users", async (req, res) => {
-  let users = getUsers();
-  try {
-    const gasUsers = await fetchUsersFromGas();
-    if (Array.isArray(gasUsers) && gasUsers.length > 0) {
-      users = mergeUsersList(users, gasUsers);
-      saveUsers(users);
-    }
-  } catch (e: any) {
-    console.warn("Gagal fetch user dari Google Sheets:", e.message);
-  }
-  res.json(users);
+app.get("/api/users", (req, res) => {
+  res.json(getUsers());
 });
 
 app.post("/api/users", async (req, res) => {
@@ -780,6 +803,8 @@ app.post("/api/users", async (req, res) => {
     if (users.some((u) => u.username.toLowerCase() === uClean)) {
       return res.status(400).json({ success: false, message: `Username "${uClean}" sudah digunakan.` });
     }
+
+    removeDeletedUsername(uClean);
 
     const newUser: ServerUser = {
       id: `usr-${Date.now()}`,
@@ -810,11 +835,13 @@ app.post("/api/users", async (req, res) => {
 
 app.put("/api/users/:id", async (req, res) => {
   try {
-    const id = decodeURIComponent(req.params.id);
+    const rawId = decodeURIComponent(req.params.id);
     const { username, password, namaLengkap, role, status } = req.body || {};
 
     const users = getUsers();
-    const idx = users.findIndex((u) => u.id === id);
+    const idx = users.findIndex(
+      (u) => u.id === rawId || u.username.toLowerCase() === rawId.toLowerCase()
+    );
     if (idx < 0) {
       return res.status(404).json({ success: false, message: "User tidak ditemukan." });
     }
@@ -823,9 +850,17 @@ app.put("/api/users/:id", async (req, res) => {
     let newUsername = current.username;
     if (username && username.trim()) {
       newUsername = username.trim().toLowerCase();
-      if (newUsername !== current.username && users.some((u) => u.id !== id && u.username.toLowerCase() === newUsername)) {
+      if (
+        newUsername !== current.username.toLowerCase() &&
+        users.some(
+          (u) =>
+            u.id !== current.id &&
+            u.username.toLowerCase() === newUsername
+        )
+      ) {
         return res.status(400).json({ success: false, message: `Username "${newUsername}" sudah digunakan.` });
       }
+      removeDeletedUsername(newUsername);
     }
 
     users[idx] = {
@@ -855,30 +890,36 @@ app.put("/api/users/:id", async (req, res) => {
 
 app.delete("/api/users/:id", async (req, res) => {
   try {
-    const id = decodeURIComponent(req.params.id);
+    const rawId = decodeURIComponent(req.params.id);
     const users = getUsers();
 
     if (users.length <= 1) {
       return res.status(400).json({ success: false, message: "Sistem harus memiliki minimal 1 user administrator." });
     }
 
-    const targetUser = users.find((u) => u.id === id);
-    const filtered = users.filter((u) => u.id !== id);
-    if (filtered.length === users.length) {
+    const targetUser = users.find(
+      (u) => u.id === rawId || u.username.toLowerCase() === rawId.toLowerCase()
+    );
+    if (!targetUser) {
       return res.status(404).json({ success: false, message: "User tidak ditemukan." });
     }
 
+    const filtered = users.filter(
+      (u) => u.id !== targetUser.id && u.username.toLowerCase() !== targetUser.username.toLowerCase()
+    );
+
     saveUsers(filtered);
+    addDeletedUsername(targetUser.username);
 
     // Hapus dari Google Sheets
     const gasCfg = getGasConfig();
     if (gasCfg.gasUrl) {
-      callGasPost(gasCfg.gasUrl, { action: "deleteUser", id: targetUser?.username || id }).catch((err) => {
+      callGasPost(gasCfg.gasUrl, { action: "deleteUser", id: targetUser.username }).catch((err) => {
         console.warn("GAS deleteUser failed:", err.message);
       });
     }
 
-    return res.json({ success: true, message: "User berhasil dihapus." });
+    return res.json({ success: true, message: `User "${targetUser.username}" berhasil dihapus.` });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: "Gagal menghapus user: " + err.message });
   }
