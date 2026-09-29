@@ -162,7 +162,7 @@ export async function loginUser(usernameInput: string, passwordInput: string): P
   });
 
   if (!matched) {
-    throw new Error('Username atau password tidak sesuai. Gunakan akun bawaan "kustana" (sandi: 222324) atau "admin" (sandi: admin / 222324).');
+    throw new Error('User dan Password yg anda masukkan salah silahkan hub admin');
   }
 
   if (matched.status === 'nonaktif') {

@@ -30,7 +30,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     } catch (err: any) {
       setError(
         err.message ||
-          'Login gagal. Silakan periksa kembali username dan password Anda.'
+          'User dan Password yg anda masukkan salah silahkan hub admin'
       );
     } finally {
       setIsLoading(false);

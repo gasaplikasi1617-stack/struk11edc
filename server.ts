@@ -692,7 +692,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!matched) {
       return res.status(401).json({
         success: false,
-        message: `Username atau password salah untuk "${uClean}". Silakan gunakan akun bawaan "kustana" (sandi: 222324) atau "admin" (sandi: admin / 222324).`,
+        message: "User dan Password yg anda masukkan salah silahkan hub admin",
       });
     }
 
