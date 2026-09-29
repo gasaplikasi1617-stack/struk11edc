@@ -172,6 +172,81 @@ function saveUsersToSheet(usersList) {
   };
 }
 
+function upsertSingleUser(u) {
+  if (!u || !u.username) {
+    return { success: false, error: "Username wajib diisi" };
+  }
+  var uName = String(u.username).trim().toLowerCase();
+  var sheet = getOrCreateUserSheet();
+  var lastRow = sheet.getLastRow();
+  var targetRow = -1;
+
+  if (lastRow > 1) {
+    var vals = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var existingId = String(vals[i][0]);
+      var existingUser = String(vals[i][1]).toLowerCase().trim();
+      if ((u.id && existingId === String(u.id)) || existingUser === uName) {
+        targetRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  var rowData = [
+    String(u.id || ("usr-" + new Date().getTime())),
+    uName,
+    String(u.password || "222324"),
+    String(u.namaLengkap || uName),
+    String(u.role || "kasir"),
+    String(u.status || "aktif"),
+    String(u.createdAt || new Date().toISOString()),
+    String(u.lastLogin || "")
+  ];
+
+  if (targetRow > 0) {
+    sheet.getRange(targetRow, 1, 1, 8).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+    targetRow = sheet.getLastRow();
+  }
+  sheet.getRange("A" + targetRow + ":H" + targetRow).setNumberFormat("@");
+
+  return {
+    success: true,
+    user: {
+      id: rowData[0],
+      username: rowData[1],
+      namaLengkap: rowData[3],
+      role: rowData[4],
+      status: rowData[5],
+      createdAt: rowData[6],
+      lastLogin: rowData[7]
+    }
+  };
+}
+
+function deleteSingleUser(uId) {
+  if (!uId) return { success: false, error: "User ID diperlukan" };
+  var sheet = getOrCreateUserSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { success: false, error: "Sheet kosong" };
+
+  var ids = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    var idVal = String(ids[i][0]);
+    var uNameVal = String(ids[i][1]).toLowerCase();
+    if (idVal === String(uId) || uNameVal === String(uId).toLowerCase()) {
+      if (uNameVal === "kustana") {
+        return { success: false, error: "Akun kustana (admin utama) tidak boleh dihapus" };
+      }
+      sheet.deleteRow(i + 2);
+      return { success: true, deletedId: uId };
+    }
+  }
+  return { success: false, error: "User tidak ditemukan" };
+}
+
 // 3. RESPONS JSON HELPER (CORS SUPPORT)
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -507,6 +582,11 @@ function doGet(e) {
       return jsonResponse(deleteTransactionRow(delGetId, delGetIdpel));
     }
 
+    if (action === "getUsers") {
+      var usersList = getAllUsersFromSheet();
+      return jsonResponse({ success: true, total: usersList.length, users: usersList });
+    }
+
     // Tampilkan Web App Index HTML
     try {
       return HtmlService.createHtmlOutputFromFile("Index")
@@ -579,6 +659,26 @@ function doPost(e) {
     if (action === "archiveAndResetMonth" || action === "resetMonth" || action === "archive") {
       var mName = payload.monthName || payload.periodName || (e && e.parameter ? (e.parameter.monthName || e.parameter.periodName) : "");
       return jsonResponse(archiveAndResetSheet(mName));
+    }
+
+    if (action === "getUsers") {
+      var usersListPost = getAllUsersFromSheet();
+      return jsonResponse({ success: true, total: usersListPost.length, users: usersListPost });
+    }
+
+    if (action === "saveUsers") {
+      var uList = payload.users || [];
+      return jsonResponse(saveUsersToSheet(uList));
+    }
+
+    if (action === "upsertUser") {
+      var uData = payload.user || payload.data || payload;
+      return jsonResponse(upsertSingleUser(uData));
+    }
+
+    if (action === "deleteUser") {
+      var uId = payload.id || (e && e.parameter ? e.parameter.id : "");
+      return jsonResponse(deleteSingleUser(uId));
     }
 
     return jsonResponse({ success: false, error: "Action tidak dikenal: " + action });

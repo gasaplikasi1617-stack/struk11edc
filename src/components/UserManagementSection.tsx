@@ -15,7 +15,9 @@ import {
   ShieldCheck,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Cloud,
+  CloudUpload
 } from 'lucide-react';
 import { AppUser } from '../types';
 import {
@@ -23,12 +25,14 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  getCurrentUser
+  getCurrentUser,
+  syncUsersWithGoogleSheets
 } from '../services/userService';
 
 export function UserManagementSection() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal State
@@ -61,6 +65,27 @@ export function UserManagementSection() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  const handleSyncCloud = async () => {
+    setIsSyncingCloud(true);
+    setNotice(null);
+    try {
+      const res = await syncUsersWithGoogleSheets();
+      setNotice({
+        type: 'success',
+        message: res.message || 'Semua akun kasir & admin berhasil disinkronkan ke Google Sheets (Sheet UserLoket)!'
+      });
+      await loadUsers();
+    } catch (err: any) {
+      setNotice({
+        type: 'error',
+        message: err.message || 'Gagal sinkronisasi akun ke Google Sheets.'
+      });
+    } finally {
+      setIsSyncingCloud(false);
+      setTimeout(() => setNotice(null), 6000);
+    }
+  };
 
   const openAddModal = () => {
     setEditingUser(null);
@@ -182,7 +207,18 @@ export function UserManagementSection() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSyncCloud}
+            disabled={isSyncingCloud || isLoading}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 active:scale-[0.99] text-xs font-bold px-3 py-2 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="Sinkronkan semua data user dengan Google Sheets (Sheet UserLoket) untuk sinkronisasi antar perangkat"
+          >
+            <CloudUpload className={`w-4 h-4 ${isSyncingCloud ? 'animate-bounce text-emerald-600' : ''}`} />
+            <span>{isSyncingCloud ? 'Menyinkronkan...' : 'Sinkron ke Cloud'}</span>
+          </button>
+
           <button
             type="button"
             onClick={loadUsers}
@@ -221,6 +257,15 @@ export function UserManagementSection() {
           <span className="font-medium">{notice.message}</span>
         </div>
       )}
+
+      {/* Info Cloud Sync Multi-Device */}
+      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
+        <Cloud className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <span className="font-bold text-blue-950">Multi-Device Cloud Sync Aktif: </span>
+          Semua akun pengguna terintegrasi otomatis antar perangkat (Laptop, HP, Tablet) via Google Sheets (Sheet <span className="font-mono font-semibold bg-blue-100/70 px-1 py-0.5 rounded text-blue-900">UserLoket</span>). User yang dibuat di satu perangkat bisa langsung dipakai login di perangkat lain.
+        </div>
+      </div>
 
       {/* Tabel Daftar User */}
       <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs">

@@ -106,6 +106,79 @@ function saveUsers(users: ServerUser[]) {
   }
 }
 
+function mergeUsersList(localList: ServerUser[], gasList: ServerUser[]): ServerUser[] {
+  const map = new Map<string, ServerUser>();
+
+  // Inisialisasi admin kustana default
+  for (const u of DEFAULT_USERS_DATA) {
+    map.set(u.username.toLowerCase(), u);
+  }
+
+  // Tambahkan dari GAS terlebih dahulu
+  if (Array.isArray(gasList)) {
+    for (const u of gasList) {
+      if (!u || !u.username) continue;
+      const key = String(u.username).toLowerCase().trim();
+      map.set(key, {
+        id: u.id || `usr-${key}`,
+        username: key,
+        password: u.password || "222324",
+        namaLengkap: u.namaLengkap || key,
+        role: u.role || "kasir",
+        status: u.status || "aktif",
+        createdAt: u.createdAt || new Date().toISOString(),
+        lastLogin: u.lastLogin || "",
+      });
+    }
+  }
+
+  // Gabungkan dengan data lokal (simpan password & login terbaru)
+  if (Array.isArray(localList)) {
+    for (const u of localList) {
+      if (!u || !u.username) continue;
+      const key = String(u.username).toLowerCase().trim();
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, u);
+      } else {
+        map.set(key, {
+          ...existing,
+          ...u,
+          password: u.password || existing.password || "222324",
+          lastLogin: u.lastLogin || existing.lastLogin || "",
+        });
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+async function fetchUsersFromGas(): Promise<ServerUser[]> {
+  const gasCfg = getGasConfig();
+  if (!gasCfg.gasUrl) return [];
+  try {
+    const res = await callGasPost(gasCfg.gasUrl, { action: "getUsers" });
+    if (res && res.users && Array.isArray(res.users)) {
+      return res.users;
+    }
+    if (res && res.data && Array.isArray(res.data)) {
+      return res.data;
+    }
+    if (Array.isArray(res)) {
+      return res;
+    }
+  } catch (e: any) {
+    try {
+      const resGet = await callGasGet(gasCfg.gasUrl, { action: "getUsers" });
+      if (resGet && resGet.users && Array.isArray(resGet.users)) {
+        return resGet.users;
+      }
+    } catch {}
+  }
+  return [];
+}
+
 // Helpers for calling Google Apps Script Web App
 function parseGasResponse(text: string): any {
   if (!text || !text.trim()) {
@@ -547,8 +620,8 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// User Authentication & Management Routes
-app.post("/api/auth/login", (req, res) => {
+// User Authentication & Management Routes (Tersinkronisasi Cloud Google Sheets)
+app.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body || {};
     const uClean = String(username || "").trim().toLowerCase();
@@ -558,10 +631,26 @@ app.post("/api/auth/login", (req, res) => {
       return res.status(400).json({ success: false, message: "Username dan password wajib diisi." });
     }
 
-    const users = getUsers();
-    const matched = users.find(
+    let users = getUsers();
+    let matched = users.find(
       (u) => u.username.toLowerCase() === uClean && (u.password === pClean || (!u.password && pClean === "222324"))
     );
+
+    // Jika belum cocok di file lokal, ambil data terbaru dari Google Sheets (multi-device cloud sync)
+    if (!matched) {
+      try {
+        const gasUsers = await fetchUsersFromGas();
+        if (Array.isArray(gasUsers) && gasUsers.length > 0) {
+          users = mergeUsersList(users, gasUsers);
+          saveUsers(users);
+          matched = users.find(
+            (u) => u.username.toLowerCase() === uClean && (u.password === pClean || (!u.password && pClean === "222324"))
+          );
+        }
+      } catch (e: any) {
+        console.warn("Sinkronisasi user dari Google Sheets saat login:", e.message);
+      }
+    }
 
     if (!matched) {
       return res.status(401).json({ success: false, message: "Username atau password salah. Silakan coba kembali." });
@@ -573,6 +662,12 @@ app.post("/api/auth/login", (req, res) => {
 
     matched.lastLogin = new Date().toISOString();
     saveUsers(users);
+
+    // Sinkronkan waktu login terakhir ke Google Sheets secara background
+    const gasCfg = getGasConfig();
+    if (gasCfg.gasUrl && gasCfg.autoSync) {
+      callGasPost(gasCfg.gasUrl, { action: "upsertUser", user: matched }).catch(() => {});
+    }
 
     const safeUser = {
       id: matched.id,
@@ -589,12 +684,21 @@ app.post("/api/auth/login", (req, res) => {
   }
 });
 
-app.get("/api/users", (req, res) => {
-  const users = getUsers();
+app.get("/api/users", async (req, res) => {
+  let users = getUsers();
+  try {
+    const gasUsers = await fetchUsersFromGas();
+    if (Array.isArray(gasUsers) && gasUsers.length > 0) {
+      users = mergeUsersList(users, gasUsers);
+      saveUsers(users);
+    }
+  } catch (e: any) {
+    console.warn("Gagal fetch user dari Google Sheets:", e.message);
+  }
   res.json(users);
 });
 
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   try {
     const { username, password, namaLengkap, role } = req.body || {};
     const uClean = String(username || "").trim().toLowerCase();
@@ -604,7 +708,7 @@ app.post("/api/users", (req, res) => {
       return res.status(400).json({ success: false, message: "Username dan password wajib diisi." });
     }
 
-    const users = getUsers();
+    let users = getUsers();
     if (users.some((u) => u.username.toLowerCase() === uClean)) {
       return res.status(400).json({ success: false, message: `Username "${uClean}" sudah digunakan.` });
     }
@@ -622,13 +726,21 @@ app.post("/api/users", (req, res) => {
     users.unshift(newUser);
     saveUsers(users);
 
+    // Sinkronkan langsung ke Google Sheets (Sheet UserLoket)
+    const gasCfg = getGasConfig();
+    if (gasCfg.gasUrl) {
+      callGasPost(gasCfg.gasUrl, { action: "upsertUser", user: newUser }).catch((err) => {
+        console.warn("GAS upsertUser failed:", err.message);
+      });
+    }
+
     return res.json({ success: true, user: newUser });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: "Gagal membuat user: " + err.message });
   }
 });
 
-app.put("/api/users/:id", (req, res) => {
+app.put("/api/users/:id", async (req, res) => {
   try {
     const id = decodeURIComponent(req.params.id);
     const { username, password, namaLengkap, role, status } = req.body || {};
@@ -658,13 +770,22 @@ app.put("/api/users/:id", (req, res) => {
     };
 
     saveUsers(users);
+
+    // Sinkronkan update ke Google Sheets
+    const gasCfg = getGasConfig();
+    if (gasCfg.gasUrl) {
+      callGasPost(gasCfg.gasUrl, { action: "upsertUser", user: users[idx] }).catch((err) => {
+        console.warn("GAS upsertUser update failed:", err.message);
+      });
+    }
+
     return res.json({ success: true, user: users[idx] });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: "Gagal memperbarui user: " + err.message });
   }
 });
 
-app.delete("/api/users/:id", (req, res) => {
+app.delete("/api/users/:id", async (req, res) => {
   try {
     const id = decodeURIComponent(req.params.id);
     const users = getUsers();
@@ -673,15 +794,56 @@ app.delete("/api/users/:id", (req, res) => {
       return res.status(400).json({ success: false, message: "Sistem harus memiliki minimal 1 user administrator." });
     }
 
+    const targetUser = users.find((u) => u.id === id);
     const filtered = users.filter((u) => u.id !== id);
     if (filtered.length === users.length) {
       return res.status(404).json({ success: false, message: "User tidak ditemukan." });
     }
 
     saveUsers(filtered);
+
+    // Hapus dari Google Sheets
+    const gasCfg = getGasConfig();
+    if (gasCfg.gasUrl) {
+      callGasPost(gasCfg.gasUrl, { action: "deleteUser", id: targetUser?.username || id }).catch((err) => {
+        console.warn("GAS deleteUser failed:", err.message);
+      });
+    }
+
     return res.json({ success: true, message: "User berhasil dihapus." });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: "Gagal menghapus user: " + err.message });
+  }
+});
+
+// Endpoint sinkronisasi manual daftar pengguna ke Google Sheets
+app.post("/api/gas/sync-users", async (req, res) => {
+  try {
+    const gasCfg = getGasConfig();
+    if (!gasCfg.gasUrl) {
+      return res.status(400).json({ success: false, message: "URL Google Apps Script belum diatur." });
+    }
+
+    const localUsers = getUsers();
+    let gasUsers: ServerUser[] = [];
+    try {
+      gasUsers = await fetchUsersFromGas();
+    } catch {}
+
+    const merged = mergeUsersList(localUsers, gasUsers);
+    saveUsers(merged);
+
+    // Push full list to Google Sheets
+    await callGasPost(gasCfg.gasUrl, { action: "saveUsers", users: merged });
+
+    return res.json({
+      success: true,
+      message: `Berhasil menyinkronkan ${merged.length} akun user ke Google Sheets!`,
+      total: merged.length,
+      users: merged,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: "Gagal sinkronisasi user: " + err.message });
   }
 });
 

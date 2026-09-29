@@ -276,3 +276,20 @@ export async function deleteUser(id: string): Promise<boolean> {
   saveStoredUsers(filtered);
   return true;
 }
+
+export async function syncUsersWithGoogleSheets(): Promise<{ success: boolean; message: string; users: AppUser[] }> {
+  try {
+    const res = await fetch('/api/gas/sync-users', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.users)) {
+        saveStoredUsers(data.users);
+        return { success: true, message: data.message, users: data.users };
+      }
+    }
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.message || 'Gagal sinkronisasi user ke Google Sheets');
+  } catch (e: any) {
+    throw new Error(e.message || 'Gagal menghubungi server untuk sinkronisasi akun.');
+  }
+}

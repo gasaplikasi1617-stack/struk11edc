@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
-import { loginUser } from '../services/userService';
+import { loginUser, fetchUsers } from '../services/userService';
 import { AppUser } from '../types';
 
 interface LoginScreenProps {
@@ -13,6 +13,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Otomatis sinkronkan daftar akun dari cloud saat layar login dibuka
+  // Memastikan device baru langsung mengenali user kasir/admin yang dibuat di device lain
+  useEffect(() => {
+    fetchUsers().catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

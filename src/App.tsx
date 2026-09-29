@@ -7,7 +7,7 @@ import { HistoryTab } from './components/HistoryTab';
 import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { LoginScreen } from './components/LoginScreen';
-import { getCurrentUser, logoutUser } from './services/userService';
+import { getCurrentUser, logoutUser, fetchUsers } from './services/userService';
 import { formatReceiptDateTime, generateRandomTransactionId } from './utils/dateFormatter';
 import { getCurrentMonthPeriod } from './utils/billParser';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
@@ -83,6 +83,7 @@ export default function App() {
     addDeletedTransactionId('TRX-85485204');
 
     fetchTransactions();
+    fetchUsers().catch(() => {});
 
     // Start background auto-sync orchestrator
     const stopSync = startAutoSync(
