@@ -7,6 +7,36 @@
     "role": "admin",
     "status": "aktif",
     "createdAt": "2026-09-28T00:00:00.000Z",
-    "lastLogin": "2026-09-29T08:16:55.197Z"
+    "lastLogin": "2026-09-29T08:24:12.223Z"
+  },
+  {
+    "id": "usr-admin",
+    "username": "admin",
+    "password": "222324",
+    "namaLengkap": "Administrator",
+    "role": "admin",
+    "status": "aktif",
+    "createdAt": "2026-09-28T00:00:00.000Z",
+    "lastLogin": "2026-09-29T08:24:19.079Z"
+  },
+  {
+    "id": "usr-kasir",
+    "username": "kasir",
+    "password": "222324",
+    "namaLengkap": "Kasir Loket",
+    "role": "kasir",
+    "status": "aktif",
+    "createdAt": "2026-09-28T00:00:00.000Z",
+    "lastLogin": "2026-09-29T08:24:25.562Z"
+  },
+  {
+    "id": "usr-kasir1",
+    "username": "kasir1",
+    "password": "222324",
+    "namaLengkap": "Kasir 1",
+    "role": "kasir",
+    "status": "aktif",
+    "createdAt": "2026-09-28T00:00:00.000Z",
+    "lastLogin": ""
   }
 ]
