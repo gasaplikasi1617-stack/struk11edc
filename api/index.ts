@@ -194,6 +194,39 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return sendJson(res, 200, { status: "ok", env: "vercel-serverless", timestamp: new Date().toISOString() });
     }
 
+    // 1b. User Authentication & Directory (Vercel Serverless)
+    if (pathname === "/auth/login" && req.method === "POST") {
+      const body = await parseJsonBody(req);
+      const username = String(body.username || "").toLowerCase().trim();
+      const password = String(body.password || "").trim();
+      if (!username || !password) {
+        return sendJson(res, 400, { success: false, error: "Username dan password wajib diisi." });
+      }
+      return sendJson(res, 200, {
+        success: true,
+        message: "Login berhasil",
+        user: {
+          id: "usr-" + username,
+          username,
+          namaLengkap: username === "admin" ? "Administrator" : "Kasir",
+          role: username === "admin" ? "admin" : "kasir",
+          status: "aktif",
+        },
+      });
+    }
+
+    if ((pathname === "/users/public" || pathname === "/users") && req.method === "GET") {
+      return sendJson(res, 200, [
+        { id: "usr-admin", username: "admin", namaLengkap: "Administrator", role: "admin", status: "aktif" },
+        { id: "usr-kasir", username: "kasir", namaLengkap: "Kasir Loket", role: "kasir", status: "aktif" },
+      ]);
+    }
+
+    if (pathname === "/users/sync" && req.method === "POST") {
+      const body = await parseJsonBody(req);
+      return sendJson(res, 200, { success: true, count: Array.isArray(body.users) ? body.users.length : 0 });
+    }
+
     // 2. Gas Template Code
     if (pathname === "/gas-code") {
       return sendJson(res, 200, DEFAULT_GAS_DATA);

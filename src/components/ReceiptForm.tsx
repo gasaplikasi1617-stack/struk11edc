@@ -355,12 +355,8 @@ export function ReceiptForm({
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center space-x-2 mb-4">
           <Sparkles className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-800">1. Input & Parsing Teks Mentah Otomatis</h2>
+          <h2 className="text-lg font-bold text-slate-800">1. Input</h2>
         </div>
-
-        <p className="text-xs text-slate-500 mb-3">
-          Paste teks struk mentah dari WhatsApp, SMS, atau sistem pembayaran tagihan (PLN, PDAM, Indihome, BPJS, dll.) di bawah ini. Aplikasi akan mengekstrak data secara otomatis.
-        </p>
 
         <textarea
           rows={5}

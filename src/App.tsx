@@ -471,7 +471,7 @@ export default function App() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                    Sistem loket kasir &amp; pembayaran tagihan PPOB multi-institusi (PLN, PDAM, Telkom, BPJS). Input otomatis, cetak A6 &amp; Dot Matrix LX-310 langsung tersimpan ke riwayat.
+                    Sistem loket kasir &amp; pembayaran tagihan PPOB multi-institusi (PLN, PDAM, Telkom, BPJS). Input otomatis &amp; cetak A6.
                   </p>
                 </div>
               </div>
