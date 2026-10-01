@@ -214,6 +214,45 @@ export function HistoryTab({
     setEndDate('');
   };
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const isTodayActive = startDate === todayStr && endDate === todayStr;
+
+  const isLast7Active = useMemo(() => {
+    if (!startDate || !endDate) return false;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    return startDate === start.toISOString().slice(0, 10) && endDate === end.toISOString().slice(0, 10);
+  }, [startDate, endDate]);
+
+  const isThisMonthActive = useMemo(() => {
+    if (!startDate || !endDate) return false;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const firstDay = `${y}-${m}-01`;
+    const lastDayObj = new Date(y, now.getMonth() + 1, 0);
+    const lastDay = `${y}-${m}-${String(lastDayObj.getDate()).padStart(2, '0')}`;
+    return startDate === firstDay && endDate === lastDay;
+  }, [startDate, endDate]);
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    statusFilter !== 'all' ||
+    serviceFilter !== 'all' ||
+    startDate ||
+    endDate
+  );
+
+  const resetAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setServiceFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setCurrentPage(1);
+  };
+
   const handleGasSyncClick = async () => {
     setIsSyncingGas(true);
     try {
@@ -673,44 +712,44 @@ export function HistoryTab({
               id="btn-deduplicate-history"
               onClick={handleDeduplicate}
               disabled={isDeduplicating || transactions.length === 0}
-              className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all"
+              className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs sm:text-sm font-semibold px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Periksa dan pastikan tidak ada data transaksi yang dobel di riwayat"
             >
               <ShieldCheck className={`w-4 h-4 ${isDeduplicating ? 'animate-pulse' : ''}`} />
-              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti'}</span>
+              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Dobel'}</span>
             </button>
 
             <button
               id="btn-gas-sync-history"
               onClick={handleGasSyncClick}
               disabled={isSyncingGas}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Sinkronisasi 2 arah dengan Google Sheets"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
-              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron'}</span>
+              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron GAS'}</span>
             </button>
 
             <button
               id="btn-force-sync-sheets"
               onClick={handleForceSyncFromSheets}
               disabled={isForceSyncing}
-              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer border border-teal-500/80"
-              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini (Solusi multi-device / setelah hapus riwayat)"
+              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/80"
+              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
             >
               <RefreshCw className={`w-4 h-4 ${isForceSyncing ? 'animate-spin' : ''}`} />
-              <span>{isForceSyncing ? 'Menyamakan...' : 'Samakan dgn Google Sheets'}</span>
+              <span>{isForceSyncing ? 'Menyamakan...' : 'Samakan Google Sheets'}</span>
             </button>
 
             <button
               id="btn-export-excel"
               onClick={handleExportToExcel}
               disabled={sortedAndFiltered.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Export riwayat transaksi ke format Microsoft Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Export</span>
+              <span>Export Excel</span>
               {sortedAndFiltered.length > 0 && (
                 <span className="bg-emerald-700/60 text-emerald-100 text-xs px-2 py-0.5 rounded-full font-mono">
                   {sortedAndFiltered.length}
@@ -721,7 +760,7 @@ export function HistoryTab({
             <button
               id="btn-restore-data"
               onClick={() => setIsRestoreModalOpen(true)}
-              className="bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Restore / upload data dari file backup JSON atau tarik langsung dari Google Sheets"
             >
               <UploadCloud className="w-4 h-4" />
@@ -731,18 +770,18 @@ export function HistoryTab({
             <button
               id="btn-monthly-reset"
               onClick={() => setIsMonthlyResetModalOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-2 transition-all cursor-pointer"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & kosongkan riwayat untuk bulan baru (0 data)"
             >
               <Archive className="w-4 h-4" />
-              <span>Tutup Buku Bulanan</span>
+              <span>Tutup Buku</span>
             </button>
 
             <button
               id="btn-clear-all-history"
               onClick={handleQuickClearAll}
               disabled={isClearingAll || transactions.length === 0}
-              className="bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-rose-200 shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 text-xs sm:text-sm font-semibold px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-rose-200 shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
               title="Hapus seluruh riwayat transaksi sekarang (fresh 0 data)"
             >
               <Trash2 className={`w-4 h-4 text-rose-600 ${isClearingAll ? 'animate-bounce' : ''}`} />
@@ -798,297 +837,317 @@ export function HistoryTab({
           </div>
         </div>
 
-        {/* Filter, Rentang Waktu, and Sort Criteria Control Bar */}
-        <div className="mt-6 pt-6 border-t border-slate-100 space-y-4">
-          {/* Rentang Waktu (Date Range) Filter Box */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-2xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/60">
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-2xs">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>Filter Rentang Waktu (Sortir Tanggal)</span>
-                    {(startDate || endDate) && (
-                      <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <span>Aktif</span>
-                        <button
-                          onClick={resetDateFilter}
-                          className="hover:text-blue-900 transition-colors ml-0.5"
-                          title="Reset filter tanggal"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Pilih tanggal mulai dan selesai untuk memfilter riwayat transaksi yang ditampilkan &amp; diekspor.
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Date Presets */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs shrink-0">
-                <span className="text-[11px] font-medium text-slate-400 mr-1">Preset:</span>
+        {/* Modern Unified Filter & Search Control Panel */}
+        <div className="mt-6 bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+          {/* Row 1: Search + Sort + Reset */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                id="input-search-history"
+                type="text"
+                placeholder="Cari ID transaksi, nama pelanggan, IDPEL, layanan..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full h-10 pl-10 pr-9 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-800 placeholder:text-slate-400 shadow-2xs transition-all"
+              />
+              {searchTerm && (
                 <button
                   type="button"
-                  onClick={setTodayFilter}
-                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Hapus pencarian"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Sort Selector */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 h-10 bg-white border border-slate-300 px-3 rounded-xl shadow-2xs">
+                <ArrowUpDown className="w-4 h-4 text-slate-500 shrink-0" />
+                <span className="text-xs font-semibold text-slate-500 hidden md:inline">Urutan:</span>
+                <select
+                  id="select-sort-criteria"
+                  value={sortCriterion}
+                  onChange={(e) => setSortCriterion(e.target.value as SortCriterion)}
+                  className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
+                >
+                  <option value="date-desc">Tanggal: Terbaru → Terlama</option>
+                  <option value="date-asc">Tanggal: Terlama → Terbaru</option>
+                  <option value="name-asc">Nama Pelanggan: A → Z</option>
+                  <option value="name-desc">Nama Pelanggan: Z → A</option>
+                  <option value="total-desc">Total Bayar: Tertinggi</option>
+                  <option value="total-asc">Total Bayar: Terendah</option>
+                  <option value="idpel-asc">IDPEL: 0 → 9</option>
+                  <option value="idpel-desc">IDPEL: 9 → 0</option>
+                  <option value="service-asc">Layanan: A → Z</option>
+                  <option value="service-desc">Layanan: Z → A</option>
+                  <option value="status-aktif">Status: Aktif Pertama</option>
+                  <option value="status-inaktif">Status: Nonaktif Pertama</option>
+                </select>
+              </div>
+
+              {/* Reset All Filters button if active */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="h-10 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                  title="Kembalikan semua filter ke pengaturan awal"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Reset Filter</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Status & Quick Date Range Segmented Buttons */}
+          <div className="pt-2 border-t border-slate-200/70 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+            {/* Left: Status Filter */}
+            <div className="lg:col-span-5 flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
+                Status:
+              </span>
+              <div className="flex-1 inline-flex bg-slate-200/70 p-1 rounded-xl gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    statusFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Semua</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                    statusFilter === 'all' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'
+                  }`}>
+                    {statusCounts.all}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('aktif'); setCurrentPage(1); }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    statusFilter === 'aktif'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === 'aktif' ? 'bg-white' : 'bg-emerald-500'}`} />
+                  <span>Aktif</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                    statusFilter === 'aktif' ? 'bg-emerald-700/80 text-white' : 'text-slate-500'
+                  }`}>
+                    {statusCounts.aktif}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('tidak_aktif'); setCurrentPage(1); }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    statusFilter === 'tidak_aktif'
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === 'tidak_aktif' ? 'bg-white' : 'bg-slate-400'}`} />
+                  <span>Nonaktif</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                    statusFilter === 'tidak_aktif' ? 'bg-slate-700 text-white' : 'text-slate-500'
+                  }`}>
+                    {statusCounts.tidakAktif}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Date Presets & Custom Date Trigger */}
+            <div className="lg:col-span-7 flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
+                Waktu:
+              </span>
+              <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => { resetDateFilter(); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
+                    !startDate && !endDate
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTodayFilter(); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
+                    isTodayActive
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                 >
                   Hari Ini
                 </button>
                 <button
                   type="button"
-                  onClick={setLast7DaysFilter}
-                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                  onClick={() => { setLast7DaysFilter(); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
+                    isLast7Active
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                 >
-                  7 Hari Terakhir
+                  7 Hari
                 </button>
                 <button
                   type="button"
-                  onClick={setThisMonthFilter}
-                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs transition-all shadow-2xs"
+                  onClick={() => { setThisMonthFilter(); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
+                    isThisMonthActive
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                 >
                   Bulan Ini
                 </button>
-                {(startDate || endDate) && (
-                  <button
-                    type="button"
-                    onClick={resetDateFilter}
-                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-lg border border-rose-200 text-xs transition-all shadow-2xs flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" />
-                    <span>Reset</span>
-                  </button>
-                )}
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  📅 Tanggal Mulai (Start Date)
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full text-xs font-semibold bg-white border border-slate-300 text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  📅 Tanggal Selesai (End Date)
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full text-xs font-semibold bg-white border border-slate-300 text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs"
-                />
+                {/* Inline custom date inputs */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                    className="h-8 text-[11px] font-medium bg-white border border-slate-300 text-slate-700 rounded-lg px-2 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs cursor-pointer"
+                    title="Tanggal Mulai"
+                  />
+                  <span className="text-slate-400 text-xs">-</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                    className="h-8 text-[11px] font-medium bg-white border border-slate-300 text-slate-700 rounded-lg px-2 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs cursor-pointer"
+                    title="Tanggal Selesai"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                id="input-search-history"
-                type="text"
-                placeholder="Cari ID Transaksi, Nama, IDPEL, Layanan..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-full bg-white text-slate-800 shadow-2xs"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600"
-                >
-                  ✕
-                </button>
+          {/* Row 3: Category Service Filter Segmented Grid */}
+          <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
+              Layanan:
+            </span>
+            <div className="flex-1 flex flex-wrap items-center gap-1.5">
+              {[
+                { id: 'all', label: 'Semua Layanan', count: categoryCounts.all },
+                { id: 'pln', label: 'Listrik / PLN', count: categoryCounts.pln },
+                { id: 'pdam', label: 'PDAM / Air', count: categoryCounts.pdam },
+                { id: 'bpjs', label: 'BPJS', count: categoryCounts.bpjs },
+                { id: 'telkom', label: 'Speedy / Telkom', count: categoryCounts.telkom },
+                { id: 'pascabayar', label: 'Pascabayar', count: categoryCounts.pascabayar },
+                { id: 'other', label: 'Lain-lain', count: categoryCounts.other },
+              ].map((cat) => {
+                const isActive = serviceFilter === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setServiceFilter(cat.id as ServiceFilterType);
+                      setCurrentPage(1);
+                    }}
+                    className={`h-8 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border ${
+                      isActive
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>{cat.label}</span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                        isActive
+                          ? 'bg-blue-700 text-white'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                      }`}
+                    >
+                      {cat.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Filter Chips & Results Count Bar */}
+          <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-700">
+                Menampilkan <strong className="text-slate-900 font-bold">{sortedAndFiltered.length}</strong> dari {transactions.length} transaksi
+              </span>
+              {hasActiveFilters && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-slate-300">|</span>
+                  <span className="text-[11px] text-slate-400 font-medium">Filter aktif:</span>
+                  {searchTerm && (
+                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                      Cari: &ldquo;{searchTerm}&rdquo;
+                      <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {statusFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                      Status: {statusFilter === 'aktif' ? 'Aktif' : 'Tidak Aktif'}
+                      <button onClick={() => { setStatusFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {serviceFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                      Layanan: {getCategoryLabel(serviceFilter as BillCategory)}
+                      <button onClick={() => { setServiceFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {(startDate || endDate) && (
+                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                      Periode: {startDate || '...'} s/d {endDate || '...'}
+                      <button onClick={() => { resetDateFilter(); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Sort Criteria Selector */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-                <ArrowUpDown className="w-4 h-4 text-blue-600 shrink-0" />
-                <label htmlFor="select-sort-criteria" className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                  Urutkan Berdasarkan:
-                </label>
-                <select
-                  id="select-sort-criteria"
-                  value={sortCriterion}
-                  onChange={(e) => setSortCriterion(e.target.value as SortCriterion)}
-                  className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
-                >
-                  <option value="date-desc">📅 Tanggal Transaksi (Terbaru → Terlama)</option>
-                  <option value="date-asc">📅 Tanggal Transaksi (Terlama → Terbaru)</option>
-                  <option value="name-asc">👤 Nama Pelanggan (A → Z)</option>
-                  <option value="name-desc">👤 Nama Pelanggan (Z → A)</option>
-                  <option value="total-desc">💰 Total Bayar (Tertinggi → Terendah)</option>
-                  <option value="total-asc">💰 Total Bayar (Terendah → Tertinggi)</option>
-                  <option value="idpel-asc">🔢 ID Pelanggan (0 → 9)</option>
-                  <option value="idpel-desc">🔢 ID Pelanggan (9 → 0)</option>
-                  <option value="service-asc">⚡ Jenis Layanan (A → Z)</option>
-                  <option value="service-desc">⚡ Jenis Layanan (Z → A)</option>
-                  <option value="status-aktif">🟢 Status (Aktif Pertama)</option>
-                  <option value="status-inaktif">⚪ Status (Tidak Aktif Pertama)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Status Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 pb-1 border-b border-slate-100">
-            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 mr-1">
-              <Filter className="w-3.5 h-3.5 text-slate-400" /> Status:
-            </span>
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                statusFilter === 'all'
-                  ? 'bg-slate-800 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Semua Status</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {statusCounts.all}
-              </span>
-            </button>
-            <button
-              onClick={() => setStatusFilter('aktif')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                statusFilter === 'aktif'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-              <span>Aktif</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'aktif' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {statusCounts.aktif}
-              </span>
-            </button>
-            <button
-              onClick={() => setStatusFilter('tidak_aktif')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                statusFilter === 'tidak_aktif'
-                  ? 'bg-slate-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-              <span>Tidak Aktif</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === 'tidak_aktif' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {statusCounts.tidakAktif}
-              </span>
-            </button>
-          </div>
-
-          {/* Category Service Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 mr-1">
-              <Filter className="w-3.5 h-3.5 text-slate-400" /> Kategori:
-            </span>
-            <button
-              onClick={() => setServiceFilter('all')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'all'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Semua</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.all}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('pln')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'pln'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Listrik / PLN</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pln' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.pln}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('pdam')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'pdam'
-                  ? 'bg-cyan-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>PDAM / Air</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pdam' ? 'bg-cyan-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.pdam}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('bpjs')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'bpjs'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>BPJS</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'bpjs' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.bpjs}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('telkom')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'telkom'
-                  ? 'bg-rose-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Speedy / Telkom</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'telkom' ? 'bg-rose-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.telkom}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('pascabayar')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'pascabayar'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Paskabayar Baru</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'pascabayar' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.pascabayar}
-              </span>
-            </button>
-            <button
-              onClick={() => setServiceFilter('other')}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1.5 ${
-                serviceFilter === 'other'
-                  ? 'bg-slate-700 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            >
-              <span>Lain-lain</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${serviceFilter === 'other' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {categoryCounts.other}
-              </span>
-            </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 underline transition-colors cursor-pointer"
+              >
+                Hapus Semua Filter
+              </button>
+            )}
           </div>
         </div>
 

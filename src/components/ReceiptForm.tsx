@@ -10,7 +10,7 @@ interface ReceiptFormProps {
   setReceipt: React.Dispatch<React.SetStateAction<ReceiptData>>;
   agentConfig: AgentConfig;
   setAgentConfig: React.Dispatch<React.SetStateAction<AgentConfig>>;
-  onSave: () => void;
+  onSave: (force?: boolean) => any | Promise<any>;
   onPrint: () => void;
   resetTrigger?: number;
 }
@@ -47,13 +47,25 @@ export function ReceiptForm({
     }));
   };
 
-  // Clear rawText and assign a fresh random ID when resetTrigger changes
+  // Clear rawText, parseNote, and assign fresh empty values when resetTrigger changes
   React.useEffect(() => {
     if (resetTrigger !== undefined && resetTrigger > 0) {
       setRawText('');
+      setParseNote('');
       setReceipt((prev) => ({
         ...prev,
         id: generateRandomTransactionId(),
+        tanggal: formatReceiptDateTime(),
+        idpel: '',
+        namaPelanggan: '',
+        pemakaian: '',
+        standMeter: '',
+        rincianTagihan: '',
+        bulanTagihan: '',
+        rpTagihan: 0,
+        lainLain: 0,
+        adminBank: 0,
+        totalBayar: 0,
       }));
     }
   }, [resetTrigger]);
@@ -620,9 +632,14 @@ export function ReceiptForm({
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={onSave}
+            onClick={async () => {
+              const res = await onSave();
+              if (res) {
+                handleClearAll();
+              }
+            }}
             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
-            title="Simpan data transaksi ke riwayat"
+            title="Simpan data transaksi ke riwayat & otomatis kosongkan form untuk input baru"
           >
             <CheckCircle className="w-4 h-4" />
             <span>Simpan</span>

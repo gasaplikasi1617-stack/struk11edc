@@ -45,6 +45,7 @@ interface ReceiptPreviewProps {
   receipt: ReceiptData;
   onPrint: () => void;
   onSave: (force?: boolean) => void | Promise<any>;
+  onReset?: () => void;
   savedStatus: boolean;
   historyCount?: number;
 }
@@ -55,7 +56,7 @@ interface DownloadedModalState {
   fileName: string;
 }
 
-export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyCount = 0 }: ReceiptPreviewProps) {
+export function ReceiptPreview({ receipt, onPrint, onSave, onReset, savedStatus, historyCount = 0 }: ReceiptPreviewProps) {
   const [previewMode, setPreviewMode] = useState<'a6' | 'dotmatrix'>('a6');
   const [dotMatrixFontSize, setDotMatrixFontSize] = useState<DotMatrixFontSize>('normal');
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
@@ -82,6 +83,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
   const [showJspmHelpModal, setShowJspmHelpModal] = useState(false);
 
   const handlePrintJSPM = async (overridePrinterName?: string) => {
+    const txToPrint = { ...receipt };
     await onSave(true);
     setIsJspmPrinting(true);
     setJspmStatusText('🤖 Menghubungkan ke JSPrintManager secara otomatis...');
@@ -89,7 +91,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
     try {
       const printerName = overridePrinterName || selectedJspmPrinter;
       const printedTo = await printDirectJSPM(
-        receipt,
+        txToPrint,
         printerName || undefined,
         (msg) => {
           setJspmStatusText(msg);
@@ -99,6 +101,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
       showActionNotice(`SUKSES! Data tersimpan & struk dikirim ke ${printedTo} via JSPrintManager (RAW Mode).`);
       setShowJspmModal(false);
       setShowJspmHelpModal(false);
+      onReset?.();
     } catch (err: any) {
       console.error(err);
       setJspmStatusText(err.message || String(err));
@@ -142,14 +145,16 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
   };
 
   const handlePrintQZTray = async (overridePrinterName?: string) => {
+    const txToPrint = { ...receipt };
     await onSave(true);
     setIsQzPrinting(true);
     showActionNotice('Data tersimpan ke riwayat! Menghubungkan ke QZ Tray & Mengirim Perintah Cetak ke LX-310...');
     try {
       const printerName = overridePrinterName || selectedQzPrinter;
-      const printedTo = await printDirectQZTray(receipt, printerName || undefined);
+      const printedTo = await printDirectQZTray(txToPrint, printerName || undefined);
       showActionNotice(`SUKSES! Data tersimpan & struk berhasil dicetak ke ${printedTo} via QZ Tray (Direct Hardware RAW).`);
       setShowQzModal(false);
+      onReset?.();
     } catch (err: any) {
       console.error(err);
       alert(`Gagal Mencetak via QZ Tray: ${err.message || err}`);
@@ -160,6 +165,7 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
   };
 
   const handleQuickQzTrayPrint = async () => {
+    const txToPrint = { ...receipt };
     // 1. Fungsi Simpan ke Riwayat (Dua-arah / otomatis)
     await onSave(true);
     setIsQzPrinting(true);
@@ -167,8 +173,9 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
 
     // 2. Fungsi Cetak via QZ Tray
     try {
-      const printedTo = await printDirectQZTray(receipt, selectedQzPrinter || undefined);
+      const printedTo = await printDirectQZTray(txToPrint, selectedQzPrinter || undefined);
       showActionNotice(`SUKSES! Data tersimpan ke riwayat & struk dicetak ke ${printedTo} via QZ Tray.`);
+      onReset?.();
     } catch (err: any) {
       console.warn('Direct QZ Tray error, membuka jendela QZ Tray:', err);
       try {
@@ -216,18 +223,22 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
   };
 
   const handleDotMatrixPrintClick = async () => {
+    const txToPrint = { ...receipt };
     await onSave(true);
     showActionNotice(`Data otomatis tersimpan ke riwayat! Menyiapkan cetak Dot Matrix Layout...`);
     setTimeout(() => {
-      printDotMatrixReceipt(receipt, undefined, dotMatrixFontSize);
+      printDotMatrixReceipt(txToPrint, undefined, dotMatrixFontSize);
+      onReset?.();
     }, 100);
   };
 
   const handleRawTextLX310PrintClick = async () => {
+    const txToPrint = { ...receipt };
     await onSave(true);
     showActionNotice('Data otomatis tersimpan ke riwayat! Menyiapkan Cetak Direct Text LX-310 (Pasti Tajam 100%)...');
     setTimeout(() => {
-      printRawTextLX310(receipt, undefined);
+      printRawTextLX310(txToPrint, undefined);
+      onReset?.();
     }, 100);
   };
 
@@ -355,6 +366,8 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
       printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();
+
+      onReset?.();
     } catch (e) {
       onPrint();
     }
@@ -496,8 +509,14 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
             </span>
           )}
           <button
-            onClick={() => onSave(false)}
-            className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-all"
+            onClick={async () => {
+              const res = await onSave(false);
+              if (res) {
+                showActionNotice('Data berhasil disimpan ke riwayat! Formulir siap untuk transaksi baru.');
+                onReset?.();
+              }
+            }}
+            className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
             title="Simpan manual data transaksi ke database riwayat"
           >
             Simpan

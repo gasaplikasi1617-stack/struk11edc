@@ -160,6 +160,27 @@ export default function App() {
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const handleResetForm = () => {
+    setReceipt({
+      id: generateRandomTransactionId(),
+      tanggal: formatReceiptDateTime(),
+      idpel: '',
+      namaPelanggan: '',
+      pemakaian: '',
+      standMeter: '',
+      rincianTagihan: '',
+      bulanTagihan: '',
+      rpTagihan: 0,
+      lainLain: 0,
+      adminBank: 0,
+      totalBayar: 0,
+      namaAgen: agentConfig.namaAgen,
+      alamat: agentConfig.alamat,
+      noHp: agentConfig.noHp,
+    });
+    setResetTrigger((prev) => prev + 1);
+  };
+
   const handleSaveTransaction = async (force: boolean = false): Promise<ReceiptData | null> => {
     // Validasi data kosong: jangan simpan form kosong ke riwayat
     const hasData =
@@ -224,6 +245,11 @@ export default function App() {
       console.warn('Local persistence warning:', localErr);
     }
 
+    // Jika dipanggil dari tombol "Simpan" biasa (!force), otomatis reset form & parsing agar langsung siap input baru
+    if (!force) {
+      handleResetForm();
+    }
+
     // 3. Simpan ke Backend Server
     try {
       const res = await fetch('/api/transactions', {
@@ -246,7 +272,6 @@ export default function App() {
         }
         if (data.success) {
           fetchTransactions();
-          setResetTrigger((prev) => prev + 1);
 
           // Background sync to Google Sheets
           executeTwoWaySync(undefined, [payload, ...transactionsRef.current])
@@ -271,10 +296,23 @@ export default function App() {
 
   const handlePrint = async () => {
     // 100% PASTI tersimpan ke riwayat sebelum browser membuka dialog cetak
-    await handleSaveTransaction(true);
+    const saved = await handleSaveTransaction(true);
+    if (!saved) return;
+
+    let resetTriggered = false;
+    const doReset = () => {
+      if (!resetTriggered) {
+        resetTriggered = true;
+        handleResetForm();
+      }
+    };
+
+    window.addEventListener('afterprint', doReset, { once: true });
+    setTimeout(doReset, 1500);
+
     setTimeout(() => {
       window.print();
-    }, 100);
+    }, 150);
   };
 
   const handleDeleteTransaction = async (targetKey: string, txData?: ReceiptData) => {
@@ -443,6 +481,7 @@ export default function App() {
                   receipt={receipt}
                   onPrint={handlePrint}
                   onSave={handleSaveTransaction}
+                  onReset={handleResetForm}
                   savedStatus={savedStatus}
                   historyCount={transactions.length}
                 />
