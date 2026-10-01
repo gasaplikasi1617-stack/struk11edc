@@ -454,27 +454,8 @@ export function HistoryTab({
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
-  // Category counts across all transactions
-  const categoryCounts = useMemo(() => {
-    const counts: Record<ServiceFilterType, number> = {
-      all: transactions.length,
-      pln: 0,
-      pdam: 0,
-      bpjs: 0,
-      telkom: 0,
-      pascabayar: 0,
-      other: 0,
-    };
-    for (const t of transactions) {
-      const cat = getTransactionCategory(t);
-      counts[cat] = (counts[cat] || 0) + 1;
-    }
-    return counts;
-  }, [transactions]);
-
-
-  // Filter transactions by search term, service category, status, and date range
-  const filteredList = useMemo(() => {
+  // Base transactions filtered by search query and date range (before serviceFilter is applied)
+  const baseFilteredForCategories = useMemo(() => {
     let startMs: number | null = null;
     let endMs: number | null = null;
 
@@ -502,13 +483,7 @@ export function HistoryTab({
 
       if (!matchSearch) return false;
 
-      // 2. Category filter
-      if (serviceFilter !== 'all') {
-        const cat = getTransactionCategory(t);
-        if (cat !== serviceFilter) return false;
-      }
-
-      // 3. Date range filter
+      // 2. Date range filter
       if (startMs !== null || endMs !== null) {
         const txMs = getTransactionTimestamp(t);
         if (txMs > 0) {
@@ -519,7 +494,33 @@ export function HistoryTab({
 
       return true;
     });
-  }, [transactions, searchTerm, serviceFilter, startDate, endDate]);
+  }, [transactions, searchTerm, startDate, endDate]);
+
+  // Category counts accurately reflecting active search & date filters
+  const categoryCounts = useMemo(() => {
+    const counts: Record<ServiceFilterType, number> = {
+      all: baseFilteredForCategories.length,
+      pln: 0,
+      pdam: 0,
+      bpjs: 0,
+      telkom: 0,
+      pascabayar: 0,
+      other: 0,
+    };
+    for (const t of baseFilteredForCategories) {
+      const cat = getTransactionCategory(t);
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [baseFilteredForCategories]);
+
+  // Filter transactions by selected service category
+  const filteredList = useMemo(() => {
+    if (serviceFilter === 'all') {
+      return baseFilteredForCategories;
+    }
+    return baseFilteredForCategories.filter((t) => getTransactionCategory(t) === serviceFilter);
+  }, [baseFilteredForCategories, serviceFilter]);
 
   // Sort filtered transactions based on selected criterion
   const sortedAndFiltered = useMemo(() => {
@@ -601,12 +602,13 @@ export function HistoryTab({
   // Export to Excel with current sorting & filtering
   const handleExportToExcel = () => {
     if (sortedAndFiltered.length === 0) {
-      alert('Tidak ada data transaksi yang sesuai untuk diekspor.');
+      alert('Tidak ada data transaksi yang sesuai dengan filter untuk diekspor.');
       return;
     }
 
     const todayStr = new Date().toISOString().slice(0, 10);
-    const filterTag = serviceFilter === 'all' ? 'Semua' : getCategoryLabel(serviceFilter).replace(/[\/\s]+/g, '_');
+    const rawCategory = serviceFilter === 'all' ? 'Semua' : getCategoryLabel(serviceFilter);
+    const filterTag = rawCategory.replace(/[:\\/?*\[\]\s]+/g, '_');
     
     let dateRangeTag = todayStr;
     let periodText = '';
@@ -622,19 +624,25 @@ export function HistoryTab({
     }
 
     const fileName = `Riwayat_${filterTag}_${dateRangeTag}.xlsx`;
-    const sheetName = serviceFilter === 'all' ? 'Riwayat Transaksi' : `Riwayat ${getCategoryLabel(serviceFilter)}`;
+    const cleanCategoryForSheet = rawCategory.replace(/[:\\/?*\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    const sheetName = serviceFilter === 'all' ? 'Riwayat Transaksi' : `Riwayat ${cleanCategoryForSheet}`.slice(0, 31);
 
-    exportTransactionsToExcel(sortedAndFiltered, {
-      fileName,
-      sheetName,
-    });
+    try {
+      exportTransactionsToExcel(sortedAndFiltered, {
+        fileName,
+        sheetName,
+      });
 
-    setExportSuccessNotice(
-      `Berhasil mengekspor ${sortedAndFiltered.length} transaksi${periodText} ke file Excel ${fileName}.`
-    );
-    setTimeout(() => {
-      setExportSuccessNotice(null);
-    }, 5000);
+      setExportSuccessNotice(
+        `Berhasil mengekspor ${sortedAndFiltered.length} transaksi (${rawCategory})${periodText} ke file Excel ${fileName}.`
+      );
+      setTimeout(() => {
+        setExportSuccessNotice(null);
+      }, 5000);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      alert('Gagal mengekspor data ke Excel: ' + (err.message || String(err)));
+    }
   };
 
   // Compute summary stats for the current list
@@ -766,9 +774,14 @@ export function HistoryTab({
               <Receipt className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Total Riwayat</p>
+              <p className="text-[11px] font-medium text-slate-500">
+                {hasActiveFilters ? 'Total Tersaring' : 'Total Riwayat'}
+              </p>
               <p className="text-sm font-bold text-slate-800">
-                {transactions.length} <span className="text-slate-400 font-normal text-xs">Transaksi</span>
+                {sortedAndFiltered.length}{' '}
+                <span className="text-slate-400 font-normal text-xs">
+                  {hasActiveFilters ? `dari ${transactions.length} Transaksi` : 'Transaksi'}
+                </span>
               </p>
             </div>
           </div>
@@ -1034,8 +1047,11 @@ export function HistoryTab({
         <div className="mt-6 border-t border-slate-200 pt-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
             <div>
-              <h3 className="font-bold text-sm text-slate-800">
-                Daftar Transaksi
+              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                <span>Daftar Transaksi</span>
+                <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-mono font-medium">
+                  {sortedAndFiltered.length}
+                </span>
               </h3>
             </div>
 

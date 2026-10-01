@@ -174,13 +174,34 @@ export function exportTransactionsToExcel(
 
   // Create workbook
   const workbook = XLSX.utils.book_new();
-  const sheetName = options?.sheetName || 'Riwayat Transaksi';
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  
+  // Sanitize sheet name: Excel strictly forbids : \ / ? * [ ] and max 31 characters
+  const rawSheetName = options?.sheetName || 'Riwayat Transaksi';
+  const cleanSheetName = rawSheetName
+    .replace(/[:\\/?*\[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 31) || 'Riwayat Transaksi';
 
-  // Determine filename
+  XLSX.utils.book_append_sheet(workbook, worksheet, cleanSheetName);
+
+  // Determine and sanitize filename (remove invalid filesystem characters)
   const today = new Date().toISOString().slice(0, 10);
-  const fileName = options?.fileName || `Riwayat_Transaksi_${today}.xlsx`;
+  const rawFileName = options?.fileName || `Riwayat_Transaksi_${today}.xlsx`;
+  let cleanFileName = rawFileName
+    .replace(/[:\\/?*\[\]"<>|]/g, '_')
+    .replace(/_+/g, '_')
+    .trim();
+  if (!cleanFileName.toLowerCase().endsWith('.xlsx')) {
+    cleanFileName += '.xlsx';
+  }
 
   // Trigger file download with cell styles enabled
-  XLSX.writeFile(workbook, fileName, { cellStyles: true });
+  try {
+    XLSX.writeFile(workbook, cleanFileName, { cellStyles: true });
+  } catch (err: any) {
+    console.error('XLSX.writeFile error:', err);
+    // Fallback writing without cellStyles if unsupported
+    XLSX.writeFile(workbook, cleanFileName);
+  }
 }
