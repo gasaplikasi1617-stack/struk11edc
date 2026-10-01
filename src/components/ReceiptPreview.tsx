@@ -20,7 +20,7 @@ import {
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
-import { getReceiptHeaderTitle } from '../utils/billParser';
+import { getReceiptHeaderTitle, getDefaultBulanTagihan, isPdamBill } from '../utils/billParser';
 import { formatTerbilang } from '../utils/terbilang';
 import {
   printDotMatrixReceipt,
@@ -497,6 +497,9 @@ export function ReceiptPreview({
     }
   };
 
+  const isPdam = isPdamBill(receipt);
+  const displayBulanTagihan = receipt.bulanTagihan || getDefaultBulanTagihan(isPdam);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
       <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -553,7 +556,7 @@ export function ReceiptPreview({
             ) : (
               <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
             )}
-            <span>Cetak QZ/Tray</span>
+            <span>OZ/Tray</span>
           </button>
         </div>
       </div>
@@ -637,7 +640,7 @@ export function ReceiptPreview({
             </div>
             <div className="flex justify-between">
               <span className="text-black">Bulan/Periode:</span>
-              <span className="text-black">{receipt.bulanTagihan || '-'}</span>
+              <span className="text-black">{displayBulanTagihan}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black">Pemakaian:</span>
@@ -728,7 +731,7 @@ export function ReceiptPreview({
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     <span className="text-slate-700">Periode</span>
-                    <span className="col-span-2 text-slate-950">: {receipt.bulanTagihan || '-'}</span>
+                    <span className="col-span-2 text-slate-950">: {displayBulanTagihan}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     <span className="text-slate-700">Pemakaian</span>

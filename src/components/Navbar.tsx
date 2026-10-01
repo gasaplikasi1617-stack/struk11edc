@@ -64,7 +64,7 @@ export function Navbar({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-lg leading-tight tracking-tight">Cetak Resi Tagihan</h1>
+                <h1 className="font-bold text-lg leading-tight tracking-tight">Sistem Pembayaran Online</h1>
                 {/* Auto Sync Live Pill */}
                 <button
                   onClick={handleManualSyncClick}
@@ -95,7 +95,7 @@ export function Navbar({
                   )}
                 </button>
               </div>
-              <p className="text-xs text-slate-400">Agen Batara — Bekasi & Google Apps Script</p>
+              <p className="text-xs text-slate-400">Agen Batara</p>
             </div>
           </div>
 

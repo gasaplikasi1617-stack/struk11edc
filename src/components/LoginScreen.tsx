@@ -158,7 +158,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-400 mt-6 font-medium">
-          PPOB Agen11EDC &copy; 2026 Agen Batara — Bekasi
+          PPOB Agen11EDC &copy; 2026 Agen Batara
         </p>
       </div>
     </div>

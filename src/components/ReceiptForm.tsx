@@ -39,7 +39,7 @@ export function ReceiptForm({
       pemakaian: '',
       standMeter: '',
       rincianTagihan: '',
-      bulanTagihan: '',
+      bulanTagihan: getDefaultBulanTagihan(false),
       rpTagihan: 0,
       lainLain: 0,
       adminBank: 0,
@@ -61,7 +61,7 @@ export function ReceiptForm({
         pemakaian: '',
         standMeter: '',
         rincianTagihan: '',
-        bulanTagihan: '',
+        bulanTagihan: getDefaultBulanTagihan(false),
         rpTagihan: 0,
         lainLain: 0,
         adminBank: 0,
@@ -458,6 +458,22 @@ export function ReceiptForm({
           </div>
 
           <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+              <span>Bulan Tagihan / Periode</span>
+              <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-medium">
+                Contoh: Sept26 / Okt26
+              </span>
+            </label>
+            <input
+              type="text"
+              value={receipt.bulanTagihan || ''}
+              onChange={(e) => handleInputChange('bulanTagihan', e.target.value)}
+              placeholder="Contoh: Sept26 / Okt26"
+              className="w-full text-sm border-2 border-blue-300 focus:border-blue-500 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-400 outline-none font-semibold text-blue-900 bg-blue-50/40"
+            />
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               ID Pelanggan (Idpel)
             </label>
@@ -503,18 +519,7 @@ export function ReceiptForm({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Bulan Tagihan / Periode</label>
-            <input
-              type="text"
-              value={receipt.bulanTagihan}
-              onChange={(e) => handleInputChange('bulanTagihan', e.target.value)}
-              placeholder="Contoh: Sep 26"
-              className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-slate-600 mb-1">Rincian Tagihan</label>
             <input
               type="text"

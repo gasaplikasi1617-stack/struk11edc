@@ -17,7 +17,7 @@ export function HeaderCustomizationSection({
 }: HeaderCustomizationSectionProps) {
   const [formData, setFormData] = useState<AgentConfig>({
     namaAgen: agentConfig.namaAgen || 'Agen Batara',
-    alamat: agentConfig.alamat || 'Bekasi',
+    alamat: agentConfig.alamat || '',
     noHp: agentConfig.noHp || '081234567890',
   });
 
@@ -27,7 +27,7 @@ export function HeaderCustomizationSection({
   useEffect(() => {
     setFormData({
       namaAgen: agentConfig.namaAgen || 'Agen Batara',
-      alamat: agentConfig.alamat || 'Bekasi',
+      alamat: agentConfig.alamat || '',
       noHp: agentConfig.noHp || '081234567890',
     });
   }, [agentConfig]);
@@ -36,7 +36,7 @@ export function HeaderCustomizationSection({
     if (e) e.preventDefault();
     const updated: AgentConfig = {
       namaAgen: formData.namaAgen.trim() || 'Agen Batara',
-      alamat: formData.alamat.trim() || 'Bekasi',
+      alamat: formData.alamat.trim() || '',
       noHp: formData.noHp.trim() || '081234567890',
     };
 
@@ -61,7 +61,7 @@ export function HeaderCustomizationSection({
   const handleResetDefault = () => {
     const defaultVal: AgentConfig = {
       namaAgen: 'Agen Batara',
-      alamat: 'Bekasi',
+      alamat: '',
       noHp: '081234567890',
     };
     setFormData(defaultVal);

@@ -9,7 +9,7 @@ import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { LoginScreen } from './components/LoginScreen';
 import { getCurrentUser, logoutUser, fetchUsers, syncUsersWithServer } from './services/userService';
 import { formatReceiptDateTime, generateRandomTransactionId } from './utils/dateFormatter';
-import { getCurrentMonthPeriod } from './utils/billParser';
+import { getCurrentMonthPeriod, getDefaultBulanTagihan } from './utils/billParser';
 import { checkDuplicateTransaction, deduplicateTransactionList } from './utils/antiDuplicate';
 import {
   getStoredTransactions,
@@ -27,7 +27,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'gas'>('create');
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
     namaAgen: 'Agen Batara',
-    alamat: 'Bekasi',
+    alamat: '',
     noHp: '081234567890',
   });
 
@@ -39,13 +39,13 @@ export default function App() {
     pemakaian: '',
     standMeter: '',
     rincianTagihan: '',
-    bulanTagihan: '',
+    bulanTagihan: getDefaultBulanTagihan(false),
     rpTagihan: 0,
     lainLain: 0,
     adminBank: 0,
     totalBayar: 0,
     namaAgen: 'Agen Batara',
-    alamat: 'Bekasi',
+    alamat: '',
     noHp: '081234567890',
   });
 
@@ -178,7 +178,7 @@ export default function App() {
       pemakaian: '',
       standMeter: '',
       rincianTagihan: '',
-      bulanTagihan: '',
+      bulanTagihan: getDefaultBulanTagihan(false),
       rpTagihan: 0,
       lainLain: 0,
       adminBank: 0,
@@ -463,7 +463,7 @@ export default function App() {
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">
-                      Sistem Pembayaran
+                      Sistem Pembayaran Online
                     </h2>
                     <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-200">
                       <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
@@ -547,7 +547,7 @@ export default function App() {
       />
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
-        <p>Cetak Resi Tagihan — Agen Batara &copy; 2026 | Didukung oleh Google Apps Script & Google Sheets</p>
+        <p>Sistem Pembayaran Online — Agen Batara &copy; 2026 | Didukung oleh Google Sheets</p>
       </footer>
     </div>
   );

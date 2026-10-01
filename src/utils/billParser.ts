@@ -122,7 +122,7 @@ export function formatPeriod3Chars(input: string): string {
     JUNI: 'Jun', JUN: 'Jun',
     JULI: 'Jul', JUL: 'Jul',
     AGUSTUS: 'Agu', AGUST: 'Agu', AGUS: 'Agu', AGT: 'Agu', AGS: 'Agu', AUG: 'Agu', AGU: 'Agu',
-    SEPTEMBER: 'Sep', SEPT: 'Sep', SEP: 'Sep',
+    SEPTEMBER: 'Sept', SEPT: 'Sept', SEP: 'Sept',
     OKTOBER: 'Okt', OKT: 'Okt', OCT: 'Okt',
     NOVEMBER: 'Nov', NOV: 'Nov',
     DESEMBER: 'Des', DES: 'Des', DEC: 'Des'
@@ -152,7 +152,7 @@ export function formatPeriod3Chars(input: string): string {
   const numMatch = upper.match(/(\d{1,2})[\/\-](\d{2,4})/);
   if (numMatch) {
     const mNum = parseInt(numMatch[1], 10);
-    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'];
     if (mNum >= 1 && mNum <= 12) {
       mCode = monthsArr[mNum];
       const y = numMatch[2];
@@ -170,14 +170,14 @@ export function formatPeriod3Chars(input: string): string {
 }
 
 export function getCurrentMonthPeriod(dateObj: Date = new Date()): string {
-  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'];
   const m = dateObj.getMonth() + 1; // 1-12
   const yStr = String(dateObj.getFullYear()).slice(-2);
   return `${monthsArr[m]}${yStr}`;
 }
 
 export function getPreviousMonthPeriod(periodStr?: string): string {
-  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const monthsArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'];
   
   let month = 0;
   let year = new Date().getFullYear();
@@ -220,7 +220,7 @@ export function getPreviousMonthPeriod(periodStr?: string): string {
 }
 
 export function getDefaultBulanTagihan(isPdam: boolean, extractedPeriod?: string): string {
-  if (extractedPeriod && extractedPeriod.trim()) {
+  if (extractedPeriod && extractedPeriod.trim() && extractedPeriod !== '-') {
     const formatted = formatPeriod3Chars(extractedPeriod);
     if (formatted) {
       if (isPdam) {
@@ -231,9 +231,9 @@ export function getDefaultBulanTagihan(isPdam: boolean, extractedPeriod?: string
   }
 
   if (isPdam) {
-    return getPreviousMonthPeriod(); // e.g. if current is Sep26 -> returns Agu26
+    return getPreviousMonthPeriod(); // e.g. if current is Okt26 -> returns Sept26
   }
-  return getCurrentMonthPeriod(); // e.g. if current is Sep26 -> returns Sep26
+  return getCurrentMonthPeriod(); // e.g. if current is Okt26 -> returns Okt26
 }
 
 export function isPdamBill(t: {
