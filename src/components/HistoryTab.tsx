@@ -677,7 +677,7 @@ export function HistoryTab({
               title="Periksa dan pastikan tidak ada data transaksi yang dobel di riwayat"
             >
               <ShieldCheck className={`w-4 h-4 ${isDeduplicating ? 'animate-pulse' : ''}`} />
-              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Dobel'}</span>
+              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti'}</span>
             </button>
 
             <button
@@ -688,7 +688,7 @@ export function HistoryTab({
               title="Sinkronisasi 2 arah dengan Google Sheets"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
-              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron GAS'}</span>
+              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron'}</span>
             </button>
 
             <button
@@ -699,7 +699,7 @@ export function HistoryTab({
               title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
             >
               <RefreshCw className={`w-4 h-4 ${isForceSyncing ? 'animate-spin' : ''}`} />
-              <span>{isForceSyncing ? 'Menyamakan...' : 'Samakan Google Sheets'}</span>
+              <span>{isForceSyncing ? 'Menyamakan...' : 'Sinkron sheet'}</span>
             </button>
 
             <button
@@ -710,7 +710,7 @@ export function HistoryTab({
               title="Export riwayat transaksi ke format Microsoft Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Export Excel</span>
+              <span>Export</span>
               {sortedAndFiltered.length > 0 && (
                 <span className="bg-emerald-700/60 text-emerald-100 text-xs px-2 py-0.5 rounded-full font-mono">
                   {sortedAndFiltered.length}
@@ -725,7 +725,7 @@ export function HistoryTab({
               title="Restore / upload data dari file backup JSON atau tarik langsung dari Google Sheets"
             >
               <UploadCloud className="w-4 h-4" />
-              <span>Restore Data</span>
+              <span>Restore</span>
             </button>
 
             <button
@@ -735,7 +735,7 @@ export function HistoryTab({
               title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & kosongkan riwayat untuk bulan baru (0 data)"
             >
               <Archive className="w-4 h-4" />
-              <span>Tutup Buku</span>
+              <span>TTP buku</span>
             </button>
 
             <button
@@ -746,7 +746,7 @@ export function HistoryTab({
               title="Hapus seluruh riwayat transaksi sekarang (fresh 0 data)"
             >
               <Trash2 className={`w-4 h-4 text-rose-600 ${isClearingAll ? 'animate-bounce' : ''}`} />
-              <span>{isClearingAll ? 'Membersihkan...' : 'Hapus Semua (0)'}</span>
+              <span>{isClearingAll ? 'Membersihkan...' : 'Hapus'}</span>
             </button>
           </div>
         </div>

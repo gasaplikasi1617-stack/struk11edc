@@ -109,8 +109,7 @@ export function Navbar({
               }`}
             >
               <Printer className="w-4 h-4" />
-              <span className="hidden md:inline">Buat &amp; Cetak Resi</span>
-              <span className="md:hidden">Resi</span>
+              <span>Input</span>
             </button>
 
             <button

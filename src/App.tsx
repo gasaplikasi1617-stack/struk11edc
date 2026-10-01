@@ -442,7 +442,7 @@ export default function App() {
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">
-                      Dashboard Cetak Resi Tagihan
+                      Sistem Pembayaran
                     </h2>
                     <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-200">
                       <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
