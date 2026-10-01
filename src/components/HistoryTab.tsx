@@ -64,8 +64,6 @@ interface HistoryTabProps {
 }
 
 type ServiceFilterType = 'all' | BillCategory;
-type StatusFilterType = 'all' | 'aktif' | 'tidak_aktif';
-
 type SortCriterion =
   | 'date-desc'
   | 'date-asc'
@@ -76,9 +74,7 @@ type SortCriterion =
   | 'idpel-asc'
   | 'idpel-desc'
   | 'service-asc'
-  | 'service-desc'
-  | 'status-aktif'
-  | 'status-inaktif';
+  | 'service-desc';
 
 function getTransactionTimestamp(tx: ReceiptData): number {
   if (tx.createdAt) {
@@ -152,7 +148,6 @@ export function HistoryTab({
 }: HistoryTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [sortCriterion, setSortCriterion] = useState<SortCriterion>('date-desc');
   const [pageSize, setPageSize] = useState<number>(1000);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -238,7 +233,6 @@ export function HistoryTab({
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-    statusFilter !== 'all' ||
     serviceFilter !== 'all' ||
     startDate ||
     endDate
@@ -246,7 +240,6 @@ export function HistoryTab({
 
   const resetAllFilters = () => {
     setSearchTerm('');
-    setStatusFilter('all');
     setServiceFilter('all');
     setStartDate('');
     setEndDate('');
@@ -479,19 +472,6 @@ export function HistoryTab({
     return counts;
   }, [transactions]);
 
-  // Status counts across all transactions
-  const statusCounts = useMemo(() => {
-    let aktif = 0;
-    let tidakAktif = 0;
-    for (const t of transactions) {
-      if (t.status === 'tidak_aktif') {
-        tidakAktif++;
-      } else {
-        aktif++;
-      }
-    }
-    return { all: transactions.length, aktif, tidakAktif };
-  }, [transactions]);
 
   // Filter transactions by search term, service category, status, and date range
   const filteredList = useMemo(() => {
@@ -528,11 +508,7 @@ export function HistoryTab({
         if (cat !== serviceFilter) return false;
       }
 
-      // 3. Status filter
-      if (statusFilter === 'aktif' && t.status === 'tidak_aktif') return false;
-      if (statusFilter === 'tidak_aktif' && t.status !== 'tidak_aktif') return false;
-
-      // 4. Date range filter
+      // 3. Date range filter
       if (startMs !== null || endMs !== null) {
         const txMs = getTransactionTimestamp(t);
         if (txMs > 0) {
@@ -543,7 +519,7 @@ export function HistoryTab({
 
       return true;
     });
-  }, [transactions, searchTerm, serviceFilter, statusFilter, startDate, endDate]);
+  }, [transactions, searchTerm, serviceFilter, startDate, endDate]);
 
   // Sort filtered transactions based on selected criterion
   const sortedAndFiltered = useMemo(() => {
@@ -571,16 +547,7 @@ export function HistoryTab({
           return String(a.rincianTagihan || '').localeCompare(String(b.rincianTagihan || ''), 'id');
         case 'service-desc':
           return String(b.rincianTagihan || '').localeCompare(String(a.rincianTagihan || ''), 'id');
-        case 'status-aktif': {
-          const aIn = a.status === 'tidak_aktif' ? 1 : 0;
-          const bIn = b.status === 'tidak_aktif' ? 1 : 0;
-          return aIn - bIn;
-        }
-        case 'status-inaktif': {
-          const aIn = a.status === 'tidak_aktif' ? 1 : 0;
-          const bIn = b.status === 'tidak_aktif' ? 1 : 0;
-          return bIn - aIn;
-        }
+
         default:
           return 0;
       }
@@ -598,7 +565,7 @@ export function HistoryTab({
   }, [sortedAndFiltered, validCurrentPage, pageSize]);
 
   // Quick toggle column sort when clicking on table header
-  const handleColumnSortClick = (field: 'date' | 'name' | 'idpel' | 'service' | 'total' | 'status') => {
+  const handleColumnSortClick = (field: 'date' | 'name' | 'idpel' | 'service' | 'total') => {
     if (field === 'date') {
       setSortCriterion((prev) => (prev === 'date-desc' ? 'date-asc' : 'date-desc'));
     } else if (field === 'name') {
@@ -609,13 +576,11 @@ export function HistoryTab({
       setSortCriterion((prev) => (prev === 'service-asc' ? 'service-desc' : 'service-asc'));
     } else if (field === 'total') {
       setSortCriterion((prev) => (prev === 'total-desc' ? 'total-asc' : 'total-desc'));
-    } else if (field === 'status') {
-      setSortCriterion((prev) => (prev === 'status-aktif' ? 'status-inaktif' : 'status-aktif'));
     }
   };
 
   // Helper to render sort icon on table headers
-  const renderSortIndicator = (field: 'date' | 'name' | 'idpel' | 'service' | 'total' | 'status') => {
+  const renderSortIndicator = (field: 'date' | 'name' | 'idpel' | 'service' | 'total') => {
     const isCurrent = sortCriterion.startsWith(field);
     if (!isCurrent) {
       return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100" />;
@@ -625,8 +590,7 @@ export function HistoryTab({
       sortCriterion === 'name-asc' ||
       sortCriterion === 'idpel-asc' ||
       sortCriterion === 'service-asc' ||
-      sortCriterion === 'total-asc' ||
-      sortCriterion === 'status-aktif';
+      sortCriterion === 'total-asc';
     return isAsc ? (
       <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold" />
     ) : (
@@ -699,11 +663,8 @@ export function HistoryTab({
                   }}
                 />
               </div>
-              <span>Riwayat Transaksi (Maksimal 1000 Transaksi)</span>
+              <span>Riwayat</span>
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Data transaksi otomatis tersimpan hingga 1000 data terakhir. Anda dapat menyortir kriteria sebelum mengekspor ke Excel.
-            </p>
           </div>
 
           {/* Export to Excel, Anti-Duplicate & GAS Two-Way Sync Action Buttons */}
@@ -805,9 +766,9 @@ export function HistoryTab({
               <Receipt className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Kapasitas Riwayat</p>
+              <p className="text-[11px] font-medium text-slate-500">Total Riwayat</p>
               <p className="text-sm font-bold text-slate-800">
-                {transactions.length} <span className="text-slate-400 font-normal text-xs">/ 1000 Transaksi</span>
+                {transactions.length} <span className="text-slate-400 font-normal text-xs">Transaksi</span>
               </p>
             </div>
           </div>
@@ -817,7 +778,7 @@ export function HistoryTab({
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Total Pembayaran (Aktif)</p>
+              <p className="text-[11px] font-medium text-slate-500">Total Pembayaran</p>
               <p className="text-sm font-bold text-emerald-700">
                 Rp {totalOmset.toLocaleString('id-ID')}
               </p>
@@ -829,7 +790,7 @@ export function HistoryTab({
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Total Admin Bank (Aktif)</p>
+              <p className="text-[11px] font-medium text-slate-500">Total Admin Bank</p>
               <p className="text-sm font-bold text-amber-700">
                 Rp {totalAdmin.toLocaleString('id-ID')}
               </p>
@@ -891,8 +852,6 @@ export function HistoryTab({
                   <option value="idpel-desc">IDPEL: 9 → 0</option>
                   <option value="service-asc">Layanan: A → Z</option>
                   <option value="service-desc">Layanan: Z → A</option>
-                  <option value="status-aktif">Status: Aktif Pertama</option>
-                  <option value="status-inaktif">Status: Nonaktif Pertama</option>
                 </select>
               </div>
 
@@ -911,78 +870,15 @@ export function HistoryTab({
             </div>
           </div>
 
-          {/* Row 2: Status & Quick Date Range Segmented Buttons */}
-          <div className="pt-2 border-t border-slate-200/70 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-            {/* Left: Status Filter */}
-            <div className="lg:col-span-5 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
-                Status:
-              </span>
-              <div className="flex-1 inline-flex bg-slate-200/70 p-1 rounded-xl gap-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    statusFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>Semua</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                    statusFilter === 'all' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'
-                  }`}>
-                    {statusCounts.all}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setStatusFilter('aktif'); setCurrentPage(1); }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    statusFilter === 'aktif'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === 'aktif' ? 'bg-white' : 'bg-emerald-500'}`} />
-                  <span>Aktif</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                    statusFilter === 'aktif' ? 'bg-emerald-700/80 text-white' : 'text-slate-500'
-                  }`}>
-                    {statusCounts.aktif}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setStatusFilter('tidak_aktif'); setCurrentPage(1); }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    statusFilter === 'tidak_aktif'
-                      ? 'bg-slate-800 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === 'tidak_aktif' ? 'bg-white' : 'bg-slate-400'}`} />
-                  <span>Nonaktif</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                    statusFilter === 'tidak_aktif' ? 'bg-slate-700 text-white' : 'text-slate-500'
-                  }`}>
-                    {statusCounts.tidakAktif}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right: Date Presets & Custom Date Trigger */}
-            <div className="lg:col-span-7 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
-                Waktu:
-              </span>
-              <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar">
-                <button
-                  type="button"
-                  onClick={() => { resetDateFilter(); setCurrentPage(1); }}
+          {/* Row 2: Date Presets & Custom Date Trigger */}
+          <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
+              Waktu:
+            </span>
+            <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => { resetDateFilter(); setCurrentPage(1); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
                     !startDate && !endDate
                       ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
@@ -1045,7 +941,6 @@ export function HistoryTab({
                 </div>
               </div>
             </div>
-          </div>
 
           {/* Row 3: Category Service Filter Segmented Grid */}
           <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center gap-2">
@@ -1093,53 +988,37 @@ export function HistoryTab({
             </div>
           </div>
 
-          {/* Active Filter Chips & Results Count Bar */}
-          <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-slate-700">
-                Menampilkan <strong className="text-slate-900 font-bold">{sortedAndFiltered.length}</strong> dari {transactions.length} transaksi
-              </span>
-              {hasActiveFilters && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-slate-300">|</span>
-                  <span className="text-[11px] text-slate-400 font-medium">Filter aktif:</span>
-                  {searchTerm && (
-                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                      Cari: &ldquo;{searchTerm}&rdquo;
-                      <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {statusFilter !== 'all' && (
-                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                      Status: {statusFilter === 'aktif' ? 'Aktif' : 'Tidak Aktif'}
-                      <button onClick={() => { setStatusFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {serviceFilter !== 'all' && (
-                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                      Layanan: {getCategoryLabel(serviceFilter as BillCategory)}
-                      <button onClick={() => { setServiceFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {(startDate || endDate) && (
-                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                      Periode: {startDate || '...'} s/d {endDate || '...'}
-                      <button onClick={() => { resetDateFilter(); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+          {/* Active Filter Chips Bar */}
+          {hasActiveFilters && (
+            <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-400 font-medium">Filter aktif:</span>
+                {searchTerm && (
+                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                    Cari: &ldquo;{searchTerm}&rdquo;
+                    <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {serviceFilter !== 'all' && (
+                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                    Layanan: {getCategoryLabel(serviceFilter as BillCategory)}
+                    <button onClick={() => { setServiceFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {(startDate || endDate) && (
+                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
+                    Periode: {startDate || '...'} s/d {endDate || '...'}
+                    <button onClick={() => { resetDateFilter(); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
 
-            {hasActiveFilters && (
               <button
                 type="button"
                 onClick={resetAllFilters}
@@ -1147,8 +1026,8 @@ export function HistoryTab({
               >
                 Hapus Semua Filter
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Transactions Table with Sortable Columns */}
@@ -1156,12 +1035,8 @@ export function HistoryTab({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
             <div>
               <h3 className="font-bold text-sm text-slate-800">
-                Daftar Transaksi ({sortedAndFiltered.length} dari {transactions.length})
+                Daftar Transaksi
               </h3>
-              <p className="text-[11px] text-slate-400">
-                Menampilkan {paginatedList.length > 0 ? (validCurrentPage - 1) * pageSize + 1 : 0} -{' '}
-                {Math.min(validCurrentPage * pageSize, sortedAndFiltered.length)} dari {sortedAndFiltered.length} transaksi
-              </p>
             </div>
 
             {/* Page Size Selector */}
@@ -1243,23 +1118,13 @@ export function HistoryTab({
                       {renderSortIndicator('total')}
                     </div>
                   </th>
-                  <th
-                    onClick={() => handleColumnSortClick('status')}
-                    className="p-3 cursor-pointer hover:bg-slate-200/70 transition-colors group text-center"
-                    title="Klik untuk sortir Status"
-                  >
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span>Status</span>
-                      {renderSortIndicator('status')}
-                    </div>
-                  </th>
                   <th className="p-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {sortedAndFiltered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-slate-400">
+                    <td colSpan={7} className="text-center py-12 text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2.5">
                         <AlertCircle className="w-9 h-9 text-slate-300" />
                         <p className="text-sm font-bold text-slate-700">
@@ -1371,32 +1236,7 @@ export function HistoryTab({
                           Tagihan: Rp {Number(tx.rpTagihan || 0).toLocaleString('id-ID')}
                         </p>
                       </td>
-                      <td className="p-3 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onToggleStatus) onToggleStatus(tx);
-                          }}
-                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer ${
-                            tx.status === 'tidak_aktif'
-                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-500 border-slate-300'
-                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
-                          }`}
-                          title={
-                            tx.status === 'tidak_aktif'
-                              ? 'Status saat ini: Tidak Aktif. Klik untuk mengubah ke Aktif'
-                              : 'Status saat ini: Aktif. Klik untuk mengubah ke Tidak Aktif'
-                          }
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              tx.status === 'tidak_aktif' ? 'bg-slate-400' : 'bg-emerald-500'
-                            }`}
-                          />
-                          <span>{tx.status === 'tidak_aktif' ? 'Tidak Aktif' : 'Aktif'}</span>
-                        </button>
-                      </td>
+
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
@@ -1450,18 +1290,13 @@ export function HistoryTab({
 
           {/* Table Footer Summary */}
           {sortedAndFiltered.length > 0 && (
-            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between items-center text-xs text-slate-600 gap-2">
+            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-end items-center text-xs text-slate-600 gap-4">
               <span>
-                Menampilkan <strong>{paginatedList.length}</strong> dari <strong>{sortedAndFiltered.length}</strong> transaksi terpilih
+                Total Tagihan: <strong>Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
               </span>
-              <div className="flex items-center gap-4">
-                <span>
-                  Total Tagihan: <strong>Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
-                </span>
-                <span className="text-blue-700 font-bold">
-                  Total Bayar: Rp {totalOmset.toLocaleString('id-ID')}
-                </span>
-              </div>
+              <span className="text-blue-700 font-bold">
+                Total Bayar: Rp {totalOmset.toLocaleString('id-ID')}
+              </span>
             </div>
           )}
 

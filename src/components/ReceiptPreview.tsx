@@ -15,6 +15,7 @@ import {
   Zap,
   FileText,
   Sparkles,
+  History,
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
@@ -48,6 +49,7 @@ interface ReceiptPreviewProps {
   onReset?: () => void;
   savedStatus: boolean;
   historyCount?: number;
+  onViewHistory?: () => void;
 }
 
 interface DownloadedModalState {
@@ -56,7 +58,15 @@ interface DownloadedModalState {
   fileName: string;
 }
 
-export function ReceiptPreview({ receipt, onPrint, onSave, onReset, savedStatus, historyCount = 0 }: ReceiptPreviewProps) {
+export function ReceiptPreview({
+  receipt,
+  onPrint,
+  onSave,
+  onReset,
+  savedStatus,
+  historyCount = 0,
+  onViewHistory,
+}: ReceiptPreviewProps) {
   const [previewMode, setPreviewMode] = useState<'a6' | 'dotmatrix'>('a6');
   const [dotMatrixFontSize, setDotMatrixFontSize] = useState<DotMatrixFontSize>('normal');
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
@@ -490,17 +500,28 @@ export function ReceiptPreview({ receipt, onPrint, onSave, onReset, savedStatus,
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
       <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
             <span>Preview</span>
           </h3>
           {/* Angka Jumlah Riwayat yang mencolok agak besar */}
           <span
-            className="inline-flex items-center justify-center font-black text-2xl sm:text-3xl text-blue-600 bg-blue-50/90 border-2 border-blue-400 px-3.5 py-0.5 rounded-xl shadow-xs min-w-[46px] leading-tight select-none"
-            title={`Total ${historyCount} data riwayat transaksi`}
+            onClick={onViewHistory}
+            className="inline-flex items-center justify-center font-black text-2xl sm:text-3xl text-blue-600 bg-blue-50/90 border-2 border-blue-400 px-3.5 py-0.5 rounded-xl shadow-xs min-w-[46px] leading-tight select-none cursor-pointer hover:bg-blue-100 transition-colors"
+            title={`Total ${historyCount} data riwayat transaksi (Klik untuk buka Riwayat)`}
           >
             {historyCount}
           </span>
+          {/* Tombol Riwayat di antara angka dan simpan */}
+          <button
+            type="button"
+            onClick={onViewHistory}
+            className="text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Buka tab Riwayat Transaksi"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>Riwayat</span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {savedStatus && (

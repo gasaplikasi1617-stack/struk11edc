@@ -73,9 +73,14 @@ export function getAutoSyncInterval(): number {
   const val = localStorage.getItem(STORAGE_KEY_SYNC_INTERVAL);
   if (val) {
     const num = parseInt(val, 10);
+    // Jika masih nilai default lama (30 detik), perbarui ke default baru 2 menit (120 detik)
+    if (num === 30) {
+      localStorage.setItem(STORAGE_KEY_SYNC_INTERVAL, '120');
+      return 120;
+    }
     if (!isNaN(num) && num >= 15) return num;
   }
-  return 30; // Default 30 detik
+  return 120; // Default 2 menit (120 detik)
 }
 
 export function setAutoSyncInterval(seconds: number): void {

@@ -878,9 +878,9 @@ export function GasIntegrationTab({
                       className="bg-white border border-slate-300 text-slate-800 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 font-semibold shadow-xs"
                     >
                       <option value={15}>Setiap 15 Detik (Sangat Cepat)</option>
-                      <option value={30}>Setiap 30 Detik (Direkomendasikan)</option>
+                      <option value={30}>Setiap 30 Detik</option>
                       <option value={60}>Setiap 1 Menit</option>
-                      <option value={120}>Setiap 2 Menit</option>
+                      <option value={120}>Setiap 2 Menit (Default)</option>
                       <option value={300}>Setiap 5 Menit</option>
                       <option value={600}>Setiap 10 Menit</option>
                       <option value={1200}>Setiap 20 Menit</option>

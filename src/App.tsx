@@ -484,6 +484,7 @@ export default function App() {
                   onReset={handleResetForm}
                   savedStatus={savedStatus}
                   historyCount={transactions.length}
+                  onViewHistory={() => setActiveTab('history')}
                 />
               </div>
             </div>
