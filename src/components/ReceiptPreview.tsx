@@ -811,14 +811,14 @@ export function ReceiptPreview({
           onClick={handleOpenJspmModal}
           disabled={isJspmPrinting}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-400"
-          title="Cetak langsung ke Epson LX-310 via JSPrintManager (AI Auto-Discovery, RAW ESC/P)"
+          title="Cetak langsung ke Epson LX-310 via JsPrint (RAW ESC/P)"
         >
           {isJspmPrinting ? (
             <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
           ) : (
             <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
           )}
-          <span>Cetak JSPrintManager (Auto AI)</span>
+          <span>JsPrint</span>
         </button>
 
         <button

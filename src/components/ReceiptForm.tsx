@@ -426,17 +426,8 @@ export function ReceiptForm({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
-              <span>ID Transaksi (Identitas Resi)</span>
-              <button
-                type="button"
-                onClick={() => handleInputChange('id', generateRandomTransactionId())}
-                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200"
-                title="Acak nomor ID Transaksi baru"
-              >
-                <RefreshCw className="w-2.5 h-2.5" />
-                <span>Acak ID</span>
-              </button>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              ID Transaksi
             </label>
             <input
               type="text"
@@ -458,17 +449,14 @@ export function ReceiptForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-              <span>Bulan Tagihan / Periode</span>
-              <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-medium">
-                Contoh: Sept26 / Okt26
-              </span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Bulan Tagihan / Periode
             </label>
             <input
               type="text"
               value={receipt.bulanTagihan || ''}
               onChange={(e) => handleInputChange('bulanTagihan', e.target.value)}
-              placeholder="Contoh: Sept26 / Okt26"
+              placeholder="Bulan Tagihan / Periode"
               className="w-full text-sm border-2 border-blue-300 focus:border-blue-500 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-400 outline-none font-semibold text-blue-900 bg-blue-50/40"
             />
           </div>
@@ -604,7 +592,7 @@ export function ReceiptForm({
             title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi ke riwayat"
           >
             <Printer className="w-4 h-4" />
-            <span>Cetak Resi (Otomatis Simpan)</span>
+            <span>Cetak</span>
           </button>
         </div>
       </div>
