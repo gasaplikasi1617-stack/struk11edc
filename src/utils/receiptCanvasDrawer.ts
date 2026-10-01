@@ -1,6 +1,7 @@
 import { ReceiptData } from '../types';
 import { formatReceiptDateTime } from './dateFormatter';
 import { getReceiptHeaderTitle } from './billParser';
+import { formatTerbilang } from './terbilang';
 
 /**
  * Pure HTML5 Canvas 2D renderer for A6 Receipt.
@@ -151,7 +152,20 @@ export function drawReceiptToCanvas(receipt: ReceiptData): HTMLCanvasElement {
   curY += 46;
 
   drawSolidLine(curY, 3);
-  curY += 30;
+  curY += 16;
+
+  // --- TERBILANG ---
+  const terbilangStr = `Terbilang: ${formatTerbilang(Number(receipt.totalBayar || 0))}`;
+  ctx.save();
+  ctx.font = `italic 15px ${fontMono}`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000000';
+  if (terbilangStr.length > 58) {
+    ctx.font = `italic 13px ${fontMono}`;
+  }
+  ctx.fillText(terbilangStr, width / 2, curY);
+  ctx.restore();
+  curY += 28;
 
   // --- FOOTER THANKS ---
   ctx.font = `bold 18px ${fontMono}`;

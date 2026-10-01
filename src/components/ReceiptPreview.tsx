@@ -20,6 +20,7 @@ import html2canvas from 'html2canvas-pro';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
 import { getReceiptHeaderTitle } from '../utils/billParser';
+import { formatTerbilang } from '../utils/terbilang';
 import {
   printDotMatrixReceipt,
   printRawTextLX310,
@@ -630,11 +631,16 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
           </div>
 
           {/* Total Bayar */}
-          <div className="py-2.5 mb-4 text-center text-black border-y-2 border-black bg-transparent">
+          <div className="py-2.5 mb-2 text-center text-black border-y-2 border-black bg-transparent">
             <div className="text-[10px] text-black uppercase font-bold tracking-wider">Total Pembayaran</div>
             <div className="text-base font-extrabold text-black mt-0.5">
               Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
             </div>
+          </div>
+
+          {/* Terbilang */}
+          <div className="text-center text-[10px] italic font-semibold text-black px-1 pb-3">
+            Terbilang: {formatTerbilang(Number(receipt.totalBayar || 0))}
           </div>
 
           {/* Footer Thanks */}
@@ -645,15 +651,18 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
         </div>
       ) : (
         /* Dot Matrix 21.6 x 6.95 cm Continuous Text Preview */
-        <div className="w-full bg-amber-50/70 border border-amber-300 rounded-2xl p-4 my-2 font-serif text-slate-950 shadow-xs overflow-x-auto">
+        <div className="w-full bg-amber-50/70 border border-amber-300 rounded-2xl p-4 my-2 font-mono text-slate-950 shadow-xs overflow-x-auto">
           {/* Top Header Centered, Bold, Larger Font (Bukopin PPOB Style) */}
-          <div className="text-center pb-2 mb-3 border-b border-dashed border-amber-300/80">
-            <h2 className="text-base font-extrabold uppercase tracking-wide text-slate-950">
+          <div className="text-center pb-2.5 mb-3 border-b-2 border-dashed border-slate-900">
+            <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-slate-950 font-bold">
               {getReceiptHeaderTitle(receipt)}
             </h2>
-            <div className="text-xs font-bold text-slate-800 uppercase mt-0.5">
+            <div className="text-xs font-bold text-slate-950 uppercase mt-1 tracking-wide">
               LOKET: {receipt.namaAgen || 'AGEN BATARA'} {receipt.alamat ? ` - ${receipt.alamat}` : ''}
             </div>
+            {receipt.noHp && (
+              <div className="text-[11px] font-bold text-slate-900 mt-0.5">Telp/WA: {receipt.noHp}</div>
+            )}
           </div>
 
           <div className="min-w-[620px] grid grid-cols-2 gap-6">
@@ -695,14 +704,14 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
               </div>
 
               <div className="text-[10px] text-slate-600 font-normal pt-2">
-                *Tanpa Garis / Polos | Font Roman Dot Matrix (Single-Pass Normal Weight)
+                *Header Bold Resident Font LX-310 | 21.6 cm x 6.95 cm Continuous Form
               </div>
             </div>
 
             {/* Right Col */}
             <div className="pl-2 flex flex-col justify-between">
               <div>
-                <div className="font-normal text-xs text-slate-950 uppercase mb-2">RINCIAN PEMBAYARAN TAGIHAN</div>
+                <div className="font-bold text-xs text-slate-950 uppercase mb-2">RINCIAN PEMBAYARAN TAGIHAN</div>
                 <div className="space-y-1.5 text-xs font-normal">
                   <div className="flex justify-between">
                     <span className="text-slate-800">{receipt.rincianTagihan || 'Tagihan Pembayaran'}</span>
@@ -720,15 +729,19 @@ export function ReceiptPreview({ receipt, onPrint, onSave, savedStatus, historyC
                   </div>
                 </div>
 
-                <div className="my-3 py-2 px-2 flex justify-between font-normal text-base text-slate-950 bg-amber-200/90 rounded-lg">
+                <div className="my-2 py-2 px-2 flex justify-between font-bold text-base text-slate-950 bg-amber-200/90 rounded-lg border border-amber-300">
                   <span>TOTAL BAYAR</span>
                   <span>Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="text-[10px] italic font-bold text-slate-950 text-center pb-1 px-1">
+                  Terbilang: {formatTerbilang(Number(receipt.totalBayar || 0))}
                 </div>
               </div>
 
               <div className="text-center text-xs text-slate-900 pt-2 font-normal space-y-0.5">
-                <div>TERIMA KASIH ATAS PEMBAYARAN ANDA</div>
-                <div className="text-[10px] text-slate-700 font-normal">Simpan struk ini sebagai bukti pembayaran yang sah.</div>
+                <div className="font-bold">STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH</div>
+                <div className="text-[10px] text-slate-700">TERIMA KASIH ATAS PEMBAYARAN ANDA</div>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { ReceiptData } from '../types';
 import { formatReceiptDateTime } from './dateFormatter';
 import { getReceiptHeaderTitle } from './billParser';
+import { formatTerbilang } from './terbilang';
 
 export type DotMatrixFontSize = 'kecil' | 'normal' | 'sedang';
 
@@ -63,7 +64,6 @@ export function printDotMatrixReceipt(
           font-family: 'Epson Draft', 'Epson Sans Serif', 'Epson Roman', 'Courier New', 'Lucida Console', monospace !important;
           font-size: ${currentSize.base};
           line-height: 1.25;
-          font-weight: 400 !important;
           -webkit-font-smoothing: none !important;
           -moz-osx-font-smoothing: unset !important;
           text-rendering: optimizeSpeed !important;
@@ -94,21 +94,29 @@ export function printDotMatrixReceipt(
           justify-content: space-between;
         }
         .header-box {
-          text-align: left;
+          text-align: center;
           margin-bottom: 5px;
+          padding-bottom: 4px;
+          border-bottom: 1px dashed #000;
         }
         .header-title {
           font-size: ${currentSize.header};
-          font-weight: 400;
+          font-weight: 800 !important;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .header-sub {
           font-size: ${currentSize.sub};
-          font-weight: 400;
+          font-weight: 700 !important;
+          margin-top: 2px;
+        }
+        .header-address {
+          font-size: ${currentSize.sub};
+          font-weight: 700 !important;
         }
         .struk-badge {
           font-size: ${currentSize.badge};
-          font-weight: 400;
+          font-weight: 700 !important;
           text-transform: uppercase;
           margin-top: 2px;
         }
@@ -132,10 +140,10 @@ export function printDotMatrixReceipt(
           word-break: break-all;
         }
         .section-title {
-          font-weight: 400;
+          font-weight: 700;
           font-size: ${currentSize.base};
           text-transform: uppercase;
-          margin-bottom: 5px;
+          margin-bottom: 4px;
         }
         .bill-table {
           width: 100%;
@@ -153,13 +161,22 @@ export function printDotMatrixReceipt(
           font-weight: 400;
         }
         .total-box {
-          padding: 5px 0;
-          margin: 5px 0;
+          padding: 4px 0;
+          margin: 4px 0 2px 0;
           display: flex;
           justify-content: space-between;
           align-items: center;
           font-size: ${currentSize.total};
-          font-weight: 400;
+          font-weight: 700;
+        }
+        .terbilang-box {
+          font-size: ${currentSize.sub};
+          font-style: italic;
+          font-weight: 700;
+          text-align: center;
+          margin-top: 1px;
+          margin-bottom: 3px;
+          word-break: break-word;
         }
         .footer-text {
           text-align: center;
@@ -173,7 +190,9 @@ export function printDotMatrixReceipt(
             height: 6.95cm;
             background: transparent !important;
             font-family: 'Epson Draft', 'Epson Sans Serif', 'Courier New', monospace !important;
-            font-weight: 400 !important;
+          }
+          .header-box, .header-title, .header-sub, .header-address, .struk-badge {
+            font-weight: bold !important;
           }
         }
       </style>
@@ -184,8 +203,10 @@ export function printDotMatrixReceipt(
         <div class="col-left">
           <div>
             <div class="header-box" style="text-align: center; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px dashed #000;">
-              <div class="header-title" style="font-weight: bold; font-size: ${currentSize.header}; text-transform: uppercase;">${strTitle}</div>
-              <div class="header-sub" style="font-weight: bold; margin-top: 2px;">LOKET: ${(receipt.namaAgen || 'AGEN BATARA').toUpperCase()}</div>
+              <div class="header-title" style="font-weight: bold !important; font-size: ${currentSize.header}; text-transform: uppercase;">${strTitle}</div>
+              <div class="header-sub" style="font-weight: bold !important; margin-top: 2px;">LOKET: ${(receipt.namaAgen || 'AGEN BATARA').toUpperCase()}</div>
+              ${receipt.alamat ? `<div class="header-address" style="font-weight: bold !important; font-size: ${currentSize.sub}; margin-top: 1px;">${receipt.alamat}</div>` : ''}
+              ${receipt.noHp ? `<div class="header-address" style="font-weight: bold !important; font-size: ${currentSize.sub};">Telp/WA: ${receipt.noHp}</div>` : ''}
             </div>
 
             <table class="meta-table">
@@ -230,7 +251,7 @@ export function printDotMatrixReceipt(
         <!-- RIGHT COLUMN: BILL DETAILS & TOTAL -->
         <div class="col-right">
           <div>
-            <div class="section-title" style="padding-bottom: 3px; margin-bottom: 4px;">
+            <div class="section-title" style="font-weight: bold; padding-bottom: 3px; margin-bottom: 4px;">
               RINCIAN PEMBAYARAN TAGIHAN
             </div>
 
@@ -251,9 +272,13 @@ export function printDotMatrixReceipt(
               ` : ''}
             </table>
 
-            <div class="total-box" style="margin-top: 6px; padding: 3px 0;">
+            <div class="total-box" style="margin-top: 5px; padding: 3px 0;">
               <span style="font-weight: bold;">TOTAL BAYAR</span>
               <span style="font-weight: bold;">Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}</span>
+            </div>
+
+            <div class="terbilang-box" style="font-size: ${currentSize.sub}; font-style: italic; font-weight: bold; text-align: center; margin-top: 1px; margin-bottom: 3px;">
+              Terbilang: ${formatTerbilang(Number(receipt.totalBayar || 0))}
             </div>
           </div>
 
@@ -317,7 +342,6 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
           font-family: 'Epson Draft', 'Epson Sans Serif', 'Courier New', 'Lucida Console', monospace !important;
           font-size: 10pt;
           line-height: 1.2;
-          font-weight: 400 !important;
           -webkit-font-smoothing: none !important;
         }
         pre {
@@ -327,14 +351,12 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
           font-size: 10pt;
           line-height: 1.2;
           white-space: pre;
-          font-weight: 400 !important;
         }
         @media print {
           html, body, pre {
             background: transparent !important;
             font-family: 'Epson Draft', 'Epson Sans Serif', 'Courier New', monospace !important;
             font-size: 10pt !important;
-            font-weight: 400 !important;
           }
         }
       </style>
@@ -362,7 +384,7 @@ export function printRawTextLX310(receipt: ReceiptData, onSave?: () => void) {
  * Generates pure 80-column plain ASCII text formatted in standard PPOB Bank Bukopin receipt style
  * (without Bukopin logo/name, keeping all original fields intact)
  */
-export function generatePlainTextReceipt(receipt: ReceiptData): string {
+export function generatePlainTextReceipt(receipt: ReceiptData, isEscp: boolean = false): string {
   const strTitle = getReceiptHeaderTitle(receipt);
   const agen = (receipt.namaAgen || 'AGEN BATARA').toUpperCase();
   const idTrx = receipt.id || 'TRX-83920184';
@@ -373,11 +395,11 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const pemakaian = receipt.pemakaian || '-';
   const standStr = receipt.standMeter ? receipt.standMeter : '';
 
-  const rincian = receipt.rincianTagihan || 'Tagihan Pembayaran';
   const rpTagihan = `Rp ${Number(receipt.rpTagihan || 0).toLocaleString('id-ID')}`;
   const rpAdmin = `Rp ${Number(receipt.adminBank || 0).toLocaleString('id-ID')}`;
   const rpTotal = `Rp ${Number(receipt.totalBayar || 0).toLocaleString('id-ID')}`;
   const rpLain = Number(receipt.lainLain) > 0 ? `Rp ${Number(receipt.lainLain).toLocaleString('id-ID')}` : '';
+  const terbilangStr = formatTerbilang(Number(receipt.totalBayar || 0));
 
   const center80 = (s: string) => {
     const str = s.trim().slice(0, 78);
@@ -385,8 +407,8 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
     return ' '.repeat(pad) + str;
   };
 
-  const lTitle = center80(strTitle);
-  const lLoket = center80(`LOKET : ${agen}`);
+  const lTitle = isEscp ? `\x1B\x45${center80(strTitle)}\x1B\x46` : center80(strTitle);
+  const lLoket = isEscp ? `\x1B\x45${center80(`LOKET : ${agen}`)}\x1B\x46` : center80(`LOKET : ${agen}`);
 
   // PPOB Bukopin Style 80 Columns Grid Layout
   const l1 = `${('ID TRANSAKSI : ' + idTrx).slice(0, 38).padEnd(38)} | ${('RP TAGIHAN   : ' + rpTagihan).slice(0, 39).padEnd(39)}`;
@@ -396,8 +418,9 @@ export function generatePlainTextReceipt(receipt: ReceiptData): string {
   const l5 = `${('PERIODE/BLN  : ' + periode).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l6 = `${('PEMAKAIAN    : ' + pemakaian).slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
   const l7 = `${(standStr ? 'STAND METER  : ' + standStr : '').slice(0, 38).padEnd(38)} | ${' '.repeat(39)}`;
+  const lTerbilang = center80(`Terbilang: ${terbilangStr}`);
   const l8 = center80('STRUK INI MERUPAKAN BUKTI PEMBAYARAN YANG SAH');
   const l9 = center80('TERIMA KASIH ATAS PEMBAYARAN ANDA');
 
-  return [lTitle, lLoket, l1, l2, l3, l4, l5, l6, l7, l8, l9].join('\n');
+  return [lTitle, lLoket, l1, l2, l3, l4, l5, l6, l7, lTerbilang, l8, l9].join('\n');
 }

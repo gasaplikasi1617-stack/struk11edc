@@ -333,7 +333,7 @@ export async function printDirectJSPM(
 
   onProgress?.(`Mengirim data cetak RAW ke: ${targetPrinter}...`);
 
-  const rawText = generatePlainTextReceipt(receipt);
+  const rawText = generatePlainTextReceipt(receipt, true);
 
   const cpj = new JSPM.ClientPrintJob();
 

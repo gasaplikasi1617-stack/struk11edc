@@ -3,6 +3,7 @@ import { AgentConfig, ReceiptData } from '../types';
 import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { formatReceiptDateTime, generateRandomTransactionId } from '../utils/dateFormatter';
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, getCurrentMonthPeriod, getDefaultBulanTagihan, isPdamBill } from '../utils/billParser';
+import { formatTerbilang } from '../utils/terbilang';
 
 interface ReceiptFormProps {
   receipt: ReceiptData;
@@ -599,14 +600,21 @@ export function ReceiptForm({
         </div>
 
         {/* Total calculation banner */}
-        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between">
-          <div>
-            <span className="text-xs uppercase tracking-wider text-blue-600 font-bold">Total Pembayaran Otomatis</span>
-            <p className="text-xs text-slate-500">(Rp Tagihan + Lain-Lain + Admin Bank)</p>
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-blue-600 font-bold">Total Pembayaran Otomatis</span>
+              <p className="text-xs text-slate-500">(Rp Tagihan + Lain-Lain + Admin Bank)</p>
+            </div>
+            <div className="text-2xl font-extrabold text-blue-700">
+              Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
+            </div>
           </div>
-          <div className="text-2xl font-extrabold text-blue-700">
-            Rp {Number(receipt.totalBayar || 0).toLocaleString('id-ID')}
-          </div>
+          {Number(receipt.totalBayar || 0) > 0 && (
+            <div className="mt-2 pt-2 border-t border-blue-200/60 text-xs text-blue-900 italic font-semibold">
+              Terbilang: {formatTerbilang(Number(receipt.totalBayar || 0))}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">

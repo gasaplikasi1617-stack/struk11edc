@@ -36,6 +36,7 @@ import {
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
+import { formatTerbilang } from '../utils/terbilang';
 import {
   executeTwoWaySync,
   forceSyncWithGoogleSheets,
@@ -414,6 +415,7 @@ export function HistoryTab({
       `Layanan: ${tx.rincianTagihan || '-'}\n` +
       `Periode: ${tx.bulanTagihan || '-'}\n` +
       `Total Bayar: Rp ${Number(tx.totalBayar || 0).toLocaleString('id-ID')}\n` +
+      `Terbilang: ${formatTerbilang(Number(tx.totalBayar || 0))}\n` +
       `-----------------------------------\n` +
       `Terima kasih atas pembayaran Anda.`
     );

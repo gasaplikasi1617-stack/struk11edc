@@ -91,7 +91,7 @@ export async function printDirectQZTray(
     throw new Error('Printer Epson LX-310 tidak ditemukan di komputer. Pastikan kabel USB terhubung.');
   }
 
-  const rawText = generatePlainTextReceipt(receipt);
+  const rawText = generatePlainTextReceipt(receipt, true);
 
   // ESC/P Commands specifically tuned for Continuous Form 21.6 cm x 6.95 cm (8.5" x 2.73")
   const data = [
