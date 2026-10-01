@@ -1627,8 +1627,10 @@ app.post("/api/gas/sync", async (req, res) => {
       }
     }
 
-    // 3. Merge both datasets cleanly
-    const { merged, newFromSheet, newFromLocal } = mergeTransactions(localTxs, remoteTxs);
+    // 3. Merge both datasets cleanly (Ambil data server tersegar saat respons jaringan tiba agar data baru tidak terhapus)
+    const currentServerTxs = getTransactions();
+    const { merged: combinedLocal } = mergeTransactions(currentServerTxs, localTxs);
+    const { merged, newFromSheet, newFromLocal } = mergeTransactions(combinedLocal, remoteTxs);
 
     // 4. If there were local transactions not yet sent to Google Sheets, push them now
     if (newFromLocal.length > 0 && pushedCount === 0) {

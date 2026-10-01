@@ -15,6 +15,55 @@ const STORAGE_KEY_TXS = 'batara_transactions_backup';
 const STORAGE_KEY_LAST_SYNC = 'batara_last_synced_at';
 const STORAGE_KEY_AUTO_SYNC = 'batara_auto_sync_enabled';
 const STORAGE_KEY_SYNC_INTERVAL = 'batara_auto_sync_interval';
+const STORAGE_KEY_PENDING_SAVES = 'batara_pending_saves';
+
+/**
+ * PENDING SAVE QUEUE
+ * Melindungi data input/cetak baru dari benturan (race condition)
+ * jika pengguna menyimpan atau mencetak saat sinkronisasi background sedang berjalan.
+ */
+export function getPendingSaves(): ReceiptData[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PENDING_SAVES);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function registerPendingSave(tx: ReceiptData): void {
+  if (!tx || !tx.id) return;
+  try {
+    const current = getPendingSaves();
+    const updated = [tx, ...current.filter((t) => t.id !== tx.id)].slice(0, 100);
+    localStorage.setItem(STORAGE_KEY_PENDING_SAVES, JSON.stringify(updated));
+  } catch {}
+
+  // Jika proses sinkronisasi sedang berjalan saat data disimpan/dicetak,
+  // tandai agar segera menjalankan sinkronisasi lanjutan (follow-up sync)
+  if (isSyncInProgress) {
+    hasPendingSyncFollowUp = true;
+  }
+}
+
+export function clearPendingSaves(syncedIds?: string[]): void {
+  try {
+    if (!syncedIds || syncedIds.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_PENDING_SAVES);
+      return;
+    }
+    const current = getPendingSaves();
+    const syncedSet = new Set(syncedIds);
+    const remaining = current.filter((t) => !syncedSet.has(t.id));
+    if (remaining.length > 0) {
+      localStorage.setItem(STORAGE_KEY_PENDING_SAVES, JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_PENDING_SAVES);
+    }
+  } catch {}
+}
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -424,9 +473,21 @@ export function isValidTransaction(t: any): boolean {
   return true;
 }
 
+export function getTxTime(t: any): number {
+  if (!t) return 0;
+  const time = new Date(t.updatedAt || t.createdAt || 0).getTime();
+  if (!isNaN(time) && time > 0) return time;
+  if (t.id && String(t.id).startsWith('TX-')) {
+    const parsedNum = Number(String(t.id).replace('TX-', ''));
+    if (!isNaN(parsedNum) && parsedNum > 1000000000) return parsedNum;
+  }
+  return 0;
+}
+
 /**
  * Gabung daftar transaksi lokal & cloud tanpa duplikasi,
- * DILENGKAPI FILTER ANTI-BANGKIT (Mencegah transaksi yang sudah dihapus / direset muncul kembali)
+ * DILENGKAPI FILTER ANTI-BANGKIT & PROTEKSI DATA TERBARU
+ * Menjamin transaksi yang baru saja dicetak atau disimpan tidak akan pernah tertimpa oleh data sinkron lama!
  */
 export function mergeTransactions(
   localList: ReceiptData[],
@@ -436,53 +497,74 @@ export function mergeTransactions(
   const deletedIds = getDeletedTransactionIds();
   const resetTime = getLastResetTimestamp();
 
-  // Masukkan data remote HANYA jika valid, bukan transaksi yang sudah dihapus, atau sebelum waktu reset
-  remoteList.filter(isValidTransaction).forEach((t) => {
+  // 1. Masukkan data remote HANYA jika valid, bukan transaksi yang sudah dihapus, atau sebelum waktu reset
+  (remoteList || []).filter(isValidTransaction).forEach((t) => {
     const id = t.id || `TX-${new Date(t.createdAt || Date.now()).getTime()}`;
-    // Jika sudah dihapus oleh pengguna, jangan pernah dimasukkan lagi!
     if (deletedIds.has(id)) return;
     if (t.idpel && deletedIds.has(t.idpel)) return;
 
-    // Jika ada waktu reset tutup buku, lewati transaksi lama yang dibuat sebelum waktu reset
     if (resetTime > 0) {
-      let tTime = 0;
-      if (t.createdAt) {
-        tTime = new Date(t.createdAt).getTime();
-      }
-      if (!tTime && t.id && String(t.id).startsWith('TX-')) {
-        const parsedNum = Number(String(t.id).replace('TX-', ''));
-        if (!isNaN(parsedNum) && parsedNum > 1000000000) tTime = parsedNum;
-      }
-      if (tTime > 0 && tTime < resetTime) {
-        return; // Lewati data lama sebelum tutup buku!
-      }
+      const tTime = getTxTime(t);
+      if (tTime > 0 && tTime < resetTime) return;
     }
 
     map.set(id, { ...t, id, idpel: cleanIdpel(t.idpel) });
   });
 
-  // Masukkan/Pertahankan data lokal (yang valid dan tidak dihapus)
-  localList.filter(isValidTransaction).forEach((t) => {
-    if (t.id && !deletedIds.has(t.id) && !map.has(t.id)) {
-      map.set(t.id, { ...t, idpel: cleanIdpel(t.idpel) });
+  // 2. Masukkan & Pertahankan data lokal (Lokal yang baru diinput/dicetak selalu diutamakan)
+  (localList || []).filter(isValidTransaction).forEach((t) => {
+    if (!t.id || deletedIds.has(t.id)) return;
+    if (t.idpel && deletedIds.has(t.idpel)) return;
+
+    if (map.has(t.id)) {
+      const existing = map.get(t.id)!;
+      const remoteTime = getTxTime(existing);
+      const localTime = getTxTime(t);
+      // Jika data lokal lebih baru atau sama baru atau punya metadata agen, utamakan versi lokal
+      if (localTime >= remoteTime || (!existing.namaAgen && t.namaAgen)) {
+        map.set(t.id, { ...existing, ...t, id: t.id, idpel: cleanIdpel(t.idpel) });
+      }
+    } else {
+      map.set(t.id, { ...t, id: t.id, idpel: cleanIdpel(t.idpel) });
+    }
+  });
+
+  // 3. Selalu pertahankan transaksi pending save (yang baru saja disimpan/dicetak)
+  // Menjamin 100% data yang baru diinput tidak akan pernah dibuang oleh sinkronisasi!
+  const pending = getPendingSaves();
+  pending.forEach((ptx) => {
+    if (ptx && ptx.id && !deletedIds.has(ptx.id)) {
+      map.set(ptx.id, { ...ptx, idpel: cleanIdpel(ptx.idpel) });
     }
   });
 
   // Urutkan dari transaksi terbaru (waktu menurun)
   return Array.from(map.values()).sort((a, b) => {
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
+    const timeA = getTxTime(a);
+    const timeB = getTxTime(b);
     return timeB - timeA;
   });
 }
 
 let isSyncInProgress = false;
+let hasPendingSyncFollowUp = false;
+
+function finishSyncSession() {
+  isSyncInProgress = false;
+  if (hasPendingSyncFollowUp) {
+    hasPendingSyncFollowUp = false;
+    setTimeout(() => {
+      executeTwoWaySync().catch(() => {});
+    }, 400);
+  }
+}
 
 /**
- * SINKRONISASI 2 ARAH CERDAS (TWO-WAY SYNC)
+ * SINKRONISASI 2 ARAH CERDAS & AMAN DARI RACE CONDITION (TWO-WAY SYNC)
  * 1. Kirim transaksi lokal ke Google Sheets (Sheets menambah yang belum ada).
  * 2. Ambil seluruh data transaksi lengkap dari Google Sheets.
- * 3. Simpan gabungan data ke state & local storage.
+ * 3. Ambil data lokal TERSEGAR saat respons tiba, lalu gabungkan secara dinamis.
+ * 4. Jika ada simpan/cetak saat sinkron sedang berjalan, otomatis jadwalkan follow-up sync.
  */
 export async function executeTwoWaySync(
   customGasUrl?: string,
@@ -495,10 +577,15 @@ export async function executeTwoWaySync(
   totalInSheet: number;
 }> {
   if (isSyncInProgress) {
+    // Sinyalkan bahwa ada request/simpan saat ini, jadwalkan follow-up sync setelah sync aktif selesai
+    hasPendingSyncFollowUp = true;
+    const freshStored = getStoredTransactions();
+    const pending = getPendingSaves();
+    const currentCombined = mergeTransactions([...pending, ...freshStored], currentLocalTxs || []);
     return {
       success: true,
-      message: 'Sinkronisasi sedang berlangsung...',
-      mergedTransactions: currentLocalTxs || getStoredTransactions(),
+      message: 'Sinkronisasi sedang berlangsung, data terbaru telah diamankan...',
+      mergedTransactions: currentCombined,
       pushedToSheet: 0,
       totalInSheet: currentSyncState.totalInSheet,
     };
@@ -508,31 +595,84 @@ export async function executeTwoWaySync(
   notifySyncListeners({ status: 'syncing', lastError: null });
 
   const gasUrl = normalizeGasUrl(customGasUrl || getStoredGasUrl());
-  const localList = currentLocalTxs || getStoredTransactions();
+  const pending = getPendingSaves();
+  const initialLocal = currentLocalTxs || getStoredTransactions();
+  const localList = mergeTransactions(pending, initialLocal);
 
-  // 1. Coba lewat API backend internal terlebih dahulu
   try {
-    const res = await fetch('/api/gas/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gasUrl, transactions: localList }),
-    });
-    const text = await res.text();
-    if (text.startsWith('{') || text.startsWith('[')) {
-      const data = JSON.parse(text);
-      if (data.success) {
-        const remoteData: ReceiptData[] = Array.isArray(data.detail?.data)
-          ? data.detail.data
-          : Array.isArray(data.data)
-          ? data.data
-          : [];
+    // 1. Coba lewat API backend internal terlebih dahulu
+    try {
+      const res = await fetch('/api/gas/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasUrl, transactions: localList }),
+      });
+      const text = await res.text();
+      if (text.startsWith('{') || text.startsWith('[')) {
+        const data = JSON.parse(text);
+        if (data.success) {
+          const remoteData: ReceiptData[] = Array.isArray(data.detail?.data)
+            ? data.detail.data
+            : Array.isArray(data.data)
+            ? data.data
+            : [];
+          
+          // Re-read FRESH local storage saat respons jaringan kembali agar data yang baru disimpan TIDAK HILANG
+          const freshStored = getStoredTransactions();
+          const latestPending = getPendingSaves();
+          const allFreshLocal = mergeTransactions([...latestPending, ...freshStored], localList);
+          const merged = mergeTransactions(allFreshLocal, remoteData);
+          saveStoredTransactions(merged);
+
+          clearPendingSaves(localList.map((t) => t.id));
+
+          const now = new Date().toISOString();
+          setLastSyncedTime(now);
+
+          const total = data.totalInSheet ?? merged.length;
+          notifySyncListeners(
+            {
+              status: 'synced',
+              lastSyncedAt: now,
+              lastError: null,
+              totalInSheet: total,
+            },
+            merged
+          );
+          finishSyncSession();
+
+          return {
+            success: true,
+            message: data.message || 'Sinkronisasi 2 arah berhasil dengan Google Sheets!',
+            mergedTransactions: merged,
+            pushedToSheet: data.pushedToSheet ?? 0,
+            totalInSheet: total,
+          };
+        }
+      }
+    } catch (backendErr: any) {
+      console.warn('Backend proxy sync failed, trying direct sync:', backendErr.message);
+    }
+
+    // 2. Fallback: Panggilan langsung ke Google Apps Script
+    try {
+      const gasRes = await directGasCall(gasUrl, 'twoWaySync', { transactions: localList });
+      if (gasRes && gasRes.success) {
+        const remoteData: ReceiptData[] = Array.isArray(gasRes.data) ? gasRes.data : [];
         
-        const merged = mergeTransactions(localList, remoteData);
+        // Re-read FRESH local storage
+        const freshStored = getStoredTransactions();
+        const latestPending = getPendingSaves();
+        const allFreshLocal = mergeTransactions([...latestPending, ...freshStored], localList);
+        const merged = mergeTransactions(allFreshLocal, remoteData);
         saveStoredTransactions(merged);
+
+        clearPendingSaves(localList.map((t) => t.id));
+
         const now = new Date().toISOString();
         setLastSyncedTime(now);
 
-        const total = data.totalInSheet ?? merged.length;
+        const total = gasRes.totalInSheet ?? merged.length;
         notifySyncListeners(
           {
             status: 'synced',
@@ -542,57 +682,26 @@ export async function executeTwoWaySync(
           },
           merged
         );
-        isSyncInProgress = false;
+        finishSyncSession();
 
         return {
           success: true,
-          message: data.message || 'Sinkronisasi 2 arah berhasil dengan Google Sheets!',
+          message: 'Sinkronisasi 2 arah berhasil langsung dengan Google Sheets!',
           mergedTransactions: merged,
-          pushedToSheet: data.pushedToSheet ?? 0,
+          pushedToSheet: gasRes.pushedToSheet ?? 0,
           totalInSheet: total,
         };
       }
+      throw new Error(gasRes?.error || 'Gagal sinkronisasi');
+    } catch (directErr: any) {
+      const errMsg = directErr.message || 'Gagal terhubung ke Google Apps Script';
+      notifySyncListeners({ status: 'error', lastError: errMsg });
+      finishSyncSession();
+      throw new Error(errMsg);
     }
-  } catch (backendErr: any) {
-    console.warn('Backend proxy sync failed, trying direct sync:', backendErr.message);
-  }
-
-  // 2. Fallback: Panggilan langsung ke Google Apps Script
-  try {
-    const gasRes = await directGasCall(gasUrl, 'twoWaySync', { transactions: localList });
-    if (gasRes && gasRes.success) {
-      const remoteData: ReceiptData[] = Array.isArray(gasRes.data) ? gasRes.data : [];
-      const merged = mergeTransactions(localList, remoteData);
-      saveStoredTransactions(merged);
-      const now = new Date().toISOString();
-      setLastSyncedTime(now);
-
-      const total = gasRes.totalInSheet ?? merged.length;
-      notifySyncListeners(
-        {
-          status: 'synced',
-          lastSyncedAt: now,
-          lastError: null,
-          totalInSheet: total,
-        },
-        merged
-      );
-      isSyncInProgress = false;
-
-      return {
-        success: true,
-        message: 'Sinkronisasi 2 arah berhasil langsung dengan Google Sheets!',
-        mergedTransactions: merged,
-        pushedToSheet: gasRes.pushedToSheet ?? 0,
-        totalInSheet: total,
-      };
-    }
-    throw new Error(gasRes?.error || 'Gagal sinkronisasi');
-  } catch (directErr: any) {
-    const errMsg = directErr.message || 'Gagal terhubung ke Google Apps Script';
-    notifySyncListeners({ status: 'error', lastError: errMsg });
-    isSyncInProgress = false;
-    throw new Error(errMsg);
+  } catch (err: any) {
+    finishSyncSession();
+    throw err;
   }
 }
 

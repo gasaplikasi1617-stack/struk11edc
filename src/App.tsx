@@ -19,6 +19,8 @@ import {
   addDeletedTransactionId,
   removeDeletedTransactionId,
   deleteGoogleSheetTransaction,
+  registerPendingSave,
+  mergeTransactions,
 } from './services/gasClientSync';
 
 export default function App() {
@@ -96,8 +98,15 @@ export default function App() {
             t.namaPelanggan !== 'BUDI SANTOSO'
         );
         const { cleaned } = deduplicateTransactionList(filtered);
-        setTransactions(cleaned);
-        saveStoredTransactions(cleaned);
+        setTransactions((prev) => {
+          // GABUNGKAN SECARA DINAMIS DENGAN STATE AKTIF SAAT INI (PREV)
+          // Menjamin transaksi yang baru saja dicetak atau disimpan tidak akan terbuang/hilang!
+          const combined = mergeTransactions(prev, cleaned);
+          const finalCleaned = deduplicateTransactionList(combined).cleaned;
+          transactionsRef.current = finalCleaned;
+          saveStoredTransactions(finalCleaned);
+          return finalCleaned;
+        });
       }
     );
 
@@ -231,14 +240,20 @@ export default function App() {
       removeDeletedTransactionId(payload.id);
       if (payload.idpel) removeDeletedTransactionId(payload.idpel);
 
-      const current = [payload, ...transactions.filter((t) => t.id !== payload.id)];
-      const { cleaned } = deduplicateTransactionList(current);
-      const toKeep = cleaned.slice(0, 1000);
-      setTransactions(toKeep);
-      saveStoredTransactions(toKeep);
-      try {
-        localStorage.setItem('agent_batara_txs', JSON.stringify(toKeep));
-      } catch {}
+      // Amankan data ke antrean pending save di sync service agar kebal dari race condition
+      registerPendingSave(payload);
+
+      setTransactions((prev) => {
+        const current = [payload, ...prev.filter((t) => t.id !== payload.id)];
+        const { cleaned } = deduplicateTransactionList(current);
+        const toKeep = cleaned.slice(0, 1000);
+        transactionsRef.current = toKeep;
+        saveStoredTransactions(toKeep);
+        try {
+          localStorage.setItem('agent_batara_txs', JSON.stringify(toKeep));
+        } catch {}
+        return toKeep;
+      });
       setSavedStatus(true);
       setTimeout(() => setSavedStatus(false), 3000);
     } catch (localErr) {
@@ -278,7 +293,13 @@ export default function App() {
             .then((syncRes) => {
               if (syncRes && Array.isArray(syncRes.mergedTransactions)) {
                 const { cleaned } = deduplicateTransactionList(syncRes.mergedTransactions);
-                setTransactions(cleaned);
+                setTransactions((prev) => {
+                  const combined = mergeTransactions(prev, cleaned);
+                  const finalCleaned = deduplicateTransactionList(combined).cleaned;
+                  transactionsRef.current = finalCleaned;
+                  saveStoredTransactions(finalCleaned);
+                  return finalCleaned;
+                });
               }
             })
             .catch(() => {});
