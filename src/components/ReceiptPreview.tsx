@@ -16,8 +16,10 @@ import {
   FileText,
   Sparkles,
   History,
+  FileSpreadsheet,
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
+import { getStoredSheetUrl } from '../services/gasClientSync';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer';
 import { formatReceiptDateTime } from '../utils/dateFormatter';
 import { getReceiptHeaderTitle, getDefaultBulanTagihan, isPdamBill } from '../utils/billParser';
@@ -515,16 +517,18 @@ export function ReceiptPreview({
           >
             {historyCount}
           </span>
-          {/* Tombol Riwayat di antara angka dan simpan */}
-          <button
-            type="button"
-            onClick={onViewHistory}
-            className="text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Buka tab Riwayat Transaksi"
+          {/* Tombol Link ke Google Sheet dengan nama Sheet */}
+          <a
+            href={getStoredSheetUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer border border-emerald-500/60"
+            title="Buka Spreadsheet Database Google Sheets di Tab Baru"
           >
-            <History className="w-3.5 h-3.5" />
-            <span>Riwayat</span>
-          </button>
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Sheet</span>
+            <ExternalLink className="w-3 h-3 opacity-80" />
+          </a>
         </div>
         <div className="flex items-center gap-2">
           {savedStatus && (
