@@ -655,179 +655,175 @@ export function HistoryTab({
   }, [sortedAndFiltered]);
 
   return (
-    <div className="space-y-6">
-      {/* Header & Stats Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-50 p-0.5 border border-slate-200 shrink-0 flex items-center justify-center shadow-xs">
-                <img
-                  src="https://iili.io/nRihMkG.png"
-                  alt="Logo"
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/logo.png';
-                  }}
-                />
+    <div className="space-y-4">
+      {/* Main Professional Data Card */}
+      <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+        {/* Top Header: Title, Live Metrics & Action Toolbar in a unified sleek strip */}
+        <div className="p-3.5 sm:p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 border-b border-slate-200/80 bg-white">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+            {/* Title & Badge */}
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                <span>Riwayat Transaksi</span>
+              </h2>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/80 font-mono">
+                {sortedAndFiltered.length}
+                {hasActiveFilters ? (
+                  <span className="text-slate-400 font-normal"> / {transactions.length}</span>
+                ) : (
+                  <span className="text-slate-400 font-normal"> data</span>
+                )}
+              </span>
+            </div>
+
+            {/* Compact Integrated Metrics (Omset & Admin Bank) */}
+            <div className="flex items-center gap-2.5 sm:gap-4 pl-0 sm:pl-4 sm:border-l border-slate-200">
+              <div className="flex items-center gap-2 bg-emerald-50/70 border border-emerald-200/60 px-2.5 py-1 rounded-lg">
+                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <div className="leading-tight">
+                  <span className="text-[10px] font-medium text-emerald-800 block">Total Omset</span>
+                  <span className="text-xs font-bold text-emerald-700 font-mono">
+                    Rp {totalOmset.toLocaleString('id-ID')}
+                  </span>
+                </div>
               </div>
-              <span>Riwayat</span>
-            </h2>
+
+              <div className="flex items-center gap-2 bg-amber-50/70 border border-amber-200/60 px-2.5 py-1 rounded-lg">
+                <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <div className="leading-tight">
+                  <span className="text-[10px] font-medium text-amber-800 block">Admin Bank</span>
+                  <span className="text-xs font-bold text-amber-700 font-mono">
+                    Rp {totalAdmin.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Export to Excel, Anti-Duplicate & GAS Two-Way Sync Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              id="btn-deduplicate-history"
-              onClick={handleDeduplicate}
-              disabled={isDeduplicating || transactions.length === 0}
-              className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs sm:text-sm font-semibold px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Periksa dan pastikan tidak ada data transaksi yang dobel di riwayat"
-            >
-              <ShieldCheck className={`w-4 h-4 ${isDeduplicating ? 'animate-pulse' : ''}`} />
-              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti'}</span>
-            </button>
-
-            <button
-              id="btn-gas-sync-history"
-              onClick={handleGasSyncClick}
-              disabled={isSyncingGas}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Sinkronisasi 2 arah dengan Google Sheets"
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncingGas ? 'animate-spin' : ''}`} />
-              <span>{isSyncingGas ? 'Sinkronisasi...' : 'Sinkron'}</span>
-            </button>
-
-            <button
-              id="btn-force-sync-sheets"
-              onClick={handleForceSyncFromSheets}
-              disabled={isForceSyncing}
-              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/80"
-              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
-            >
-              <RefreshCw className={`w-4 h-4 ${isForceSyncing ? 'animate-spin' : ''}`} />
-              <span>{isForceSyncing ? 'Menyamakan...' : 'Sinkron sheet'}</span>
-            </button>
-
+          {/* Action Buttons Toolbar */}
+          <div className="flex flex-wrap items-center gap-1.5 self-start xl:self-center">
+            {/* Export Excel */}
             <button
               id="btn-export-excel"
               onClick={handleExportToExcel}
               disabled={sortedAndFiltered.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Export riwayat transaksi ke format Microsoft Excel (.xlsx)"
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Export data tersaring ke format Microsoft Excel (.xlsx)"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Export</span>
               {sortedAndFiltered.length > 0 && (
-                <span className="bg-emerald-700/60 text-emerald-100 text-xs px-2 py-0.5 rounded-full font-mono">
+                <span className="bg-emerald-700/80 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
                   {sortedAndFiltered.length}
                 </span>
               )}
             </button>
 
+            {/* Sinkron GAS */}
+            <button
+              id="btn-gas-sync-history"
+              onClick={handleGasSyncClick}
+              disabled={isSyncingGas}
+              className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Sinkronisasi 2 arah dengan Google Sheets"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
+              <span>{isSyncingGas ? 'Sinkron...' : 'Sinkron'}</span>
+            </button>
+
+            {/* Sinkron Sheets Persis */}
+            <button
+              id="btn-force-sync-sheets"
+              onClick={handleForceSyncFromSheets}
+              disabled={isForceSyncing}
+              className="h-8 px-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/70"
+              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
+              <span>{isForceSyncing ? 'Menyamakan...' : 'Sheet'}</span>
+            </button>
+
+            {/* Anti-Dobel */}
+            <button
+              id="btn-deduplicate-history"
+              onClick={handleDeduplicate}
+              disabled={isDeduplicating || transactions.length === 0}
+              className="h-8 px-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Periksa dan pastikan tidak ada data transaksi yang dobel"
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 ${isDeduplicating ? 'animate-pulse' : ''}`} />
+              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Dobel'}</span>
+            </button>
+
+            {/* Restore Data */}
             <button
               id="btn-restore-data"
               onClick={() => setIsRestoreModalOpen(true)}
-              className="bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Restore / upload data dari file backup JSON atau tarik langsung dari Google Sheets"
+              className="h-8 px-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Restore / upload data dari file backup JSON"
             >
-              <UploadCloud className="w-4 h-4" />
+              <UploadCloud className="w-3.5 h-3.5" />
               <span>Restore</span>
             </button>
 
+            {/* Tutup Buku */}
             <button
               id="btn-monthly-reset"
               onClick={() => setIsMonthlyResetModalOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & kosongkan riwayat untuk bulan baru (0 data)"
+              className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & mulai bulan baru"
             >
-              <Archive className="w-4 h-4" />
-              <span>TTP buku</span>
+              <Archive className="w-3.5 h-3.5" />
+              <span>Tutup Buku</span>
             </button>
 
+            {/* Hapus Data */}
             <button
               id="btn-clear-all-history"
               onClick={handleQuickClearAll}
               disabled={isClearingAll || transactions.length === 0}
-              className="bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 text-xs sm:text-sm font-semibold px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-rose-200 shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Hapus seluruh riwayat transaksi sekarang (fresh 0 data)"
+              className="h-8 px-2 text-rose-600 hover:text-rose-800 hover:bg-rose-50 disabled:opacity-40 text-xs font-semibold rounded-lg transition-all cursor-pointer border border-transparent hover:border-rose-200 inline-flex items-center gap-1"
+              title="Hapus seluruh riwayat transaksi sekarang"
             >
-              <Trash2 className={`w-4 h-4 text-rose-600 ${isClearingAll ? 'animate-bounce' : ''}`} />
-              <span>{isClearingAll ? 'Membersihkan...' : 'Hapus'}</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isClearingAll ? '...' : 'Hapus'}</span>
             </button>
           </div>
         </div>
 
-        {/* Success Alert for Export */}
+        {/* Success Alert for Export or Sync */}
         {exportSuccessNotice && (
-          <div className="mt-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all animate-fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-medium">{exportSuccessNotice}</span>
+          <div className="px-4 py-2 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs flex items-center justify-between gap-2 transition-all animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="font-medium">{exportSuccessNotice}</span>
+            </div>
+            <button
+              onClick={() => setExportSuccessNotice(null)}
+              className="text-emerald-700 hover:text-emerald-900 cursor-pointer p-0.5"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
         )}
 
-        {/* Stat Summary Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="bg-blue-100 text-blue-700 p-2 rounded-lg">
-              <Receipt className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500">
-                {hasActiveFilters ? 'Total Tersaring' : 'Total Riwayat'}
-              </p>
-              <p className="text-sm font-bold text-slate-800">
-                {sortedAndFiltered.length}{' '}
-                <span className="text-slate-400 font-normal text-xs">
-                  {hasActiveFilters ? `dari ${transactions.length} Transaksi` : 'Transaksi'}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500">Total Pembayaran</p>
-              <p className="text-sm font-bold text-emerald-700">
-                Rp {totalOmset.toLocaleString('id-ID')}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500">Total Admin Bank</p>
-              <p className="text-sm font-bold text-amber-700">
-                Rp {totalAdmin.toLocaleString('id-ID')}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Modern Unified Filter & Search Control Panel */}
-        <div className="mt-6 bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-          {/* Row 1: Search + Sort + Reset */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Filter Strip: Unified Search, Time Presets, Sorting & Category Tabs */}
+        <div className="p-3 sm:p-3.5 bg-slate-50/80 border-b border-slate-200 space-y-2.5">
+          {/* Row 1: Search + Date Presets & Inputs + Sort + Page Size */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
             {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="relative w-full lg:w-72 shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="input-search-history"
                 type="text"
-                placeholder="Cari ID transaksi, nama pelanggan, IDPEL, layanan..."
+                placeholder="Cari ID, nama pelanggan, IDPEL, layanan..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full h-10 pl-10 pr-9 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-800 placeholder:text-slate-400 shadow-2xs transition-all"
+                className="w-full h-8 pl-8 pr-7 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-800 placeholder:text-slate-400 shadow-2xs"
               />
               {searchTerm && (
                 <button
@@ -836,66 +832,22 @@ export function HistoryTab({
                     setSearchTerm('');
                     setCurrentPage(1);
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                   title="Hapus pencarian"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               )}
             </div>
 
-            {/* Sort Selector */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 h-10 bg-white border border-slate-300 px-3 rounded-xl shadow-2xs">
-                <ArrowUpDown className="w-4 h-4 text-slate-500 shrink-0" />
-                <span className="text-xs font-semibold text-slate-500 hidden md:inline">Urutan:</span>
-                <select
-                  id="select-sort-criteria"
-                  value={sortCriterion}
-                  onChange={(e) => setSortCriterion(e.target.value as SortCriterion)}
-                  className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
-                >
-                  <option value="date-desc">Tanggal: Terbaru → Terlama</option>
-                  <option value="date-asc">Tanggal: Terlama → Terbaru</option>
-                  <option value="name-asc">Nama Pelanggan: A → Z</option>
-                  <option value="name-desc">Nama Pelanggan: Z → A</option>
-                  <option value="total-desc">Total Bayar: Tertinggi</option>
-                  <option value="total-asc">Total Bayar: Terendah</option>
-                  <option value="idpel-asc">IDPEL: 0 → 9</option>
-                  <option value="idpel-desc">IDPEL: 9 → 0</option>
-                  <option value="service-asc">Layanan: A → Z</option>
-                  <option value="service-desc">Layanan: Z → A</option>
-                </select>
-              </div>
-
-              {/* Reset All Filters button if active */}
-              {hasActiveFilters && (
+            {/* Time Presets & Date Inputs */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="inline-flex items-center bg-white p-0.5 rounded-lg border border-slate-300 shadow-2xs">
                 <button
                   type="button"
-                  onClick={resetAllFilters}
-                  className="h-10 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                  title="Kembalikan semua filter ke pengaturan awal"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Reset Filter</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Row 2: Date Presets & Custom Date Trigger */}
-          <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
-              Waktu:
-            </span>
-            <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => { resetDateFilter(); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                    !startDate && !endDate
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  onClick={() => { resetDateFilter(); setCurrentPage(1); }}
+                  className={`h-6.5 px-2.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                    !startDate && !endDate ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   Semua
@@ -903,10 +855,8 @@ export function HistoryTab({
                 <button
                   type="button"
                   onClick={() => { setTodayFilter(); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                    isTodayActive
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  className={`h-6.5 px-2.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                    isTodayActive ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   Hari Ini
@@ -914,10 +864,8 @@ export function HistoryTab({
                 <button
                   type="button"
                   onClick={() => { setLast7DaysFilter(); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                    isLast7Active
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  className={`h-6.5 px-2.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                    isLast7Active ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   7 Hari
@@ -925,162 +873,131 @@ export function HistoryTab({
                 <button
                   type="button"
                   onClick={() => { setThisMonthFilter(); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                    isThisMonthActive
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  className={`h-6.5 px-2.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                    isThisMonthActive ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   Bulan Ini
                 </button>
+              </div>
 
-                {/* Inline custom date inputs */}
-                <div className="flex items-center gap-1 ml-auto">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
-                    className="h-8 text-[11px] font-medium bg-white border border-slate-300 text-slate-700 rounded-lg px-2 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs cursor-pointer"
-                    title="Tanggal Mulai"
-                  />
-                  <span className="text-slate-400 text-xs">-</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
-                    className="h-8 text-[11px] font-medium bg-white border border-slate-300 text-slate-700 rounded-lg px-2 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs cursor-pointer"
-                    title="Tanggal Selesai"
-                  />
-                </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                  className="h-7 text-[11px] bg-white border border-slate-300 text-slate-700 rounded-md px-1.5 outline-none shadow-2xs cursor-pointer"
+                  title="Mulai"
+                />
+                <span className="text-slate-400 text-xs">-</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                  className="h-7 text-[11px] bg-white border border-slate-300 text-slate-700 rounded-md px-1.5 outline-none shadow-2xs cursor-pointer"
+                  title="Selesai"
+                />
               </div>
             </div>
 
-          {/* Row 3: Category Service Filter Segmented Grid */}
-          <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 w-14">
-              Layanan:
-            </span>
-            <div className="flex-1 flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'all', label: 'Semua Layanan', count: categoryCounts.all },
-                { id: 'pln', label: 'Listrik / PLN', count: categoryCounts.pln },
-                { id: 'pdam', label: 'PDAM / Air', count: categoryCounts.pdam },
-                { id: 'bpjs', label: 'BPJS', count: categoryCounts.bpjs },
-                { id: 'telkom', label: 'Speedy / Telkom', count: categoryCounts.telkom },
-                { id: 'pascabayar', label: 'Pascabayar', count: categoryCounts.pascabayar },
-                { id: 'other', label: 'Lain-lain', count: categoryCounts.other },
-              ].map((cat) => {
-                const isActive = serviceFilter === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      setServiceFilter(cat.id as ServiceFilterType);
-                      setCurrentPage(1);
-                    }}
-                    className={`h-8 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border ${
-                      isActive
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <span>{cat.label}</span>
-                    <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                        isActive
-                          ? 'bg-blue-700 text-white'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200/60'
-                      }`}
-                    >
-                      {cat.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Active Filter Chips Bar */}
-          {hasActiveFilters && (
-            <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] text-slate-400 font-medium">Filter aktif:</span>
-                {searchTerm && (
-                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                    Cari: &ldquo;{searchTerm}&rdquo;
-                    <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {serviceFilter !== 'all' && (
-                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                    Layanan: {getCategoryLabel(serviceFilter as BillCategory)}
-                    <button onClick={() => { setServiceFilter('all'); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {(startDate || endDate) && (
-                  <span className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs">
-                    Periode: {startDate || '...'} s/d {endDate || '...'}
-                    <button onClick={() => { resetDateFilter(); setCurrentPage(1); }} className="hover:text-rose-600 ml-0.5 cursor-pointer">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
+            {/* Sort & Row Count & Reset Filter */}
+            <div className="flex items-center gap-1.5 self-start lg:self-center">
+              <div className="flex items-center gap-1 h-8 bg-white border border-slate-300 px-2 rounded-lg shadow-2xs">
+                <ArrowUpDown className="w-3 h-3 text-slate-400 shrink-0" />
+                <select
+                  id="select-sort-criteria"
+                  value={sortCriterion}
+                  onChange={(e) => setSortCriterion(e.target.value as SortCriterion)}
+                  className="text-[11px] font-semibold text-slate-700 bg-transparent outline-none cursor-pointer"
+                >
+                  <option value="date-desc">Tanggal: Baru → Lama</option>
+                  <option value="date-asc">Tanggal: Lama → Baru</option>
+                  <option value="name-asc">Nama: A → Z</option>
+                  <option value="name-desc">Nama: Z → A</option>
+                  <option value="total-desc">Total: Tertinggi</option>
+                  <option value="total-asc">Total: Terendah</option>
+                  <option value="idpel-asc">IDPEL: 0 → 9</option>
+                  <option value="idpel-desc">IDPEL: 9 → 0</option>
+                </select>
               </div>
 
-              <button
-                type="button"
-                onClick={resetAllFilters}
-                className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 underline transition-colors cursor-pointer"
-              >
-                Hapus Semua Filter
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Transactions Table with Sortable Columns */}
-        <div className="mt-6 border-t border-slate-200 pt-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
-            <div>
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                <span>Daftar Transaksi</span>
-                <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-mono font-medium">
-                  {sortedAndFiltered.length}
-                </span>
-              </h3>
-            </div>
-
-            {/* Page Size Selector */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500 font-medium">Tampilkan:</span>
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                {[50, 100, 250, 500, 1000].map((size) => (
+              <div className="flex items-center bg-white border border-slate-300 p-0.5 rounded-lg shadow-2xs text-[11px]">
+                <span className="text-slate-400 px-1 hidden sm:inline text-[10px]">Baris:</span>
+                {[50, 100, 500, 1000].map((size) => (
                   <button
                     key={size}
                     onClick={() => {
                       setPageSize(size);
                       setCurrentPage(1);
                     }}
-                    className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all cursor-pointer ${
-                      pageSize === size
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    className={`h-6 px-1.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                      pageSize === size ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     {size}
                   </button>
                 ))}
               </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="h-8 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] rounded-lg border border-rose-200 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                  title="Reset semua filter"
+                >
+                  <X className="w-3 h-3" />
+                  <span className="hidden sm:inline">Reset</span>
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left border-collapse">
+          {/* Row 2: Service Category Filter Tabs with Live Badges */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+            {[
+              { id: 'all', label: 'Semua Layanan', count: categoryCounts.all },
+              { id: 'pln', label: 'Listrik / PLN', count: categoryCounts.pln },
+              { id: 'pdam', label: 'PDAM / Air', count: categoryCounts.pdam },
+              { id: 'bpjs', label: 'BPJS', count: categoryCounts.bpjs },
+              { id: 'telkom', label: 'Speedy / Telkom', count: categoryCounts.telkom },
+              { id: 'pascabayar', label: 'Pascabayar', count: categoryCounts.pascabayar },
+              { id: 'other', label: 'Lain-lain', count: categoryCounts.other },
+            ].map((cat) => {
+              const isActive = serviceFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setServiceFilter(cat.id as ServiceFilterType);
+                    setCurrentPage(1);
+                  }}
+                  className={`h-7 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap border ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      isActive
+                        ? 'bg-blue-700 text-white'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                    }`}
+                  >
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Transactions Table - Clean and Seamlessly Attached */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider select-none">
                   <th className="p-3 w-12 text-center">No</th>
@@ -1304,34 +1221,42 @@ export function HistoryTab({
             </table>
           </div>
 
-          {/* Table Footer Summary */}
-          {sortedAndFiltered.length > 0 && (
-            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-end items-center text-xs text-slate-600 gap-4">
+          {/* Integrated Table Footer: Summary & Pagination in one clean bar */}
+          <div className="px-4 py-3 bg-slate-50/90 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-xs text-slate-600 gap-3">
+            {/* Left: Summary totals */}
+            <div className="flex items-center gap-4 flex-wrap">
               <span>
-                Total Tagihan: <strong>Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
+                Total Tagihan: <strong className="text-slate-800 font-mono">Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
               </span>
-              <span className="text-blue-700 font-bold">
-                Total Bayar: Rp {totalOmset.toLocaleString('id-ID')}
+              <span className="text-slate-300">|</span>
+              <span>
+                Total Bayar: <strong className="text-blue-700 font-mono font-bold">Rp {totalOmset.toLocaleString('id-ID')}</strong>
               </span>
+              {sortedAndFiltered.length > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-400 font-mono text-[11px]">
+                    {sortedAndFiltered.length} Transaksi
+                  </span>
+                </>
+              )}
             </div>
-          )}
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 border border-slate-200 rounded-xl shadow-2xs">
-              <div className="text-xs text-slate-500 font-medium">
-                Halaman <span className="font-bold text-slate-800">{validCurrentPage}</span> dari{' '}
-                <span className="font-bold text-slate-800">{totalPages}</span> (Total {sortedAndFiltered.length} transaksi)
-              </div>
+            {/* Right: Pagination */}
+            {totalPages > 1 && (
               <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  Halaman <span className="font-bold text-slate-700">{validCurrentPage}</span> / {totalPages}
+                </span>
+
                 <button
                   type="button"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={validCurrentPage <= 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
+                  className="h-7 px-2.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Sebelumnya</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sebelumnya</span>
                 </button>
 
                 <div className="flex items-center gap-1">
@@ -1346,14 +1271,14 @@ export function HistoryTab({
                       const showEllipsis = prev && p - prev > 1;
                       return (
                         <React.Fragment key={p}>
-                          {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
+                          {showEllipsis && <span className="px-0.5 text-slate-400 text-xs">...</span>}
                           <button
                             type="button"
                             onClick={() => setCurrentPage(p)}
-                            className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            className={`w-6.5 h-6.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                               validCurrentPage === p
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
+                                ? 'bg-blue-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:bg-slate-100 border border-slate-200 bg-white'
                             }`}
                           >
                             {p}
@@ -1367,16 +1292,15 @@ export function HistoryTab({
                   type="button"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={validCurrentPage >= totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
+                  className="h-7 px-2.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                 >
-                  <span>Selanjutnya</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <span className="hidden sm:inline">Selanjutnya</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
       {/* PNG & WhatsApp Modal */}
       {pngModalState && (
