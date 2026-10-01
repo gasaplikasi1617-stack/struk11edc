@@ -410,62 +410,10 @@ export function ReceiptForm({
         </div>
       </div>
 
-      {/* 2. Kustomisasi Header Agen */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Building className="w-5 h-5 text-blue-600" />
-          <span>3. Kustomisasi Header Resi (Agen)</span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-              <Building className="w-3.5 h-3.5 text-slate-400" /> Nama Toko / Agen
-            </label>
-            <input
-              type="text"
-              value={receipt.namaAgen}
-              onChange={(e) => {
-                handleInputChange('namaAgen', e.target.value);
-                setAgentConfig({ ...agentConfig, namaAgen: e.target.value });
-              }}
-              className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" /> Alamat Agen
-            </label>
-            <input
-              type="text"
-              value={receipt.alamat}
-              onChange={(e) => {
-                handleInputChange('alamat', e.target.value);
-                setAgentConfig({ ...agentConfig, alamat: e.target.value });
-              }}
-              className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5 text-slate-400" /> No. HP / WhatsApp
-            </label>
-            <input
-              type="text"
-              value={receipt.noHp}
-              onChange={(e) => {
-                handleInputChange('noHp', e.target.value);
-                setAgentConfig({ ...agentConfig, noHp: e.target.value });
-              }}
-              className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Editor Data Resi Lengkap */}
+      {/* 2. Editor Data Resi Lengkap */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-800">2 & 3. Editor Detail Resi Tagihan</h2>
+          <h2 className="text-lg font-bold text-slate-800">2. Editor Detail Resi Tagihan</h2>
           <button
             type="button"
             onClick={handleClearAll}

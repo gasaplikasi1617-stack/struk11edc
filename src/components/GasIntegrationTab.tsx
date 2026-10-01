@@ -20,12 +20,14 @@ import {
   Archive,
   RotateCcw,
   Users,
+  Building,
 } from 'lucide-react';
-import { GasSyncConfig, ReceiptData } from '../types';
+import { AgentConfig, GasSyncConfig, ReceiptData } from '../types';
 import { DEFAULT_GAS_DATA, DEFAULT_GAS_URL, GasScriptData } from '../data/gasTemplates';
 import { formatIdpelAsText } from '../utils/exportExcel';
 import { MonthlyResetModal } from './MonthlyResetModal';
 import { UserManagementSection } from './UserManagementSection';
+import { HeaderCustomizationSection } from './HeaderCustomizationSection';
 import {
   executeTwoWaySync,
   forceSyncWithGoogleSheets,
@@ -50,6 +52,10 @@ interface GasIntegrationTabProps {
   onSyncSuccess?: () => void;
   transactions?: ReceiptData[];
   onRefreshTransactions?: () => void;
+  agentConfig?: AgentConfig;
+  setAgentConfig?: React.Dispatch<React.SetStateAction<AgentConfig>>;
+  receipt?: ReceiptData;
+  setReceipt?: React.Dispatch<React.SetStateAction<ReceiptData>>;
 }
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
@@ -76,6 +82,10 @@ export function GasIntegrationTab({
   onSyncSuccess,
   transactions,
   onRefreshTransactions,
+  agentConfig,
+  setAgentConfig,
+  receipt,
+  setReceipt,
 }: GasIntegrationTabProps) {
   const [gasData, setGasData] = useState<GasScriptData>(DEFAULT_GAS_DATA);
 
@@ -115,7 +125,7 @@ export function GasIntegrationTab({
   const [previewData, setPreviewData] = useState<ReceiptData[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isMonthlyResetModalOpen, setIsMonthlyResetModalOpen] = useState(false);
-  const [integrationSubTab, setIntegrationSubTab] = useState<'sheets' | 'users'>('sheets');
+  const [integrationSubTab, setIntegrationSubTab] = useState<'sheets' | 'users' | 'header'>('sheets');
 
   // Subscribe to live sync events
   useEffect(() => {
@@ -579,7 +589,7 @@ export function GasIntegrationTab({
 
   return (
     <div className="space-y-6">
-      {/* Sub-Tab Navigation Header (Google Sheets vs Manajemen User) */}
+      {/* Sub-Tab Navigation Header (Google Sheets vs Manajemen User vs Kustomisasi Header Resi) */}
       <div className="flex flex-wrap items-center gap-2 bg-slate-200/80 p-1.5 rounded-2xl w-fit border border-slate-300 shadow-2xs">
         <button
           type="button"
@@ -606,9 +616,29 @@ export function GasIntegrationTab({
           <Users className="w-4 h-4 text-indigo-600" />
           <span>Manajemen User Kasir</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setIntegrationSubTab('header')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            integrationSubTab === 'header'
+              ? 'bg-white text-blue-700 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Building className="w-4 h-4 text-blue-600" />
+          <span>3. Kustomisasi Header Resi (Agen)</span>
+        </button>
       </div>
 
-      {integrationSubTab === 'users' ? (
+      {integrationSubTab === 'header' ? (
+        <HeaderCustomizationSection
+          agentConfig={agentConfig || { namaAgen: 'Agen Batara', alamat: 'Bekasi', noHp: '081234567890' }}
+          setAgentConfig={setAgentConfig || (() => {})}
+          receipt={receipt}
+          setReceipt={setReceipt}
+        />
+      ) : integrationSubTab === 'users' ? (
         <UserManagementSection />
       ) : (
         <>

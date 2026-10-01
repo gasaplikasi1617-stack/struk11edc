@@ -506,6 +506,10 @@ export default function App() {
             onSyncSuccess={fetchTransactions}
             transactions={transactions}
             onRefreshTransactions={fetchTransactions}
+            agentConfig={agentConfig}
+            setAgentConfig={setAgentConfig}
+            receipt={receipt}
+            setReceipt={setReceipt}
           />
         )}
       </main>
