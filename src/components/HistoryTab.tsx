@@ -32,6 +32,7 @@ import {
   UploadCloud,
   ChevronLeft,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { exportTransactionsToExcel } from '../utils/exportExcel';
 import { getTransactionCategory, getCategoryLabel, BillCategory } from '../utils/billParser';
@@ -57,7 +58,7 @@ import {
 interface HistoryTabProps {
   transactions: ReceiptData[];
   onSelectTransaction: (tx: ReceiptData) => void;
-  onDeleteTransaction: (id: string, tx?: ReceiptData) => void;
+  onDeleteTransaction: (id: string, tx?: ReceiptData, skipConfirm?: boolean) => void;
   onToggleStatus?: (tx: ReceiptData) => void;
   onRefreshTransactions?: () => Promise<void> | void;
   onNavigateToGasTab?: () => void;
@@ -282,42 +283,16 @@ export function HistoryTab({
     }
   };
 
-  const [isDeduplicating, setIsDeduplicating] = useState(false);
-
-  const handleDeduplicate = async () => {
-    setIsDeduplicating(true);
-    try {
-      const res = await fetch('/api/transactions/deduplicate', { method: 'POST' });
-      const data = await res.json();
-      if (onRefreshTransactions) {
-        await onRefreshTransactions();
-      }
-      setExportSuccessNotice(data.message || 'Pemeriksaan anti-duplikat selesai.');
-    } catch (err: any) {
-      setExportSuccessNotice('Gagal membersihkan duplikat: ' + (err.message || String(err)));
-    } finally {
-      setIsDeduplicating(false);
-      setTimeout(() => setExportSuccessNotice(null), 5000);
-    }
-  };
-
+  const [pendingDeleteTx, setPendingDeleteTx] = useState<ReceiptData | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [confirmClearChecked, setConfirmClearChecked] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
 
-  const handleQuickClearAll = async () => {
+  const executeQuickClearAll = async () => {
     if (transactions.length === 0) {
       alert('Riwayat transaksi sudah kosong (0 data).');
       return;
     }
-
-    const conf = confirm(
-      `PERINGATAN TUTUP BUKU / BERSIHKAN DATA:\n\n` +
-      `Anda akan menghapus seluruh ${transactions.length} data riwayat transaksi saat ini.\n\n` +
-      `1. File backup Excel (.xlsx) & cadangan JSON akan OTOMATIS diunduh agar data lama Anda aman 100% di komputer/HP.\n` +
-      `2. Riwayat aplikasi akan menjadi 0 transaksi bersih.\n` +
-      `3. Data lama dijamin TIDAK AKAN MUNCUL KEMBALI di bulan baru.\n\n` +
-      `Apakah Anda yakin ingin melanjutkan?`
-    );
-    if (!conf) return;
 
     setIsClearingAll(true);
     try {
@@ -368,10 +343,10 @@ export function HistoryTab({
         `Sukses! Seluruh ${transactions.length} data riwayat telah dibersihkan dan dicadangkan. Aplikasi kini fresh dengan 0 transaksi untuk bulan baru.`
       );
     } catch (err: any) {
-      alert(`Terjadi kendala saat membersihkan data: ${err.message || String(err)}`);
+      alert('Gagal membersihkan data: ' + (err.message || String(err)));
     } finally {
       setIsClearingAll(false);
-      setTimeout(() => setExportSuccessNotice(null), 6000);
+      setTimeout(() => setExportSuccessNotice(null), 7000);
     }
   };
 
@@ -701,93 +676,97 @@ export function HistoryTab({
           </div>
 
           {/* Action Buttons Toolbar */}
-          <div className="flex flex-wrap items-center gap-1.5 self-start xl:self-center">
-            {/* Export Excel */}
-            <button
-              id="btn-export-excel"
-              onClick={handleExportToExcel}
-              disabled={sortedAndFiltered.length === 0}
-              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Export data tersaring ke format Microsoft Excel (.xlsx)"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Export</span>
-              {sortedAndFiltered.length > 0 && (
-                <span className="bg-emerald-700/80 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
-                  {sortedAndFiltered.length}
-                </span>
-              )}
-            </button>
+          <div className="flex flex-wrap items-center gap-2 self-start xl:self-center">
+            {/* Kelompok 1: Operasional Utama & Sinkronisasi */}
+            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+              {/* Export Excel */}
+              <button
+                id="btn-export-excel"
+                onClick={handleExportToExcel}
+                disabled={sortedAndFiltered.length === 0}
+                className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Export data tersaring ke format Microsoft Excel (.xlsx)"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Export</span>
+                {sortedAndFiltered.length > 0 && (
+                  <span className="bg-emerald-700/80 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
+                    {sortedAndFiltered.length}
+                  </span>
+                )}
+              </button>
 
-            {/* Sinkron GAS */}
-            <button
-              id="btn-gas-sync-history"
-              onClick={handleGasSyncClick}
-              disabled={isSyncingGas}
-              className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Sinkronisasi 2 arah dengan Google Sheets"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
-              <span>{isSyncingGas ? 'Sinkron...' : 'Sinkron'}</span>
-            </button>
+              {/* Sinkron GAS */}
+              <button
+                id="btn-gas-sync-history"
+                onClick={handleGasSyncClick}
+                disabled={isSyncingGas}
+                className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Sinkronisasi 2 arah dengan Google Sheets"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
+                <span>{isSyncingGas ? 'Sinkron...' : 'Sinkron'}</span>
+              </button>
 
-            {/* Sinkron Sheets Persis */}
-            <button
-              id="btn-force-sync-sheets"
-              onClick={handleForceSyncFromSheets}
-              disabled={isForceSyncing}
-              className="h-8 px-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/70"
-              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
-              <span>{isForceSyncing ? 'Menyamakan...' : 'Sheet'}</span>
-            </button>
+              {/* Sinkron Sheets Persis */}
+              <button
+                id="btn-force-sync-sheets"
+                onClick={handleForceSyncFromSheets}
+                disabled={isForceSyncing}
+                className="h-8 px-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/70"
+                title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
+                <span>{isForceSyncing ? 'Menyamakan...' : 'Sheet'}</span>
+              </button>
+            </div>
 
-            {/* Anti-Dobel */}
-            <button
-              id="btn-deduplicate-history"
-              onClick={handleDeduplicate}
-              disabled={isDeduplicating || transactions.length === 0}
-              className="h-8 px-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Periksa dan pastikan tidak ada data transaksi yang dobel"
-            >
-              <ShieldCheck className={`w-3.5 h-3.5 ${isDeduplicating ? 'animate-pulse' : ''}`} />
-              <span>{isDeduplicating ? 'Memeriksa...' : 'Anti-Dobel'}</span>
-            </button>
+            {/* Kelompok 2: Cadangan & Pengelolaan */}
+            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+              {/* Restore Data */}
+              <button
+                id="btn-restore-data"
+                onClick={() => setIsRestoreModalOpen(true)}
+                className="h-8 px-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Restore / upload data dari file backup JSON"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>Restore</span>
+              </button>
 
-            {/* Restore Data */}
-            <button
-              id="btn-restore-data"
-              onClick={() => setIsRestoreModalOpen(true)}
-              className="h-8 px-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Restore / upload data dari file backup JSON"
-            >
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span>Restore</span>
-            </button>
+              {/* Tutup Buku */}
+              <button
+                id="btn-monthly-reset"
+                onClick={() => setIsMonthlyResetModalOpen(true)}
+                className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & mulai bulan baru"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                <span>Tutup Buku</span>
+              </button>
+            </div>
 
-            {/* Tutup Buku */}
-            <button
-              id="btn-monthly-reset"
-              onClick={() => setIsMonthlyResetModalOpen(true)}
-              className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & mulai bulan baru"
-            >
-              <Archive className="w-3.5 h-3.5" />
-              <span>Tutup Buku</span>
-            </button>
-
-            {/* Hapus Data */}
-            <button
-              id="btn-clear-all-history"
-              onClick={handleQuickClearAll}
-              disabled={isClearingAll || transactions.length === 0}
-              className="h-8 px-2 text-rose-600 hover:text-rose-800 hover:bg-rose-50 disabled:opacity-40 text-xs font-semibold rounded-lg transition-all cursor-pointer border border-transparent hover:border-rose-200 inline-flex items-center gap-1"
-              title="Hapus seluruh riwayat transaksi sekarang"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>{isClearingAll ? '...' : 'Hapus'}</span>
-            </button>
+            {/* Kelompok 3: Zona Bahaya / Hapus (Dipisahkan secara jelas dengan border pelindung) */}
+            <div className="flex items-center pl-1 sm:pl-2 border-l border-slate-200">
+              <button
+                id="btn-clear-all-history"
+                type="button"
+                onClick={() => {
+                  if (transactions.length === 0) {
+                    alert('Riwayat transaksi sudah kosong (0 data).');
+                    return;
+                  }
+                  setConfirmClearChecked(false);
+                  setIsClearAllModalOpen(true);
+                }}
+                disabled={isClearingAll || transactions.length === 0}
+                className="h-8 px-3 bg-white hover:bg-rose-50 border border-rose-200/80 hover:border-rose-400 text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:border-slate-200 disabled:text-slate-400 text-xs font-semibold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                title="Hapus riwayat transaksi (dilengkapi konfirmasi keamanan)"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <span>Hapus</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1200,15 +1179,13 @@ export function HistoryTab({
                             <span className="hidden sm:inline">PNG</span>
                           </button>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const deleteKey = tx.id || tx.idpel || tx.namaPelanggan || '';
-                              if (deleteKey) {
-                                onDeleteTransaction(deleteKey, tx);
-                              }
+                              setPendingDeleteTx(tx);
                             }}
                             className="bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 text-xs p-1.5 rounded-lg transition-all border border-rose-200 cursor-pointer"
-                            title="Hapus riwayat transaksi ini"
+                            title="Hapus riwayat transaksi ini (dengan pengaman konfirmasi)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1388,6 +1365,151 @@ export function HistoryTab({
             <p className="text-[11px] text-slate-400 text-center mt-3">
               *Klik <strong>Salin Gambar WA</strong> lalu Paste di chat WhatsApp, atau gunakan <strong>Kirim Teks WA</strong>.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Confirmation Modal: Hapus Satu Transaksi */}
+      {pendingDeleteTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform transition-all animate-scale-in space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Transaksi</h3>
+                <p className="text-xs text-slate-500">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Nama Pelanggan:</span>
+                <span className="font-bold text-slate-800">{pendingDeleteTx.namaPelanggan || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">ID Pelanggan (IDPEL):</span>
+                <span className="font-mono font-bold text-blue-600">{pendingDeleteTx.idpel || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Layanan:</span>
+                <span className="font-medium text-slate-700">{pendingDeleteTx.rincianTagihan || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Periode Tagihan:</span>
+                <span className="font-medium text-slate-700">{pendingDeleteTx.bulanTagihan || '-'}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                <span className="text-slate-500">Total Bayar:</span>
+                <span className="font-bold text-emerald-600">Rp {pendingDeleteTx.totalBayar ? pendingDeleteTx.totalBayar.toLocaleString('id-ID') : '0'}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin menghapus transaksi ini? Data akan dihapus permanen dan diproteksi agar tidak muncul kembali saat sinkronisasi Google Sheets.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteTx(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const deleteKey = pendingDeleteTx.id || pendingDeleteTx.idpel || pendingDeleteTx.namaPelanggan || '';
+                  if (deleteKey) {
+                    onDeleteTransaction(deleteKey, pendingDeleteTx, true);
+                  }
+                  setPendingDeleteTx(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Transaksi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Confirmation Modal: Hapus Seluruh Riwayat */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 transform transition-all animate-scale-in space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Seluruh Riwayat</h3>
+                <p className="text-xs text-rose-600 font-semibold">Tindakan Pengamanan Data</p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-4 text-xs text-rose-950 space-y-2.5">
+              <p className="font-bold text-rose-900 text-sm">
+                Anda akan menghapus seluruh {transactions.length} data transaksi saat ini.
+              </p>
+              <div className="space-y-1.5 text-slate-700">
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span><strong>Cadangan Otomatis:</strong> File backup Excel (.xlsx) dan JSON akan otomatis diunduh ke komputer/HP Anda agar data tetap aman 100%.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span><strong>Riwayat Bersih:</strong> Database lokal aplikasi akan direset menjadi 0 data transaksi.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span><strong>Proteksi Sinkronisasi:</strong> Data yang dihapus dijamin tidak akan tertarik kembali dari Google Sheets.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Checkbox Pengaman */}
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer select-none hover:bg-slate-100/70 transition-colors">
+              <input
+                type="checkbox"
+                checked={confirmClearChecked}
+                onChange={(e) => setConfirmClearChecked(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-700 font-medium">
+                Saya mengerti dan telah memastikan bahwa saya ingin menghapus seluruh data riwayat ini.
+              </span>
+            </label>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClearAllModalOpen(false);
+                  setConfirmClearChecked(false);
+                }}
+                disabled={isClearingAll}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={!confirmClearChecked || isClearingAll}
+                onClick={async () => {
+                  setIsClearAllModalOpen(false);
+                  setConfirmClearChecked(false);
+                  await executeQuickClearAll();
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isClearingAll ? 'Sedang Menghapus...' : 'Ya, Hapus Seluruh Riwayat'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

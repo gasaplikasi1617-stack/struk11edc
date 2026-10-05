@@ -336,17 +336,19 @@ export default function App() {
     }, 150);
   };
 
-  const handleDeleteTransaction = async (targetKey: string, txData?: ReceiptData) => {
+  const handleDeleteTransaction = async (targetKey: string, txData?: ReceiptData, skipConfirm: boolean = false) => {
     if (!targetKey) return;
     const targetTx = txData || transactions.find((t) => t.id === targetKey || t.idpel === targetKey || t.namaPelanggan === targetKey);
     const displayName = targetTx?.namaPelanggan || targetTx?.idpel || targetKey;
     const idpel = targetTx?.idpel && targetTx.idpel !== '-' ? targetTx.idpel : '';
 
-    const confirmMsg =
-      `Apakah Anda yakin ingin menghapus data transaksi "${displayName}" ${idpel ? `(ID Pelanggan: ${idpel})` : ''} dari riwayat?\n\n` +
-      `Catatan: Data akan dihapus secara permanen dan DIJAMIN TIDAK AKAN MUNCUL KEMBALI saat disinkronkan ke Google Sheets.`;
+    if (!skipConfirm) {
+      const confirmMsg =
+        `Apakah Anda yakin ingin menghapus data transaksi "${displayName}" ${idpel ? `(ID Pelanggan: ${idpel})` : ''} dari riwayat?\n\n` +
+        `Catatan: Data akan dihapus secara permanen dan DIJAMIN TIDAK AKAN MUNCUL KEMBALI saat disinkronkan ke Google Sheets.`;
 
-    if (!confirm(confirmMsg)) return;
+      if (!confirm(confirmMsg)) return;
+    }
 
     const idToBlock = targetTx?.id || targetKey;
     const idpelToBlock = targetTx?.idpel;
