@@ -220,20 +220,22 @@ export function getPreviousMonthPeriod(periodStr?: string): string {
 }
 
 export function getDefaultBulanTagihan(isPdam: boolean, extractedPeriod?: string): string {
-  if (extractedPeriod && extractedPeriod.trim() && extractedPeriod !== '-') {
+  // Ketentuan 2: Pengecualian untuk struk STRUK PEMBAYARAN TAGIHAN PDAM maka formatnya beda
+  // Yaitu bulan kemarin. Contoh: Bulan ini Oktober 2026 maka diisi dengan September 2026 (Sept26)
+  if (isPdam) {
+    return getPreviousMonthPeriod();
+  }
+
+  // Ketentuan 1: Buat PLN, BPJS, TELKOM/SPeedy dan lain lain
+  // Isi dengan format bulan tahun saat ini. Contoh: Oktober 2026 maka ditulis dengan isian Okt26 atau mmmyy
+  if (extractedPeriod && extractedPeriod.trim() && extractedPeriod !== '-' && extractedPeriod !== 'BULAN BERJALAN') {
     const formatted = formatPeriod3Chars(extractedPeriod);
     if (formatted) {
-      if (isPdam) {
-        return getPreviousMonthPeriod(formatted);
-      }
       return formatted;
     }
   }
 
-  if (isPdam) {
-    return getPreviousMonthPeriod(); // e.g. if current is Okt26 -> returns Sept26
-  }
-  return getCurrentMonthPeriod(); // e.g. if current is Okt26 -> returns Okt26
+  return getCurrentMonthPeriod(); // e.g. Okt26 saat Oktober 2026
 }
 
 export function isPdamBill(t: {

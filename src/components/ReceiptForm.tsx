@@ -300,7 +300,7 @@ export function ReceiptForm({
 
         setReceipt((prev) => {
           const isPdam = isPdamBill({ ...d, rawText });
-          let finalBulanTagihan = getDefaultBulanTagihan(isPdam, d.bulanTagihan || prev.bulanTagihan);
+          let finalBulanTagihan = getDefaultBulanTagihan(isPdam, d.bulanTagihan);
 
           return {
             ...prev,
@@ -343,7 +343,7 @@ export function ReceiptForm({
       }
       if (field === 'rincianTagihan') {
         const isPdam = isPdamBill({ rincianTagihan: String(value) });
-        updated.bulanTagihan = getDefaultBulanTagihan(isPdam, prev.bulanTagihan);
+        updated.bulanTagihan = getDefaultBulanTagihan(isPdam);
       }
       return updated;
     });

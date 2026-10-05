@@ -308,7 +308,7 @@ function parseGasResponse(text: string): any {
   }
 }
 
-async function callGasPost(url: string, body: any, timeoutMs: number = 8000): Promise<any> {
+async function callGasPost(url: string, body: any, timeoutMs: number = 35000, retryCount: number = 1): Promise<any> {
   const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
 
@@ -316,33 +316,41 @@ async function callGasPost(url: string, body: any, timeoutMs: number = 8000): Pr
     throw new Error("URL yang Anda masukkan adalah URL Editor/Dev. Silakan gunakan Web App URL yang berakhiran '/exec' dari menu Deploy.");
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const res = await fetch(cleanUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    try {
+      const res = await fetch(cleanUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        redirect: "follow",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
 
-    const text = await res.text();
-    return parseGasResponse(text);
-  } catch (err: any) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      throw new Error(`Koneksi ke Google Apps Script timeout (melebihi ${timeoutMs / 1000} detik)`);
+      const text = await res.text();
+      return parseGasResponse(text);
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTimeout = err.name === "AbortError" || (err.message && err.message.toLowerCase().includes("abort"));
+      if (attempt < retryCount) {
+        // Wait 1s before retry
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      if (isTimeout) {
+        throw new Error(`Koneksi ke Google Apps Script timeout (melebihi ${Math.round(timeoutMs / 1000)} detik)`);
+      }
+      throw err;
     }
-    throw err;
   }
 }
 
-async function callGasGet(url: string, params: Record<string, string> = {}, timeoutMs: number = 8000): Promise<any> {
+async function callGasGet(url: string, params: Record<string, string> = {}, timeoutMs: number = 35000, retryCount: number = 1): Promise<any> {
   const cleanUrl = (url || "").trim();
   if (!cleanUrl) throw new Error("URL Google Apps Script belum diisi");
 
@@ -355,25 +363,33 @@ async function callGasGet(url: string, params: Record<string, string> = {}, time
     u.searchParams.set(k, v);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const res = await fetch(u.toString(), {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    try {
+      const res = await fetch(u.toString(), {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
 
-    const text = await res.text();
-    return parseGasResponse(text);
-  } catch (err: any) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      throw new Error("Koneksi ke Google Apps Script timeout (melebihi 20 detik)");
+      const text = await res.text();
+      return parseGasResponse(text);
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTimeout = err.name === "AbortError" || (err.message && err.message.toLowerCase().includes("abort"));
+      if (attempt < retryCount) {
+        // Wait 1s before retry
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      if (isTimeout) {
+        throw new Error(`Koneksi ke Google Apps Script timeout (melebihi ${Math.round(timeoutMs / 1000)} detik)`);
+      }
+      throw err;
     }
-    throw err;
   }
 }
 
@@ -1505,7 +1521,7 @@ ${rawText}
       pemakaian: pemakaian,
       standMeter: standMeter,
       rincianTagihan: rincianTagihan || "Tagihan Layanan",
-      bulanTagihan: bulanTagihan || "BULAN BERJALAN",
+      bulanTagihan: bulanTagihan || getDefaultBulanTagihan(isPdamCheck),
       rpTagihan: rpTagihan || 50000,
       lainLain,
       adminBank,
@@ -1603,7 +1619,7 @@ app.post("/api/gas/sync", async (req, res) => {
       const syncRes = await callGasPost(targetUrl, {
         action: "twoWaySync",
         transactions: localTxs,
-      });
+      }, 40000);
 
       if (syncRes && syncRes.success && Array.isArray(syncRes.data)) {
         remoteTxs = syncRes.data;
@@ -1616,7 +1632,7 @@ app.post("/api/gas/sync", async (req, res) => {
     // 2. Fallback: If remoteTxs is empty, pull via GET
     if (remoteTxs.length === 0) {
       try {
-        const getRes = await callGasGet(targetUrl, { action: "getTransactions" });
+        const getRes = await callGasGet(targetUrl, { action: "getTransactions" }, 35000);
         if (getRes && Array.isArray(getRes.data)) {
           remoteTxs = getRes.data;
         } else if (Array.isArray(getRes)) {
@@ -1638,7 +1654,7 @@ app.post("/api/gas/sync", async (req, res) => {
         await callGasPost(targetUrl, {
           action: "syncTransactions",
           transactions: newFromLocal,
-        });
+        }, 35000);
         pushedCount = newFromLocal.length;
       } catch (pushErr: any) {
         console.warn("GAS push missing records error:", pushErr.message);
