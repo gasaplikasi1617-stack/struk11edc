@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, History, Receipt, RefreshCw, LogOut, UserCheck } from 'lucide-react';
+import { Home, History, Receipt, RefreshCw, LogOut, UserCheck } from 'lucide-react';
 import { subscribeSyncState, SyncState, executeTwoWaySync } from '../services/gasClientSync';
 import { AppUser } from '../types';
 
@@ -102,14 +102,15 @@ export function Navbar({
           <nav className="flex items-center space-x-1 sm:space-x-2">
             <button
               onClick={() => setActiveTab('create')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 activeTab === 'create'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
+              title="Halaman Utama / Input Resi"
             >
-              <Printer className="w-4 h-4" />
-              <span>Input</span>
+              <Home className="w-4 h-4" />
+              <span>Home</span>
             </button>
 
             <button
