@@ -652,22 +652,26 @@ export function HistoryTab({
             </div>
 
             {/* Compact Integrated Metrics (Omset & Admin Bank) */}
-            <div className="flex items-center gap-2.5 sm:gap-4 pl-0 sm:pl-4 sm:border-l border-slate-200">
-              <div className="flex items-center gap-2 bg-emerald-50/70 border border-emerald-200/60 px-2.5 py-1 rounded-lg">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <div className="flex items-center gap-2 sm:gap-3.5 pl-0 sm:pl-3.5 sm:border-l border-slate-200">
+              <div className="flex items-center gap-2.5 bg-emerald-50/80 border border-emerald-200/80 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl shadow-2xs">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100/90 flex items-center justify-center text-emerald-700 shrink-0">
+                  <Wallet className="w-4.5 h-4.5 text-emerald-600" />
+                </div>
                 <div className="leading-tight">
-                  <span className="text-[10px] font-medium text-emerald-800 block">Total Omset</span>
-                  <span className="text-xs font-bold text-emerald-700 font-mono">
+                  <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">Total Omset</span>
+                  <span className="text-base sm:text-lg font-black text-emerald-700 font-mono tracking-tight">
                     Rp {totalOmset.toLocaleString('id-ID')}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-amber-50/70 border border-amber-200/60 px-2.5 py-1 rounded-lg">
-                <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <div className="flex items-center gap-2.5 bg-amber-50/80 border border-amber-200/80 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl shadow-2xs">
+                <div className="w-8 h-8 rounded-lg bg-amber-100/90 flex items-center justify-center text-amber-700 shrink-0">
+                  <Building2 className="w-4.5 h-4.5 text-amber-600" />
+                </div>
                 <div className="leading-tight">
-                  <span className="text-[10px] font-medium text-amber-800 block">Admin Bank</span>
-                  <span className="text-xs font-bold text-amber-700 font-mono">
+                  <span className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider block">Admin Bank</span>
+                  <span className="text-base sm:text-lg font-black text-amber-700 font-mono tracking-tight">
                     Rp {totalAdmin.toLocaleString('id-ID')}
                   </span>
                 </div>
@@ -1201,18 +1205,22 @@ export function HistoryTab({
           {/* Integrated Table Footer: Summary & Pagination in one clean bar */}
           <div className="px-4 py-3 bg-slate-50/90 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-xs text-slate-600 gap-3">
             {/* Left: Summary totals */}
-            <div className="flex items-center gap-4 flex-wrap">
-              <span>
-                Total Tagihan: <strong className="text-slate-800 font-mono">Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
+            <div className="flex items-center gap-3 sm:gap-4 flex-wrap text-xs sm:text-sm">
+              <span className="text-slate-600">
+                Total Tagihan: <strong className="text-slate-800 font-mono font-bold">Rp {sortedAndFiltered.reduce((s, t) => s + (Number(t.rpTagihan) || 0), 0).toLocaleString('id-ID')}</strong>
               </span>
               <span className="text-slate-300">|</span>
-              <span>
-                Total Bayar: <strong className="text-blue-700 font-mono font-bold">Rp {totalOmset.toLocaleString('id-ID')}</strong>
+              <span className="text-amber-800 font-medium">
+                Admin Bank: <strong className="text-amber-700 font-mono font-extrabold text-sm sm:text-base">Rp {totalAdmin.toLocaleString('id-ID')}</strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span className="text-emerald-800 font-medium">
+                Total Omset: <strong className="text-emerald-700 font-mono font-extrabold text-sm sm:text-base">Rp {totalOmset.toLocaleString('id-ID')}</strong>
               </span>
               {sortedAndFiltered.length > 0 && (
                 <>
                   <span className="text-slate-300">|</span>
-                  <span className="text-slate-400 font-mono text-[11px]">
+                  <span className="text-slate-500 font-mono text-[11px] font-semibold bg-slate-200/70 px-2 py-0.5 rounded-md">
                     {sortedAndFiltered.length} Transaksi
                   </span>
                 </>
