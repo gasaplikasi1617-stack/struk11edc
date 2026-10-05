@@ -203,31 +203,8 @@ export function ReceiptForm({
       namaPelanggan = namaPelanggan.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
     }
 
-    // Check line 1 (baris kedua) or any line for period
-    for (const idx of [1, 0, 2]) {
-      if (lines[idx] && /jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(lines[idx])) {
-        bulanTagihan = formatPeriod3Chars(lines[idx]);
-        break;
-      }
-    }
-
-    if (!bulanTagihan) {
-      for (const line of lines) {
-        if (/jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(line)) {
-          bulanTagihan = formatPeriod3Chars(line);
-          break;
-        }
-      }
-    }
-
-    if (!bulanTagihan) {
-      const periodMatch = text.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
-      if (periodMatch) bulanTagihan = formatPeriod3Chars(periodMatch[0]);
-      else bulanTagihan = "";
-    }
-
     const isPdamCheck = isPdam || isPdamBill({ rincianTagihan, rawText: text });
-    bulanTagihan = getDefaultBulanTagihan(isPdamCheck, bulanTagihan);
+    bulanTagihan = getDefaultBulanTagihan(isPdamCheck);
 
     if (!idpel) {
       idpel = extractIdpelFromLines(lines, text);
@@ -300,7 +277,7 @@ export function ReceiptForm({
 
         setReceipt((prev) => {
           const isPdam = isPdamBill({ ...d, rawText });
-          let finalBulanTagihan = getDefaultBulanTagihan(isPdam, d.bulanTagihan);
+          let finalBulanTagihan = getDefaultBulanTagihan(isPdam);
 
           return {
             ...prev,

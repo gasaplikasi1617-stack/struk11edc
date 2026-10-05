@@ -1249,7 +1249,7 @@ Aturan Ekstraksi Sangat Penting:
    - "Customer ID" / "Cust ID" / "Account No"
    Ambil nomor/kodenya secara bersih dan akurat (tanpa menyertakan label atau kata keterangan tambahan).
 2. "namaPelanggan": Ambil nama pelanggan / peserta / nasabah lengkap dalam SATU baris. Jika nama pelanggan pada teks terpotong dalam 2 baris, JANGAN abaikan baris kedua. Satukan kedua baris tersebut menjadi satu baris nama lengkap tanpa enter/patah baris.
-3. "bulanTagihan": Ambil nama bulan dan tahun saja (contoh: "SEP26", "AGUSTUS 2026", "08/2026"). JANGAN sertakan kata "Rp" atau angka nominal uang setelahnya.
+3. "bulanTagihan": Wajib ikuti aturan ini: jika struk adalah PDAM / Air maka isi dengan bulan kemarin ("Sept26" saat Oktober 2026). Jika struk adalah PLN, BPJS, TELKOM, Speedy, Pascabayar, atau layanan lainnya maka selalu isi dengan bulan dan tahun berjalan ("Okt26" saat Oktober 2026). Format selalu mmmyy.
 4. "pemakaian":
    - Jika teks adalah PLN / Listrik / Token: format "pemakaian" HARUS menyertakan daya dengan "VA", contoh: "R1M/900 VA".
    - Jika teks adalah PDAM / Air: format "pemakaian" HARUS mengandung "m3" (contoh: "23 m3"). Kosongkan jika tidak ada.
@@ -1300,7 +1300,7 @@ ${rawText}
 
       // Determine period based on rule: current month for normal bills, previous month for PDAM
       const isPdam = isPdamBill({ ...parsedData, rawText });
-      parsedData.bulanTagihan = getDefaultBulanTagihan(isPdam, parsedData.bulanTagihan);
+      parsedData.bulanTagihan = getDefaultBulanTagihan(isPdam);
 
       const rpTagihan = Number(parsedData.rpTagihan) || 0;
       const lainLain = Number(parsedData.lainLain) || 0;
@@ -1452,31 +1452,8 @@ ${rawText}
       namaPelanggan = namaPelanggan.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
     }
 
-    // Check line 1 (baris kedua) or any line for period
-    for (const idx of [1, 0, 2]) {
-      if (lines[idx] && /jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(lines[idx])) {
-        bulanTagihan = formatPeriod3Chars(lines[idx]);
-        break;
-      }
-    }
-
-    if (!bulanTagihan) {
-      for (const line of lines) {
-        if (/jan|feb|mar|apr|mei|jun|jul|agu|agt|ags|sep|okt|nov|des|aug|oct|dec|\d{1,2}\/\d{2,4}|\b202[0-9]\b/i.test(line)) {
-          bulanTagihan = formatPeriod3Chars(line);
-          break;
-        }
-      }
-    }
-
-    if (!bulanTagihan) {
-      const periodMatch = rawText.match(/([A-Za-z]{3,9}\s*\d{2,4}|\d{2}\/\d{4})/);
-      if (periodMatch) bulanTagihan = formatPeriod3Chars(periodMatch[0]);
-      else bulanTagihan = "";
-    }
-
     const isPdamCheck = isPdam || isPdamBill({ rincianTagihan, rawText });
-    bulanTagihan = getDefaultBulanTagihan(isPdamCheck, bulanTagihan);
+    bulanTagihan = getDefaultBulanTagihan(isPdamCheck);
 
     if (!idpel) {
       idpel = extractIdpelFromLines(lines, rawText);

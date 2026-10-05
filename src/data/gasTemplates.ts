@@ -818,7 +818,7 @@ function testInitAndPing() {
         pemakaian: document.getElementById('pemakaian').value || '-',
         standMeter: document.getElementById('standMeter').value || '-',
         rincianTagihan: document.getElementById('rincianTagihan').value || 'Tagihan Pembayaran',
-        bulanTagihan: document.getElementById('bulanTagihan').value || 'SEP26',
+        bulanTagihan: document.getElementById('bulanTagihan').value || (['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'][new Date().getMonth() + 1] + String(new Date().getFullYear()).slice(-2)),
         rpTagihan: rp,
         lainLain: lain,
         adminBank: admin,
@@ -850,7 +850,16 @@ function testInitAndPing() {
       document.getElementById('idpel').value = idpel;
       document.getElementById('rpTagihan').value = rp;
       document.getElementById('namaPelanggan').value = lines[0] ? lines[0].toUpperCase() : 'PELANGGAN';
-      document.getElementById('bulanTagihan').value = 'SEP26';
+      var isPdam = /pdam|air|pam|tirta|meter air|m3/i.test(text);
+      var mArr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'];
+      var dObj = new Date();
+      var mIdx = dObj.getMonth() + 1;
+      var yCode = String(dObj.getFullYear()).slice(-2);
+      if (isPdam) {
+        mIdx = mIdx - 1;
+        if (mIdx < 1) { mIdx = 12; yCode = String(dObj.getFullYear() - 1).slice(-2); }
+      }
+      document.getElementById('bulanTagihan').value = mArr[mIdx] + yCode;
       calcTotal();
       showAlert('Struk berhasil diparse!');
     }
