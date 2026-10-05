@@ -420,14 +420,14 @@ export function ReceiptForm({
               )}
             </button>
 
-            {/* 2. Clear / Reset */}
+            {/* 2. Clear / Reset (Warna Background Menarik & Jelas) */}
             <button
               type="button"
               onClick={handleClearAll}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300 shadow-2xs cursor-pointer active:scale-[0.98]"
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-rose-500 via-rose-600 to-red-600 hover:from-rose-600 hover:via-rose-700 hover:to-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all border border-rose-400/50 shadow-md hover:shadow-rose-500/25 cursor-pointer active:scale-[0.98]"
               title="Bersihkan teks input dan kosongkan isian form"
             >
-              <RotateCcw className="w-4 h-4 text-slate-500" />
+              <RotateCcw className="w-4 h-4 text-white" />
               <span>Clear / Reset</span>
             </button>
 
