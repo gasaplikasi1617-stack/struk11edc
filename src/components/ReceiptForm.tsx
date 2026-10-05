@@ -398,39 +398,13 @@ export function ReceiptForm({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300 cursor-pointer"
-              title="Bersihkan teks input dan kosongkan isian form"
-            >
-              <RotateCcw className="w-4 h-4 text-slate-500" />
-              <span>Clear / Reset</span>
-            </button>
-            <button
-              type="button"
-              disabled={isParsing}
-              onClick={handleParse}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {isParsing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Memproses AI...</span>
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  <span>Input</span>
-                </>
-              )}
-            </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* 1. QZ/Tray */}
             <button
               type="button"
               disabled={isQzPrinting}
               onClick={handleQzTrayAction}
-              className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer border border-emerald-500/70"
+              className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer border border-emerald-500/70 active:scale-[0.98]"
               title="Cetak langsung ke Epson LX-310 via QZ Tray & Otomatis Simpan ke Riwayat"
             >
               {isQzPrinting ? (
@@ -442,6 +416,38 @@ export function ReceiptForm({
                 <>
                   <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
                   <span>QZ/Tray</span>
+                </>
+              )}
+            </button>
+
+            {/* 2. Clear / Reset */}
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300 shadow-2xs cursor-pointer active:scale-[0.98]"
+              title="Bersihkan teks input dan kosongkan isian form"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-500" />
+              <span>Clear / Reset</span>
+            </button>
+
+            {/* 3. Input (Background Menarik & Eye-Catching) */}
+            <button
+              type="button"
+              disabled={isParsing}
+              onClick={handleParse}
+              className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:via-indigo-700 hover:to-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md hover:shadow-indigo-500/30 transition-all disabled:opacity-50 cursor-pointer border border-indigo-400/40 active:scale-[0.98]"
+              title="Proses teks tagihan otomatis ke form"
+            >
+              {isParsing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-200" />
+                  <span>Memproses AI...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span className="tracking-wide">Input</span>
                 </>
               )}
             </button>
@@ -607,32 +613,6 @@ export function ReceiptForm({
               Terbilang: {formatTerbilang(Number(receipt.totalBayar || 0))}
             </div>
           )}
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={async () => {
-              const res = await onSave();
-              if (res) {
-                handleClearAll();
-              }
-            }}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
-            title="Simpan data transaksi ke riwayat & otomatis kosongkan form untuk input baru"
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Simpan</span>
-          </button>
-          <button
-            type="button"
-            onClick={onPrint}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
-            title="Cetak resi ukuran A6 dan otomatis menyimpan data transaksi ke riwayat"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Cetak</span>
-          </button>
         </div>
       </div>
     </div>
