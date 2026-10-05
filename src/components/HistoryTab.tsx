@@ -679,98 +679,90 @@ export function HistoryTab({
             </div>
           </div>
 
-          {/* Action Buttons Toolbar */}
-          <div className="flex flex-wrap items-center gap-2 self-start xl:self-center">
-            {/* Kelompok 1: Operasional Utama & Sinkronisasi */}
-            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
-              {/* Export Excel */}
-              <button
-                id="btn-export-excel"
-                onClick={handleExportToExcel}
-                disabled={sortedAndFiltered.length === 0}
-                className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Export data tersaring ke format Microsoft Excel (.xlsx)"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Export</span>
-                {sortedAndFiltered.length > 0 && (
-                  <span className="bg-emerald-700/80 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
-                    {sortedAndFiltered.length}
-                  </span>
-                )}
-              </button>
+          {/* Action Buttons Toolbar - Sebaris Rapi */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 self-start xl:self-center">
+            {/* 1. Export Excel */}
+            <button
+              id="btn-export-excel"
+              onClick={handleExportToExcel}
+              disabled={sortedAndFiltered.length === 0}
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Export data tersaring ke format Microsoft Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Export</span>
+              {sortedAndFiltered.length > 0 && (
+                <span className="bg-emerald-700/80 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium">
+                  {sortedAndFiltered.length}
+                </span>
+              )}
+            </button>
 
-              {/* Sinkron GAS */}
-              <button
-                id="btn-gas-sync-history"
-                onClick={handleGasSyncClick}
-                disabled={isSyncingGas}
-                className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Sinkronisasi 2 arah dengan Google Sheets"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
-                <span>{isSyncingGas ? 'Sinkron...' : 'Sinkron'}</span>
-              </button>
+            {/* 2. Sinkron GAS */}
+            <button
+              id="btn-gas-sync-history"
+              onClick={handleGasSyncClick}
+              disabled={isSyncingGas}
+              className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Sinkronisasi 2 arah dengan Google Sheets"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
+              <span>{isSyncingGas ? 'Sinkron...' : 'Sinkron'}</span>
+            </button>
 
-              {/* Sinkron Sheets Persis */}
-              <button
-                id="btn-force-sync-sheets"
-                onClick={handleForceSyncFromSheets}
-                disabled={isForceSyncing}
-                className="h-8 px-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/70"
-                title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
-                <span>{isForceSyncing ? 'Menyamakan...' : 'Sheet'}</span>
-              </button>
-            </div>
+            {/* 3. Sheet */}
+            <button
+              id="btn-force-sync-sheets"
+              onClick={handleForceSyncFromSheets}
+              disabled={isForceSyncing}
+              className="h-8 px-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer border border-teal-500/70 shrink-0"
+              title="Tarik seluruh transaksi dari Google Sheets dan samakan persis di perangkat ini"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isForceSyncing ? 'animate-spin' : ''}`} />
+              <span>{isForceSyncing ? 'Menyamakan...' : 'Sheet'}</span>
+            </button>
 
-            {/* Kelompok 2: Cadangan & Pengelolaan */}
-            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
-              {/* Restore Data */}
-              <button
-                id="btn-restore-data"
-                onClick={() => setIsRestoreModalOpen(true)}
-                className="h-8 px-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Restore / upload data dari file backup JSON"
-              >
-                <UploadCloud className="w-3.5 h-3.5" />
-                <span>Restore</span>
-              </button>
+            {/* 4. Restore */}
+            <button
+              id="btn-restore-data"
+              onClick={() => setIsRestoreModalOpen(true)}
+              className="h-8 px-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Restore / upload data dari file backup JSON"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Restore</span>
+            </button>
 
-              {/* Tutup Buku */}
-              <button
-                id="btn-monthly-reset"
-                onClick={() => setIsMonthlyResetModalOpen(true)}
-                className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & mulai bulan baru"
-              >
-                <Archive className="w-3.5 h-3.5" />
-                <span>Tutup Buku</span>
-              </button>
-            </div>
+            {/* 5. Tutup Buku */}
+            <button
+              id="btn-monthly-reset"
+              onClick={() => setIsMonthlyResetModalOpen(true)}
+              className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Tutup buku bulanan: cadangkan data lama ke Excel/JSON & mulai bulan baru"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Tutup Buku</span>
+            </button>
 
-            {/* Kelompok 3: Zona Bahaya / Hapus (Dipisahkan secara jelas dengan border pelindung) */}
-            <div className="flex items-center pl-1 sm:pl-2 border-l border-slate-200">
-              <button
-                id="btn-clear-all-history"
-                type="button"
-                onClick={() => {
-                  if (transactions.length === 0) {
-                    alert('Riwayat transaksi sudah kosong (0 data).');
-                    return;
-                  }
-                  setConfirmClearChecked(false);
-                  setIsClearAllModalOpen(true);
-                }}
-                disabled={isClearingAll || transactions.length === 0}
-                className="h-8 px-3 bg-white hover:bg-rose-50 border border-rose-200/80 hover:border-rose-400 text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:border-slate-200 disabled:text-slate-400 text-xs font-semibold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
-                title="Hapus riwayat transaksi (dilengkapi konfirmasi keamanan)"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                <span>Hapus</span>
-              </button>
-            </div>
+            {/* 6. Hapus (Background Kuning) */}
+            <button
+              id="btn-clear-all-history"
+              type="button"
+              onClick={() => {
+                if (transactions.length === 0) {
+                  alert('Riwayat transaksi sudah kosong (0 data).');
+                  return;
+                }
+                setConfirmClearChecked(false);
+                setIsClearAllModalOpen(true);
+              }}
+              disabled={isClearingAll || transactions.length === 0}
+              className="h-8 px-3 bg-yellow-400 hover:bg-yellow-500 disabled:bg-slate-200 disabled:text-slate-400 text-slate-900 border border-yellow-500 hover:border-yellow-600 text-xs font-bold rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Hapus riwayat transaksi (dilengkapi konfirmasi keamanan)"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-slate-900" />
+              <span>Hapus</span>
+            </button>
           </div>
         </div>
 

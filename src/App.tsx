@@ -496,6 +496,7 @@ export default function App() {
                   setAgentConfig={setAgentConfig}
                   onSave={handleSaveTransaction}
                   onPrint={handlePrint}
+                  onReset={handleResetForm}
                   resetTrigger={resetTrigger}
                 />
               </div>

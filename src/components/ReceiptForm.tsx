@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AgentConfig, ReceiptData } from '../types';
-import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer, RotateCcw, Trash2 } from 'lucide-react';
+import { Wand2, Sparkles, RefreshCw, CheckCircle2, CheckCircle, Building, MapPin, Phone, Printer, RotateCcw, Trash2, Zap } from 'lucide-react';
 import { formatReceiptDateTime, generateRandomTransactionId } from '../utils/dateFormatter';
 import { extractIdpelFromLines, cleanExtractedId, formatPeriod3Chars, getPreviousMonthPeriod, getCurrentMonthPeriod, getDefaultBulanTagihan, isPdamBill } from '../utils/billParser';
 import { formatTerbilang } from '../utils/terbilang';
+import { printDirectQZTray } from '../utils/qzTrayPrinter';
 
 interface ReceiptFormProps {
   receipt: ReceiptData;
@@ -12,6 +13,7 @@ interface ReceiptFormProps {
   setAgentConfig: React.Dispatch<React.SetStateAction<AgentConfig>>;
   onSave: (force?: boolean) => any | Promise<any>;
   onPrint: () => void;
+  onReset?: () => void;
   resetTrigger?: number;
 }
 
@@ -22,6 +24,7 @@ export function ReceiptForm({
   setAgentConfig,
   onSave,
   onPrint,
+  onReset,
   resetTrigger,
 }: ReceiptFormProps) {
   const [rawText, setRawText] = useState('');
@@ -326,6 +329,50 @@ export function ReceiptForm({
     });
   };
 
+  const [isQzPrinting, setIsQzPrinting] = useState(false);
+
+  const handleQzTrayAction = async () => {
+    let currentReceipt = { ...receipt };
+    if (rawText.trim() && (!currentReceipt.namaPelanggan || currentReceipt.namaPelanggan === 'PELANGGAN' || !currentReceipt.totalBayar)) {
+      const d = clientParse(rawText);
+      currentReceipt = { ...currentReceipt, ...d };
+      setReceipt(currentReceipt);
+    }
+
+    if (!currentReceipt.namaPelanggan && !currentReceipt.idpel && (!currentReceipt.totalBayar || currentReceipt.totalBayar <= 0)) {
+      alert("Silakan masukkan teks mentah atau isi data tagihan terlebih dahulu sebelum mencetak!");
+      return;
+    }
+
+    setIsQzPrinting(true);
+    setParseNote('Menyimpan ke riwayat & menghubungkan ke QZ Tray...');
+
+    try {
+      // 1. Simpan ke database / riwayat
+      await onSave(true);
+
+      // 2. Cetak langsung via QZ Tray (Epson LX-310)
+      const printedTo = await printDirectQZTray(currentReceipt);
+      setParseNote(`SUKSES! Data tersimpan & struk dikirim ke ${printedTo} via QZ Tray.`);
+
+      // 3. Reset form
+      if (onReset) {
+        onReset();
+      } else {
+        handleClearAll();
+      }
+    } catch (err: any) {
+      console.warn('QZ Tray direct print warning:', err);
+      alert(
+        `Data transaksi BERHASIL DISIMPAN ke riwayat.\n\n` +
+        `Untuk mencetak via QZ Tray: Pastikan program QZ Tray sudah terbuka dan aktif (ikon hijau di dekat jam Windows).\n\n` +
+        `Detail: ${err.message || String(err)}`
+      );
+    } finally {
+      setIsQzPrinting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. Paste & Parse Section */}
@@ -351,11 +398,11 @@ export function ReceiptForm({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={handleClearAll}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300"
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-slate-300 cursor-pointer"
               title="Bersihkan teks input dan kosongkan isian form"
             >
               <RotateCcw className="w-4 h-4 text-slate-500" />
@@ -365,7 +412,7 @@ export function ReceiptForm({
               type="button"
               disabled={isParsing}
               onClick={handleParse}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50 cursor-pointer"
             >
               {isParsing ? (
                 <>
@@ -376,6 +423,25 @@ export function ReceiptForm({
                 <>
                   <Wand2 className="w-4 h-4" />
                   <span>Input</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              disabled={isQzPrinting}
+              onClick={handleQzTrayAction}
+              className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer border border-emerald-500/70"
+              title="Cetak langsung ke Epson LX-310 via QZ Tray & Otomatis Simpan ke Riwayat"
+            >
+              {isQzPrinting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                  <span>Mencetak QZ...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>QZ/Tray</span>
                 </>
               )}
             </button>
